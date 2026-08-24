@@ -1,5 +1,6 @@
 import * as Device from "expo-device";
-import { Platform, StyleSheet } from "react-native";
+import { Link } from "expo-router";
+import { Platform, Pressable, StyleSheet, Text } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AnimatedIcon } from "@/components/animated-icon";
@@ -38,6 +39,17 @@ export default function HomeScreen() {
             Welcome to&nbsp;Expo
           </ThemedText>
         </ThemedView>
+
+        <Link href="/login" asChild>
+          <Pressable
+            className="h-11 items-center justify-center rounded-full bg-black px-6 dark:bg-white"
+            style={({ pressed }) => pressed && { opacity: 0.7 }}
+          >
+            <Text className="text-base font-semibold text-white dark:text-black">
+              앱 들어가기
+            </Text>
+          </Pressable>
+        </Link>
 
         <ThemedText type="code" style={styles.code}>
           get started
