@@ -1,14 +1,15 @@
 {
   "expo": {
-    "name": "swyp6-team8-app",
-    "slug": "swyp6-team8-app",
+    "name": "unstiff",
+    "slug": "unstiff",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "swyp6team8app",
+    "scheme": "unstiff",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.percent8.unstiff"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.percent8.unstiff"
     },
     "web": {
       "output": "static",
