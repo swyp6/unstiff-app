@@ -12,6 +12,7 @@ export function SocialLoginButtons() {
       />
       <SocialLoginButton
         provider="kakao"
+        label="카카오로 계속하기"
         onPress={() => console.log("kakao login pressed")}
       />
       <SocialLoginButton
