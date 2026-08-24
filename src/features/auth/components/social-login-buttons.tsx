@@ -4,7 +4,7 @@ import { SocialLoginButton } from "./social-login-button";
 
 export function SocialLoginButtons() {
   return (
-    <View className="w-full gap-3">
+    <View className="items-center gap-3">
       <SocialLoginButton
         provider="apple"
         label="Apple로 계속하기"

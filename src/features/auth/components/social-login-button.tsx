@@ -11,7 +11,13 @@ export type SocialLoginButtonProps = {
 };
 
 const KAKAO_BUTTON_IMAGE = require("@/assets/social-login/kakao-login-button.png");
-const KAKAO_BUTTON_ASPECT_RATIO = 183 / 45;
+
+// Shared size for all three buttons. Kakao's official asset can't be
+// stretched to fill a wider box (brand guideline forbids resizing the
+// symbol/ratio), so instead every button is sized to this same box and
+// centered — Kakao's image just renders at its natural aspect ratio inside
+// it via `contentFit="contain"`, instead of being the odd one out.
+const BUTTON_SIZE_CLASS = "h-[45px] w-72";
 
 export function SocialLoginButton({
   provider,
@@ -24,16 +30,12 @@ export function SocialLoginButton({
     return (
       <Pressable
         onPress={onPress}
-        className="h-[45px] w-full"
+        className={BUTTON_SIZE_CLASS}
         style={({ pressed }) => pressed && { opacity: 0.7 }}
       >
         <Image
           source={KAKAO_BUTTON_IMAGE}
-          style={{
-            width: "100%",
-            height: "100%",
-            aspectRatio: KAKAO_BUTTON_ASPECT_RATIO,
-          }}
+          style={{ width: "100%", height: "100%" }}
           contentFit="contain"
         />
       </Pressable>
@@ -57,8 +59,8 @@ export function SocialLoginButton({
       onPress={onPress}
       className={
         isApple
-          ? "h-[45px] w-full flex-row items-center justify-center gap-2 rounded-full bg-black dark:border dark:border-[#DADCE0] dark:bg-white"
-          : "h-[45px] w-full flex-row items-center justify-center gap-2 rounded-full border border-[#DADCE0] bg-white"
+          ? `${BUTTON_SIZE_CLASS} flex-row items-center justify-center gap-2 rounded-full bg-black dark:border dark:border-[#DADCE0] dark:bg-white`
+          : `${BUTTON_SIZE_CLASS} flex-row items-center justify-center gap-2 rounded-full border border-[#DADCE0] bg-white`
       }
       style={({ pressed }) => pressed && { opacity: 0.7 }}
     >
