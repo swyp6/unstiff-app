@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { Pressable, Text, useColorScheme } from "react-native";
+import { Text, useColorScheme } from "react-native";
+
+import { Button, buttonTextVariants } from "@/components/ui/button";
 
 export type SocialProvider = "apple" | "kakao" | "google";
 
@@ -13,51 +15,18 @@ export type SocialLoginButtonProps = {
 const KAKAO_SYMBOL_IMAGE = require("@/assets/social-login/kakao-symbol.png");
 const GOOGLE_LOGO_IMAGE = require("@/assets/social-login/google-logo.png");
 
-// Shared size/shape for all three buttons so they read as one button group.
-const BUTTON_SIZE_CLASS =
-  "h-[45px] w-72 flex-row items-center justify-center gap-2 rounded-full";
-
-const PROVIDER_STYLES: Record<
-  SocialProvider,
-  { container: string; containerDark?: string; text: string; textDark?: string }
-> = {
-  apple: {
-    container: "bg-black",
-    containerDark: "border border-[#DADCE0] bg-white",
-    text: "text-white",
-    textDark: "text-black",
-  },
-  kakao: {
-    container: "bg-[#FEE500]",
-    text: "text-black/85",
-  },
-  google: {
-    container: "border border-[#DADCE0] bg-white",
-    text: "text-[#3C4043]",
-  },
-};
-
 export function SocialLoginButton({
   provider,
   label,
   onPress,
 }: SocialLoginButtonProps) {
   const isDark = useColorScheme() === "dark";
-  const styles = PROVIDER_STYLES[provider];
 
   return (
-    <Pressable
-      onPress={onPress}
-      className={`${BUTTON_SIZE_CLASS} ${isDark && styles.containerDark ? styles.containerDark : styles.container}`}
-      style={({ pressed }) => pressed && { opacity: 0.7 }}
-    >
+    <Button variant={provider} onPress={onPress}>
       <SocialLoginIcon provider={provider} isDark={isDark} />
-      <Text
-        className={`text-base font-semibold ${isDark && styles.textDark ? styles.textDark : styles.text}`}
-      >
-        {label}
-      </Text>
-    </Pressable>
+      <Text className={buttonTextVariants({ variant: provider })}>{label}</Text>
+    </Button>
   );
 }
 
