@@ -34,7 +34,9 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "@react-native-kakao/core",
+      "expo-build-properties"
     ],
     "experiments": {
       "typedRoutes": true,
