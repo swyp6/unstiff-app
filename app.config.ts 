@@ -1,0 +1,24 @@
+import { ConfigContext, ExpoConfig } from 'expo/config';
+
+export default ({ config }: ConfigContext): ExpoConfig => {
+  const kakaoNativeAppKey = process.env.KAKAO_NATIVE_APP_KEY;
+
+  if (!kakaoNativeAppKey) {
+    throw new Error(
+      'KAKAO_NATIVE_APP_KEY is not defined. Please check your .env.local file.',
+    );
+  }
+
+  return {
+    ...config,
+    plugins: [
+      ...(config.plugins ?? []),
+      [
+        '@react-native-kakao/core',
+        {
+          nativeAppKey: kakaoNativeAppKey,
+        },
+      ],
+    ],
+  };
+};

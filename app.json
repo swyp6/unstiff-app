@@ -35,8 +35,17 @@
           "imageWidth": 76
         }
       ],
-      "@react-native-kakao/core",
-      "expo-build-properties"
+
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "extraMavenRepos": [
+              "https://devrepo.kakao.com/nexus/content/groups/public/"
+            ]
+          }
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
