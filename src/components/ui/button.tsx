@@ -38,6 +38,7 @@ export type ButtonProps = Omit<PressableProps, "style"> &
 export function Button({ variant, size, className, ...props }: ButtonProps) {
   return (
     <Pressable
+      accessibilityRole="button"
       className={cn(buttonVariants({ variant, size }), className)}
       style={({ pressed }) => pressed && { opacity: 0.7 }}
       {...props}

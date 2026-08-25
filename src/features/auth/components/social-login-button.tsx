@@ -23,7 +23,7 @@ export function SocialLoginButton({
   const isDark = useColorScheme() === "dark";
 
   return (
-    <Button variant={provider} onPress={onPress}>
+    <Button variant={provider} onPress={onPress} accessibilityLabel={label}>
       <SocialLoginIcon provider={provider} isDark={isDark} />
       <Text className={buttonTextVariants({ variant: provider })}>{label}</Text>
     </Button>
