@@ -1,8 +1,7 @@
 import { requireNativeViewManager } from "expo-modules-core";
 import type { ComponentType } from "react";
-import type { ViewProps } from "react-native";
 
-export type KakaoMapViewProps = ViewProps;
+import type { KakaoMapViewProps } from "./KakaoMap.types";
 
 const NativeKakaoMapView: ComponentType<KakaoMapViewProps> =
   requireNativeViewManager("KakaoMap");

@@ -27,6 +27,22 @@ public class KakaoMapModule: Module {
       return true
     }.runOnQueue(.main)
 
-    View(KakaoMapView.self) {}
+    View(KakaoMapView.self) {
+      Prop("latitude") { (view: KakaoMapView, latitude: Double) in
+        view.latitude = latitude
+      }
+
+      Prop("longitude") { (view: KakaoMapView, longitude: Double) in
+        view.longitude = longitude
+      }
+
+      Prop("level", 17) { (view: KakaoMapView, level: Int) in
+        view.level = level
+      }
+
+      OnViewDidUpdateProps { (view: KakaoMapView) in
+        view.applyProps()
+      }
+    }
   }
 }

@@ -37,7 +37,14 @@ export default function MapScreen() {
   }, []);
 
   if (initializationStatus === "ready") {
-    return <KakaoMapView style={{ flex: 1 }} />;
+    return (
+      <KakaoMapView
+        style={{ flex: 1 }}
+        latitude={37.566691}
+        longitude={126.978365}
+        level={17}
+      />
+    );
   }
 
   return (

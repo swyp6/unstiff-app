@@ -3,10 +3,21 @@ import KakaoMapsSDK
 import UIKit
 
 final class KakaoMapView: ExpoView, MapControllerDelegate {
+  private struct CameraState: Equatable {
+    let latitude: Double
+    let longitude: Double
+    let level: Int
+  }
+
+  var latitude: Double?
+  var longitude: Double?
+  var level = 17
+
   private var viewContainer: KMViewContainer?
   private var controller: KMController?
   private var isPrepared = false
   private var didAddMapView = false
+  private var appliedCamera: CameraState?
   private var isObservingApplicationLifecycle = false
 
   required init(appContext: AppContext? = nil) {
@@ -39,18 +50,19 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
   }
 
   func addViews() {
-    guard !didAddMapView else {
+    guard !didAddMapView, let camera = cameraState else {
       return
     }
 
     didAddMapView = true
+    appliedCamera = camera
 
-    let position = MapPoint(longitude: 126.978365, latitude: 37.566691)
+    let position = MapPoint(longitude: camera.longitude, latitude: camera.latitude)
     let mapViewInfo = MapviewInfo(
       viewName: "mapview",
       viewInfoName: "map",
       defaultPosition: position,
-      defaultLevel: 17
+      defaultLevel: camera.level
     )
 
     controller?.addView(mapViewInfo)
@@ -62,6 +74,7 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
 
   func addViewSucceeded(_ viewName: String, viewInfoName: String) {
     print("[KakaoMap] map view added")
+    updateCameraIfPossible()
   }
 
   func addViewFailed(_ viewName: String, viewInfoName: String) {
@@ -76,8 +89,34 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
     mapView.viewRect = CGRect(origin: .zero, size: size)
   }
 
+  func applyProps() {
+    startEngineIfPossible()
+    updateCameraIfPossible()
+  }
+
+  private var cameraState: CameraState? {
+    guard
+      let latitude,
+      latitude.isFinite,
+      (-90.0...90.0).contains(latitude),
+      let longitude,
+      longitude.isFinite,
+      (-180.0...180.0).contains(longitude),
+      (6...21).contains(level)
+    else {
+      return nil
+    }
+
+    return CameraState(latitude: latitude, longitude: longitude, level: level)
+  }
+
   private func startEngineIfPossible() {
-    guard window != nil, bounds.width > 0, bounds.height > 0 else {
+    guard
+      window != nil,
+      bounds.width > 0,
+      bounds.height > 0,
+      cameraState != nil
+    else {
       return
     }
 
@@ -124,10 +163,31 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
       controller?.resetEngine()
       isPrepared = false
       didAddMapView = false
+      appliedCamera = nil
       controller = nil
       viewContainer?.removeFromSuperview()
       viewContainer = nil
     }
+  }
+
+  private func updateCameraIfPossible() {
+    guard
+      let camera = cameraState,
+      camera != appliedCamera,
+      let mapView = controller?.getView("mapview") as? KakaoMap
+    else {
+      return
+    }
+
+    let target = MapPoint(longitude: camera.longitude, latitude: camera.latitude)
+    let cameraUpdate = CameraUpdate.make(
+      target: target,
+      zoomLevel: camera.level,
+      mapView: mapView
+    )
+
+    mapView.moveCamera(cameraUpdate)
+    appliedCamera = camera
   }
 
   private func addApplicationLifecycleObservers() {
