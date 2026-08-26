@@ -34,7 +34,8 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      "./modules/kakao-map/app.plugin.js"
     ],
     "experiments": {
       "typedRoutes": true,
