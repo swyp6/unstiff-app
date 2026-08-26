@@ -5,12 +5,9 @@
   "dependencies": {
     "@expo/ui": "~57.0.11",
     "@expo/vector-icons": "^15.0.2",
-    "@react-native-kakao/core": "^2.2.7",
-    "@react-native-kakao/map": "^2.2.7",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "expo": "~57.0.13",
-    "expo-build-properties": "~57.0.14",
     "expo-constants": "~57.0.11",
     "expo-device": "~57.0.1",
     "expo-font": "~57.0.1",
