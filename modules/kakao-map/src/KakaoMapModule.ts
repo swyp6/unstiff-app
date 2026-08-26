@@ -1,5 +1,7 @@
 import { NativeModule, requireNativeModule } from "expo";
 
-declare class KakaoMapModule extends NativeModule<{}> {}
+declare class KakaoMapModule extends NativeModule<{}> {
+  initialize(): Promise<boolean>;
+}
 
 export default requireNativeModule<KakaoMapModule>("KakaoMap");
