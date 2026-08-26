@@ -26,5 +26,7 @@ public class KakaoMapModule: Module {
       KakaoMapModule.isInitialized = true
       return true
     }.runOnQueue(.main)
+
+    View(KakaoMapView.self) {}
   }
 }

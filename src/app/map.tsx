@@ -4,15 +4,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
-import KakaoMapModule from "../../modules/kakao-map";
+import KakaoMapModule, { KakaoMapView } from "../../modules/kakao-map";
 
 type InitializationStatus = "initializing" | "ready" | "error";
-
-const statusMessage: Record<InitializationStatus, string> = {
-  initializing: "지도 SDK 초기화 중...",
-  ready: "지도 SDK 초기화 완료",
-  error: "지도 SDK 초기화에 실패했습니다.",
-};
 
 export default function MapScreen() {
   const [initializationStatus, setInitializationStatus] =
@@ -42,6 +36,10 @@ export default function MapScreen() {
     };
   }, []);
 
+  if (initializationStatus === "ready") {
+    return <KakaoMapView style={{ flex: 1 }} />;
+  }
+
   return (
     <ThemedView style={{ flex: 1 }}>
       <SafeAreaView
@@ -53,8 +51,11 @@ export default function MapScreen() {
           gap: Spacing.six,
         }}
       >
-        <ThemedText type="title">지도 화면</ThemedText>
-        <ThemedText>{statusMessage[initializationStatus]}</ThemedText>
+        <ThemedText>
+          {initializationStatus === "error"
+            ? "지도를 불러올 수 없습니다."
+            : "지도 SDK 초기화 중..."}
+        </ThemedText>
       </SafeAreaView>
     </ThemedView>
   );
