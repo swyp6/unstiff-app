@@ -3,6 +3,8 @@ import KakaoMapsSDK
 import UIKit
 
 final class KakaoMapView: ExpoView, MapControllerDelegate {
+  private static let internalMapViewAdditionErrorCode = -10_001
+
   private struct CameraState: Equatable {
     let latitude: Double
     let longitude: Double
@@ -82,7 +84,12 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
   }
 
   func addViewFailed(_ viewName: String, viewInfoName: String) {
-    print("[KakaoMap] add view failed")
+    didAddMapView = false
+    appliedCamera = nil
+    onError([
+      "code": Self.internalMapViewAdditionErrorCode,
+      "message": "지도를 생성하지 못했습니다.",
+    ])
   }
 
   func containerDidResized(_ size: CGSize) {
