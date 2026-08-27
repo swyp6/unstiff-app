@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import * as Location from "expo-location";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -6,42 +7,99 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import KakaoMapModule, { KakaoMapView } from "../../modules/kakao-map";
 
-type InitializationStatus = "initializing" | "ready" | "error";
+type MapStatus =
+  "loading" | "ready" | "permission-denied" | "services-disabled" | "error";
+
+type CurrentLocation = {
+  latitude: number;
+  longitude: number;
+};
 
 export default function MapScreen() {
-  const [initializationStatus, setInitializationStatus] =
-    useState<InitializationStatus>("initializing");
+  const [status, setStatus] = useState<MapStatus>("loading");
+  const [currentLocation, setCurrentLocation] =
+    useState<CurrentLocation | null>(null);
 
   useEffect(() => {
     let isMounted = true;
 
-    const initializeKakaoMap = async () => {
+    const loadMap = async () => {
       try {
         const initialized = await KakaoMapModule.initialize();
 
-        if (isMounted) {
-          setInitializationStatus(initialized ? "ready" : "error");
+        if (!isMounted) {
+          return;
         }
+
+        if (!initialized) {
+          setStatus("error");
+          return;
+        }
+
+        const permission = await Location.getForegroundPermissionsAsync();
+
+        if (!isMounted) {
+          return;
+        }
+
+        const finalPermission =
+          permission.status === Location.PermissionStatus.GRANTED
+            ? permission
+            : await Location.requestForegroundPermissionsAsync();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (finalPermission.status !== Location.PermissionStatus.GRANTED) {
+          setStatus("permission-denied");
+          return;
+        }
+
+        const servicesEnabled = await Location.hasServicesEnabledAsync();
+
+        if (!isMounted) {
+          return;
+        }
+
+        if (!servicesEnabled) {
+          setStatus("services-disabled");
+          return;
+        }
+
+        const location = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCurrentLocation({
+          latitude: location.coords.latitude,
+          longitude: location.coords.longitude,
+        });
+        setStatus("ready");
       } catch {
         if (isMounted) {
-          setInitializationStatus("error");
+          setStatus("error");
         }
       }
     };
 
-    void initializeKakaoMap();
+    void loadMap();
 
     return () => {
       isMounted = false;
     };
   }, []);
 
-  if (initializationStatus === "ready") {
+  if (status === "ready" && currentLocation) {
     return (
       <KakaoMapView
         style={{ flex: 1 }}
-        latitude={37.566691}
-        longitude={126.978365}
+        latitude={currentLocation.latitude}
+        longitude={currentLocation.longitude}
         level={17}
       />
     );
@@ -59,9 +117,13 @@ export default function MapScreen() {
         }}
       >
         <ThemedText>
-          {initializationStatus === "error"
-            ? "지도를 불러올 수 없습니다."
-            : "지도 SDK 초기화 중..."}
+          {status === "permission-denied"
+            ? "현재 위치를 사용하려면 위치 권한이 필요합니다."
+            : status === "services-disabled"
+              ? "위치 서비스를 켜주세요."
+              : status === "error"
+                ? "현재 위치를 불러오지 못했습니다."
+                : "현재 위치를 불러오는 중..."}
         </ThemedText>
       </SafeAreaView>
     </ThemedView>

@@ -63,6 +63,17 @@ const config: ExpoConfig = {
     "expo-secure-store",
 
     "./modules/kakao-map/app.plugin.js",
+
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "현재 위치를 지도 중심에 표시하기 위해 위치 권한이 필요합니다.",
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        isIosBackgroundLocationEnabled: false,
+      },
+    ],
   ],
 
   experiments: {
