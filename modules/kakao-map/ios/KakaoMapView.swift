@@ -12,6 +12,7 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
   var latitude: Double?
   var longitude: Double?
   var level = 17
+  let onError = EventDispatcher()
 
   private var viewContainer: KMViewContainer?
   private var controller: KMController?
@@ -69,7 +70,10 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
   }
 
   func authenticationFailed(_ errorCode: Int, desc: String) {
-    print("[KakaoMap] authentication failed")
+    onError([
+      "code": errorCode,
+      "message": desc,
+    ])
   }
 
   func addViewSucceeded(_ viewName: String, viewInfoName: String) {

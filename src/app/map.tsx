@@ -25,14 +25,9 @@ export default function MapScreen() {
 
     const loadMap = async () => {
       try {
-        const initialized = await KakaoMapModule.initialize();
+        await KakaoMapModule.initialize();
 
         if (!isMounted) {
-          return;
-        }
-
-        if (!initialized) {
-          setStatus("error");
           return;
         }
 
@@ -101,6 +96,7 @@ export default function MapScreen() {
         latitude={currentLocation.latitude}
         longitude={currentLocation.longitude}
         level={17}
+        onError={() => setStatus("error")}
       />
     );
   }

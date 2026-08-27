@@ -7,9 +7,9 @@ public class KakaoMapModule: Module {
   public func definition() -> ModuleDefinition {
     Name("KakaoMap")
 
-    AsyncFunction("initialize") { () throws -> Bool in
+    AsyncFunction("initialize") { () throws -> Void in
       if KakaoMapModule.isInitialized {
-        return true
+        return
       }
 
       guard
@@ -24,10 +24,11 @@ public class KakaoMapModule: Module {
 
       SDKInitializer.InitSDK(appKey: appKey)
       KakaoMapModule.isInitialized = true
-      return true
     }.runOnQueue(.main)
 
     View(KakaoMapView.self) {
+      Events("onError")
+
       Prop("latitude") { (view: KakaoMapView, latitude: Double) in
         view.latitude = latitude
       }
