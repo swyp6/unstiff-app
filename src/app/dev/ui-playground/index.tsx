@@ -11,25 +11,40 @@ export default function UiPlaygroundScreen() {
         UI Components
       </Text>
 
+      {/* Input */}
       <View className="mb-10">
         <Text className="mb-4 text-xl font-bold text-[#191F28]">Input</Text>
-        <Link href="/dev/ui-playground/text-field" asChild>
-          <Pressable className="rounded-lg border border-[#E5E8EB] px-4 py-4">
-            <Text className="text-base font-medium text-[#333D4B]">
-              TextField
-            </Text>
-          </Pressable>
-        </Link>
+
+        <View className="gap-3">
+          <Link href="/dev/ui-playground/text-field" asChild>
+            <Pressable className="rounded-lg border border-[#E5E8EB] px-4 py-4">
+              <Text className="text-base font-medium text-[#333D4B]">
+                TextField
+              </Text>
+            </Pressable>
+          </Link>
+
+          <Link href="/dev/ui-playground/textarea" asChild>
+            <Pressable className="rounded-lg border border-[#E5E8EB] px-4 py-4">
+              <Text className="text-base font-medium text-[#333D4B]">
+                Textarea
+              </Text>
+            </Pressable>
+          </Link>
+        </View>
       </View>
 
+      {/* Display */}
       <View className="mb-10">
         <Text className="text-xl font-bold text-[#191F28]">Display</Text>
       </View>
 
+      {/* Navigation */}
       <View className="mb-10">
         <Text className="text-xl font-bold text-[#191F28]">Navigation</Text>
       </View>
 
+      {/* Feedback */}
       <View className="mb-10">
         <Text className="text-xl font-bold text-[#191F28]">Feedback</Text>
       </View>
