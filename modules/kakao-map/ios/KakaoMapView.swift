@@ -29,8 +29,6 @@ final class KakaoMapView: ExpoView, MapControllerDelegate {
 
   deinit {
     removeApplicationLifecycleObservers()
-    controller?.pauseEngine()
-    controller?.resetEngine()
   }
 
   override func layoutSubviews() {
