@@ -19,6 +19,9 @@ export default function MapScreen() {
   const [status, setStatus] = useState<MapStatus>("loading");
   const [currentLocation, setCurrentLocation] =
     useState<CurrentLocation | null>(null);
+  const [nativeErrorMessage, setNativeErrorMessage] = useState<string | null>(
+    null,
+  );
 
   useEffect(() => {
     let isMounted = true;
@@ -96,7 +99,10 @@ export default function MapScreen() {
         latitude={currentLocation.latitude}
         longitude={currentLocation.longitude}
         level={17}
-        onError={() => setStatus("error")}
+        onError={({ nativeEvent }) => {
+          setNativeErrorMessage(nativeEvent.message);
+          setStatus("error");
+        }}
       />
     );
   }
@@ -118,7 +124,7 @@ export default function MapScreen() {
             : status === "services-disabled"
               ? "위치 서비스를 켜주세요."
               : status === "error"
-                ? "현재 위치를 불러오지 못했습니다."
+                ? nativeErrorMessage || "현재 위치를 불러오지 못했습니다."
                 : "현재 위치를 불러오는 중..."}
         </ThemedText>
       </SafeAreaView>
