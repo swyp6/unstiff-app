@@ -8,10 +8,12 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: "unstiff",
   userInterfaceStyle: "automatic",
+
   ios: {
-    icon: "./assets/expo.icon",
+    icon: "./assets/images/icon.png",
     bundleIdentifier: "com.percent8.unstiff",
   },
+
   android: {
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
@@ -21,13 +23,21 @@ const config: ExpoConfig = {
     },
     predictiveBackGestureEnabled: false,
     package: "com.percent8.unstiff",
+
+    blockedPermissions: [
+      "android.permission.ACCESS_COARSE_LOCATION",
+      "android.permission.ACCESS_FINE_LOCATION",
+    ],
   },
+
   web: {
     output: "static",
     favicon: "./assets/images/favicon.png",
   },
+
   plugins: [
     "expo-router",
+
     [
       "expo-splash-screen",
       {
@@ -36,12 +46,14 @@ const config: ExpoConfig = {
         imageWidth: 76,
       },
     ],
+
     [
       "@react-native-seoul/kakao-login",
       {
         kakaoAppKey: process.env.KAKAO_NATIVE_APP_KEY,
       },
     ],
+
     [
       "expo-build-properties",
       {
@@ -52,8 +64,23 @@ const config: ExpoConfig = {
         },
       },
     ],
+
     "expo-secure-store",
+
+    "./modules/kakao-map/app.plugin.js",
+
+    [
+      "expo-location",
+      {
+        locationWhenInUsePermission:
+          "현재 위치를 지도 중심에 표시하기 위해 위치 권한이 필요합니다.",
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        isIosBackgroundLocationEnabled: false,
+      },
+    ],
   ],
+
   experiments: {
     typedRoutes: true,
     reactCompiler: true,

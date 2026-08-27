@@ -51,6 +51,19 @@ export default function HomeScreen() {
           </Pressable>
         </Link>
 
+        {Platform.OS === "ios" && (
+          <Link href="/map" asChild>
+            <Pressable
+              className="h-11 items-center justify-center rounded-full bg-black px-6 dark:bg-white"
+              style={({ pressed }) => pressed && { opacity: 0.7 }}
+            >
+              <Text className="text-base font-semibold text-white dark:text-black">
+                지도 들어가기
+              </Text>
+            </Pressable>
+          </Link>
+        )}
+
         <ThemedText type="code" style={styles.code}>
           get started
         </ThemedText>
