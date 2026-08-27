@@ -15,6 +15,10 @@ type CurrentLocation = {
   longitude: number;
 };
 
+const CURRENT_LOCATION_TIMEOUT_MS = 10_000;
+const LAST_KNOWN_LOCATION_MAX_AGE_MS = 3 * 60 * 1_000;
+const LAST_KNOWN_LOCATION_REQUIRED_ACCURACY_M = 300;
+
 export default function MapScreen() {
   const [status, setStatus] = useState<MapStatus>("loading");
   const [currentLocation, setCurrentLocation] =
@@ -25,6 +29,27 @@ export default function MapScreen() {
 
   useEffect(() => {
     let isMounted = true;
+    let locationTimeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    const getCurrentPositionWithTimeout = async () => {
+      try {
+        return await Promise.race([
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          }),
+          new Promise<never>((_, reject) => {
+            locationTimeoutId = setTimeout(() => {
+              reject(new Error("Current location request timed out"));
+            }, CURRENT_LOCATION_TIMEOUT_MS);
+          }),
+        ]);
+      } finally {
+        if (locationTimeoutId !== undefined) {
+          clearTimeout(locationTimeoutId);
+          locationTimeoutId = undefined;
+        }
+      }
+    };
 
     const loadMap = async () => {
       try {
@@ -65,11 +90,23 @@ export default function MapScreen() {
           return;
         }
 
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
+        let location: Location.LocationObject | null;
+
+        try {
+          location = await getCurrentPositionWithTimeout();
+        } catch {
+          location = await Location.getLastKnownPositionAsync({
+            maxAge: LAST_KNOWN_LOCATION_MAX_AGE_MS,
+            requiredAccuracy: LAST_KNOWN_LOCATION_REQUIRED_ACCURACY_M,
+          });
+        }
 
         if (!isMounted) {
+          return;
+        }
+
+        if (!location) {
+          setStatus("error");
           return;
         }
 
@@ -89,6 +126,11 @@ export default function MapScreen() {
 
     return () => {
       isMounted = false;
+
+      if (locationTimeoutId !== undefined) {
+        clearTimeout(locationTimeoutId);
+        locationTimeoutId = undefined;
+      }
     };
   }, []);
 
