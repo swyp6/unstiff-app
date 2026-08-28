@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { platformKeyValueStorage } from "@/lib/persisted-storage";
+import {
+  markHydratedOnRehydrate,
+  platformKeyValueStorage,
+} from "@/lib/persisted-storage";
 
 type OnboardingState = {
   hasCompletedOnboarding: boolean;
@@ -26,9 +29,7 @@ export const useOnboardingStore = create<OnboardingState>()(
       partialize: (state) => ({
         hasCompletedOnboarding: state.hasCompletedOnboarding,
       }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
-      },
+      onRehydrateStorage: markHydratedOnRehydrate,
     },
   ),
 );

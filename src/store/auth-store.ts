@@ -1,7 +1,10 @@
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 
-import { platformKeyValueStorage } from "@/lib/persisted-storage";
+import {
+  markHydratedOnRehydrate,
+  platformKeyValueStorage,
+} from "@/lib/persisted-storage";
 
 type AuthState = {
   accessToken: string | null;
@@ -24,9 +27,7 @@ export const useAuthStore = create<AuthState>()(
       name: "auth-storage",
       storage: createJSONStorage(() => platformKeyValueStorage),
       partialize: (state) => ({ accessToken: state.accessToken }),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
-      },
+      onRehydrateStorage: markHydratedOnRehydrate,
     },
   ),
 );

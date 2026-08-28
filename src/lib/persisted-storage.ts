@@ -22,3 +22,17 @@ export const platformKeyValueStorage =
         setItem: SecureStore.setItemAsync,
         removeItem: SecureStore.deleteItemAsync,
       };
+
+// zustand's persist middleware calls the returned callback as
+// `(state, error)`, where `state` is only defined on a successful read —
+// on a failed one (corrupted JSON, a SecureStore error) it's `undefined`.
+// Reading `initialState` from the outer closure instead (always defined,
+// since it's `get() ?? configResult`) makes hydration finish either way,
+// instead of leaving `hasHydrated` stuck at false forever on a read error.
+export function markHydratedOnRehydrate<
+  T extends { setHasHydrated: (value: boolean) => void },
+>(initialState: T) {
+  return () => {
+    initialState.setHasHydrated(true);
+  };
+}

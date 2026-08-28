@@ -1,5 +1,5 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -51,26 +51,31 @@ export default function OnboardingScreen() {
     router.replace("/login");
   }
 
-  function goToNextStep() {
-    if (step >= STEPS.length - 1) return;
+  // Gesture.Pan() below is memoized to build the gesture config once rather
+  // than on every render, so these read/clamp the step via the functional
+  // setState form instead of closing over the `step` state value directly.
+  const goToNextStep = useCallback(() => {
     setDirection("forward");
-    setStep(step + 1);
-  }
+    setStep((current) => Math.min(current + 1, STEPS.length - 1));
+  }, []);
 
-  function goToPreviousStep() {
-    if (step <= 0) return;
+  const goToPreviousStep = useCallback(() => {
     setDirection("backward");
-    setStep(step - 1);
-  }
+    setStep((current) => Math.max(current - 1, 0));
+  }, []);
 
-  const swipeGesture = Gesture.Pan().onEnd((event) => {
-    "worklet";
-    if (event.translationX < -SWIPE_THRESHOLD) {
-      scheduleOnRN(goToNextStep);
-    } else if (event.translationX > SWIPE_THRESHOLD) {
-      scheduleOnRN(goToPreviousStep);
-    }
-  });
+  const swipeGesture = useMemo(
+    () =>
+      Gesture.Pan().onEnd((event) => {
+        "worklet";
+        if (event.translationX < -SWIPE_THRESHOLD) {
+          scheduleOnRN(goToNextStep);
+        } else if (event.translationX > SWIPE_THRESHOLD) {
+          scheduleOnRN(goToPreviousStep);
+        }
+      }),
+    [goToNextStep, goToPreviousStep],
+  );
 
   return (
     <ThemedView style={{ flex: 1 }}>
