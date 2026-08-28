@@ -20,6 +20,7 @@ export function StepCountCard() {
       await requestStepCountAuthorization();
       setStepCount(await getTodayStepCount());
     } catch (error) {
+      setStepCount(null);
       setErrorMessage(
         error instanceof Error
           ? error.message
