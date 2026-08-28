@@ -89,17 +89,21 @@ function rgbaToHex({ r, g, b, a }) {
   return a < 1 ? `${hex}${toHex(a)}` : hex;
 }
 
-function resolveValue(variables, variable, modeId, seen = new Set()) {
+function resolveValue(variables, collections, variable, seen = new Set()) {
   if (seen.has(variable.id)) {
     throw new Error(`Circular variable alias detected at "${variable.name}"`);
   }
   seen.add(variable.id);
 
+  // Always use the variable's own collection's default mode — an alias may
+  // point into a different collection, whose mode IDs aren't guaranteed to
+  // line up with the referring collection's.
+  const modeId = collections[variable.variableCollectionId].defaultModeId;
   const raw =
     variable.valuesByMode[modeId] ?? Object.values(variable.valuesByMode)[0];
   if (raw && typeof raw === "object" && raw.type === "VARIABLE_ALIAS") {
     const aliased = variables[raw.id];
-    return resolveValue(variables, aliased, modeId, seen);
+    return resolveValue(variables, collections, aliased, seen);
   }
   return raw;
 }
@@ -115,10 +119,8 @@ function buildTokens(apiResponse) {
   const radius = {};
 
   for (const variable of Object.values(variables)) {
-    const collection = collections[variable.variableCollectionId];
-    const modeId = collection.defaultModeId;
     const key = toKebab(variable.name);
-    const value = resolveValue(variables, variable, modeId);
+    const value = resolveValue(variables, collections, variable);
 
     if (variable.resolvedType === "COLOR") {
       const hex = rgbaToHex(value);
