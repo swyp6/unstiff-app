@@ -254,7 +254,8 @@ async function fetchFromRestApi() {
 }
 
 async function main() {
-  const inputPath = getInputPathArg() ?? DEFAULT_EXPORT_PATH;
+  const explicitInputPath = getInputPathArg();
+  const inputPath = explicitInputPath ?? DEFAULT_EXPORT_PATH;
   const rootDir = process.cwd();
   const resolvedInputPath = path.join(rootDir, inputPath);
 
@@ -262,6 +263,13 @@ async function main() {
   if (fs.existsSync(resolvedInputPath)) {
     console.log(`Reading Figma variables from ${inputPath}`);
     apiResponse = JSON.parse(fs.readFileSync(resolvedInputPath, "utf8"));
+  } else if (explicitInputPath) {
+    // An explicit --input that doesn't exist is a mistake (e.g. a typo'd
+    // path) — fail loudly instead of silently falling back to a different
+    // data source (the REST API), which could overwrite tokens with
+    // unintended remote values.
+    console.error(`--input file not found: ${inputPath}`);
+    process.exit(1);
   } else {
     console.log("No export file found, falling back to the Figma REST API");
     apiResponse = await fetchFromRestApi();
