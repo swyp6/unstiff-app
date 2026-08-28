@@ -6,7 +6,7 @@ import {
   TabTriggerSlotProps,
   TabListProps,
 } from "expo-router/ui";
-import { SymbolView, type AndroidSymbol } from "expo-symbols";
+import { SymbolView, type SFSymbol } from "expo-symbols";
 import { Pressable, useColorScheme, View, StyleSheet } from "react-native";
 
 import { ExternalLink } from "./external-link";
@@ -21,11 +21,14 @@ export default function AppTabs() {
       <TabSlot style={{ height: "100%" }} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
+          <TabTrigger name="home" href="/home" asChild>
             <TabButton icon="home">Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
-            <TabButton icon="map">Explore</TabButton>
+          <TabTrigger name="xp" href="/xp" asChild>
+            <TabButton icon="star">XP</TabButton>
+          </TabTrigger>
+          <TabTrigger name="mypage" href="/mypage" asChild>
+            <TabButton icon="person">마이페이지</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -33,12 +36,20 @@ export default function AppTabs() {
   );
 }
 
+type TabIconName = "home" | "star" | "person";
+
+const IOS_SYMBOL_NAMES: Record<TabIconName, SFSymbol> = {
+  home: "house",
+  star: "star",
+  person: "person",
+};
+
 export function TabButton({
   children,
   icon,
   isFocused,
   ...props
-}: TabTriggerSlotProps & { icon: AndroidSymbol }) {
+}: TabTriggerSlotProps & { icon: TabIconName }) {
   const colors = Colors[useColorScheme() === "dark" ? "dark" : "light"];
   return (
     <Pressable {...props} style={({ pressed }) => pressed && styles.pressed}>
@@ -48,7 +59,7 @@ export function TabButton({
       >
         <SymbolView
           tintColor={isFocused ? colors.text : colors.textSecondary}
-          name={{ ios: icon === "home" ? "house" : "map", web: icon }}
+          name={{ ios: IOS_SYMBOL_NAMES[icon], web: icon }}
           size={14}
         />
         <ThemedText

@@ -19,7 +19,7 @@ async function handleKakaoLogin() {
     const accessToken = await completeOAuthSignIn("kakao", kakaoIdToken);
     useAuthStore.getState().setAccessToken(accessToken);
     console.log("kakao login success!!!! ", { accessToken });
-    router.replace("/");
+    router.replace("/home");
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("kakao login failed", {
