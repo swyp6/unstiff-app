@@ -17,7 +17,7 @@ export default function LoginScreen() {
           gap: Spacing.six,
         }}
       >
-        <ThemedText type="title">환영합니다</ThemedText>
+        <ThemedText typography="title-1-bold">환영합니다</ThemedText>
         <SocialLoginButtons />
       </SafeAreaView>
     </ThemedView>

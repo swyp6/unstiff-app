@@ -1,0 +1,45 @@
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 12px;
+    padding: 12px;
+    color: #333;
+  }
+  button {
+    width: 100%;
+    padding: 8px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  p {
+    color: #666;
+    line-height: 1.5;
+  }
+</style>
+<button id="export">토큰 JSON 내보내기</button>
+<p id="status">
+  이 파일 안의 로컬 Variables(컬러/타이포/radius)를 JSON으로 다운로드합니다.
+</p>
+<script>
+  document.getElementById("export").onclick = () => {
+    parent.postMessage({ pluginMessage: { type: "export" } }, "*");
+  };
+
+  window.onmessage = (event) => {
+    const msg = event.data.pluginMessage;
+    if (!msg || msg.type !== "export-result") return;
+
+    const blob = new Blob([JSON.stringify(msg.data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "figma-variables-export.json";
+    a.click();
+    URL.revokeObjectURL(url);
+
+    document.getElementById("status").textContent =
+      "다운로드 완료 — 다운로드된 파일을 swyp6-team8-app/scripts/figma-variables-export.json 으로 옮긴 뒤 npm run sync-figma-tokens 실행하세요.";
+  };
+</script>

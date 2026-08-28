@@ -1,3 +1,5 @@
+const figmaTokens = require("./tailwind.tokens.js");
+
 /** @type {import("tailwindcss").Config} */
 module.exports = {
   content: [
@@ -9,10 +11,14 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        ...figmaTokens.colors,
+        // Brand colors for third-party login buttons — not part of the design system.
         kakao: "#FEE500",
         "google-border": "#DADCE0",
         "google-text": "#3C4043",
       },
+      fontSize: figmaTokens.fontSize,
+      borderRadius: figmaTokens.borderRadius,
     },
   },
   plugins: [],
