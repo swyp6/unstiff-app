@@ -9,7 +9,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { useOnboardingStore } from "@/store/onboarding-store";
 
 // No Figma design has been shared for this tab yet — placeholder screen with
-// just the logout actions wired up.
+// just the settings entry and logout actions wired up.
 export default function MyPageScreen() {
   function handleLogout() {
     Alert.alert("로그아웃", "로그아웃 하시겠어요?", [
@@ -59,6 +59,15 @@ export default function MyPageScreen() {
         >
           마이페이지
         </ThemedText>
+
+        <Pressable
+          className="items-center rounded-2xl border border-line-normal py-4"
+          accessibilityRole="button"
+          accessibilityLabel="설정"
+          onPress={() => router.push("/mypage/settings")}
+        >
+          <ThemedText typography="body-2-bold">설정</ThemedText>
+        </Pressable>
 
         <Pressable
           className="items-center rounded-2xl border border-line-normal py-4"
