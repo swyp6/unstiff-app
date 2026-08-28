@@ -156,9 +156,17 @@ function buildTokens(apiResponse) {
 
   const typography = {};
   for (const scale of TYPOGRAPHY_SCALE) {
+    const lineHeightToken = scale.lineHeightToken ?? scale.sizeToken;
     const size = fontSizeByToken[scale.sizeToken];
-    const lineHeight =
-      lineHeightByToken[scale.lineHeightToken ?? scale.sizeToken];
+    const lineHeight = lineHeightByToken[lineHeightToken];
+    if (typeof size !== "number" || typeof lineHeight !== "number") {
+      throw new Error(
+        `Typography scale "${scale.name}" expects Figma variables ` +
+          `font-size/${scale.sizeToken} and line-height/${lineHeightToken}, ` +
+          "but one is missing. Check TYPOGRAPHY_SCALE in " +
+          "scripts/sync-figma-tokens.js against the current Figma foundation.",
+      );
+    }
     for (const weight of scale.weights) {
       for (const [suffix, fontPrefix] of [
         ["", KOREAN_FONT_PREFIX],
