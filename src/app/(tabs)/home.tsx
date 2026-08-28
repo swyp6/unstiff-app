@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { useIsFocused } from "expo-router";
 import { useState } from "react";
 import { Modal, Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -53,6 +54,10 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
 
 export default function HomeScreen() {
   const theme = useTheme();
+  // Native tabs render every tab's screen eagerly, so without this guard the
+  // mission popup could appear over the xp/mypage tabs — it should only ever
+  // show while the home tab is the one actually focused.
+  const isFocused = useIsFocused();
   const [isTodayCardExpanded, setIsTodayCardExpanded] = useState(true);
   const [planItems, setPlanItems] = useState<WorkoutPlanItem[]>([]);
   const [hasDeclinedMission, setHasDeclinedMission] = useState(false);
@@ -479,7 +484,9 @@ export default function HomeScreen() {
       </SafeAreaView>
 
       <Modal
-        visible={isMissionPopupVisible && cardVariant === "mission"}
+        visible={
+          isFocused && isMissionPopupVisible && cardVariant === "mission"
+        }
         transparent
         animationType="fade"
         onRequestClose={() => setIsMissionPopupVisible(false)}
