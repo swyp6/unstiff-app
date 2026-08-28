@@ -218,7 +218,7 @@ function renderAppTokens({
     `  fontSize: number;\n` +
     `  lineHeight: number;\n` +
     `};\n\n` +
-    `export const typography: Record<string, TypographyStyle> = ${JSON.stringify(typography, null, 2)};\n`
+    `export const typography = ${JSON.stringify(typography, null, 2)} as const satisfies Record<string, TypographyStyle>;\n`
   );
 }
 

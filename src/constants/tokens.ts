@@ -152,7 +152,7 @@ export type TypographyStyle = {
   lineHeight: number;
 };
 
-export const typography: Record<string, TypographyStyle> = {
+export const typography = {
   "display-1-medium": {
     fontFamily: "NotoSansKR_500Medium",
     fontSize: 26,
@@ -413,4 +413,4 @@ export const typography: Record<string, TypographyStyle> = {
     fontSize: 11,
     lineHeight: 15,
   },
-};
+} as const satisfies Record<string, TypographyStyle>;
