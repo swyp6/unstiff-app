@@ -97,8 +97,6 @@ export async function getTodayStepCount(): Promise<number> {
           date: {
             startDate: startOfToday,
             endDate: now,
-            strictStartDate: true,
-            strictEndDate: true,
           },
         },
       },
