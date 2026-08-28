@@ -37,7 +37,10 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SettingsSectionLabel label="계정" />
           <View>
-            <SettingsRow title="계정 설정" />
+            <SettingsRow
+              onPress={() => router.push("/mypage/settings/account")}
+              title="계정 설정"
+            />
             <SettingsRow title="알림 설정" />
           </View>
         </View>
