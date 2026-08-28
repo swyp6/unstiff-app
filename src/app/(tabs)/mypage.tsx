@@ -19,7 +19,7 @@ export default function MyPageScreen() {
         style: "destructive",
         onPress: () => {
           useAuthStore.getState().logout();
-          router.replace("/login");
+          router.replace("/splash");
         },
       },
     ]);
@@ -37,7 +37,7 @@ export default function MyPageScreen() {
           onPress: () => {
             useAuthStore.getState().logout();
             useOnboardingStore.getState().resetOnboarding();
-            router.replace("/onboarding");
+            router.replace("/splash");
           },
         },
       ],

@@ -482,7 +482,7 @@ export default function HomeScreen() {
         visible={isMissionPopupVisible && cardVariant === "mission"}
         transparent
         animationType="fade"
-        onRequestClose={declineMission}
+        onRequestClose={() => setIsMissionPopupVisible(false)}
       >
         <View className="flex-1 items-center justify-center bg-black/50 px-5">
           <View className="w-full max-w-[303px] rounded-3xl bg-background-normal p-6">
