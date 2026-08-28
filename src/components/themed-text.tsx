@@ -36,14 +36,20 @@ export function ThemedText({
     <Text
       style={[
         { color: theme[themeColor ?? "text"] },
-        type === "default" && styles.default,
-        type === "title" && styles.title,
-        type === "small" && styles.small,
-        type === "smallBold" && styles.smallBold,
-        type === "subtitle" && styles.subtitle,
-        type === "link" && styles.link,
-        type === "linkPrimary" && styles.linkPrimary,
-        type === "code" && styles.code,
+        !typographyKey && type === "default" && styles.default,
+        !typographyKey && type === "title" && styles.title,
+        !typographyKey && type === "small" && styles.small,
+        !typographyKey && type === "smallBold" && styles.smallBold,
+        !typographyKey && type === "subtitle" && styles.subtitle,
+        !typographyKey && type === "link" && styles.link,
+        !typographyKey && type === "linkPrimary" && styles.linkPrimary,
+        !typographyKey && type === "code" && styles.code,
+        // typography (when set) fully owns font styling — a leftover
+        // fontWeight from `type`'s styles can conflict with the exact
+        // weighted font family it sets, so `type`'s font styles are excluded
+        // above rather than just overridden here.
+        typographyKey &&
+          type === "linkPrimary" && { color: styles.linkPrimary.color },
         typographyKey && typography[typographyKey],
         style,
       ]}
