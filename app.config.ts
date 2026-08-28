@@ -79,6 +79,15 @@ const config: ExpoConfig = {
         isIosBackgroundLocationEnabled: false,
       },
     ],
+    [
+      "@kingstinct/react-native-healthkit",
+      {
+        NSHealthShareUsageDescription:
+          "걸음 수 데이터를 불러오기 위해 건강 데이터 접근 권한이 필요합니다.",
+        NSHealthUpdateUsageDescription: false,
+        background: false,
+      },
+    ],
   ],
 
   experiments: {

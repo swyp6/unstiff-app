@@ -1,13 +1,21 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { useIsFocused } from "expo-router";
+import { Link, useIsFocused } from "expo-router";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, View } from "react-native";
+import {
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
+import { StepCountCard } from "@/features/healthkit/components/step-count-card";
 import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -480,6 +488,22 @@ export default function HomeScreen() {
               </View>
             )}
           </View>
+
+          {Platform.OS === "ios" && (
+            <View className="gap-3">
+              <Link href="/map" asChild>
+                <Pressable
+                  className="h-11 items-center justify-center rounded-full bg-black px-6 dark:bg-white"
+                  style={({ pressed }) => pressed && { opacity: 0.7 }}
+                >
+                  <Text className="text-base font-semibold text-white dark:text-black">
+                    지도 들어가기
+                  </Text>
+                </Pressable>
+              </Link>
+              <StepCountCard />
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
 
