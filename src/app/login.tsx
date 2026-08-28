@@ -1,6 +1,6 @@
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ThemedText } from "@/components/themed-text";
+import { BrandMark } from "@/components/brand-mark";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { SocialLoginButtons } from "@/features/auth/components/social-login-buttons";
@@ -17,7 +17,7 @@ export default function LoginScreen() {
           gap: Spacing.six,
         }}
       >
-        <ThemedText typography="title-1-bold">환영합니다</ThemedText>
+        <BrandMark size={200} />
         <SocialLoginButtons />
       </SafeAreaView>
     </ThemedView>

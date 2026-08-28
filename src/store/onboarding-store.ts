@@ -6,27 +6,29 @@ import {
   platformKeyValueStorage,
 } from "@/lib/persisted-storage";
 
-type AuthState = {
-  accessToken: string | null;
+type OnboardingState = {
+  hasCompletedOnboarding: boolean;
   hasHydrated: boolean;
-  setAccessToken: (token: string | null) => void;
+  completeOnboarding: () => void;
+  resetOnboarding: () => void;
   setHasHydrated: (value: boolean) => void;
-  logout: () => void;
 };
 
-export const useAuthStore = create<AuthState>()(
+export const useOnboardingStore = create<OnboardingState>()(
   persist(
     (set) => ({
-      accessToken: null,
+      hasCompletedOnboarding: false,
       hasHydrated: false,
-      setAccessToken: (accessToken) => set({ accessToken }),
+      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+      resetOnboarding: () => set({ hasCompletedOnboarding: false }),
       setHasHydrated: (hasHydrated) => set({ hasHydrated }),
-      logout: () => set({ accessToken: null }),
     }),
     {
-      name: "auth-storage",
+      name: "onboarding-storage",
       storage: createJSONStorage(() => platformKeyValueStorage),
-      partialize: (state) => ({ accessToken: state.accessToken }),
+      partialize: (state) => ({
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
+      }),
       onRehydrateStorage: markHydratedOnRehydrate,
     },
   ),
