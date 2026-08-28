@@ -36,6 +36,11 @@ export function StepCountCard() {
       <ThemedText type="subtitle">
         {stepCount === null ? "-" : stepCount.toLocaleString()}
       </ThemedText>
+      {stepCount === 0 && (
+        <ThemedText type="small" themeColor="textSecondary">
+          걸음 수가 보이지 않는다면 건강 앱의 접근 권한을 확인해주세요.
+        </ThemedText>
+      )}
       {errorMessage && (
         <ThemedText type="small" themeColor="textSecondary">
           {errorMessage}

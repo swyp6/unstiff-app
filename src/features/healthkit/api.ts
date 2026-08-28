@@ -57,11 +57,12 @@ export async function requestStepCountAuthorization(): Promise<void> {
   try {
     const { requestAuthorization } =
       await import("@kingstinct/react-native-healthkit");
-    const didComplete = await requestAuthorization({
+    // This reports whether the request completed, not whether read access was granted.
+    const didCompleteRequest = await requestAuthorization({
       toRead: [STEP_COUNT_IDENTIFIER],
     });
 
-    if (!didComplete) {
+    if (!didCompleteRequest) {
       throw new HealthKitError(
         "AUTHORIZATION_FAILED",
         "걸음 수 읽기 권한 요청을 완료하지 못했습니다.",
