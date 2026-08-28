@@ -7,20 +7,27 @@ import { Platform } from "react-native";
 
 import { semanticColors } from "@/constants/tokens";
 
-// The Figma foundation has no dark mode yet, so `dark` mirrors `light` for now —
-// re-running `npm run sync-figma-tokens` after dark mode tokens are added will
-// still only populate `light`; wire up `dark` separately once that mode exists.
-const light = {
-  text: semanticColors["label-normal"],
-  background: semanticColors["background-normal"],
-  backgroundElement: semanticColors["fill-normal"],
-  backgroundSelected: semanticColors["fill-strong"],
-  textSecondary: semanticColors["label-subtle"],
-} as const;
-
+// The Figma foundation has no dark mode yet. `dark` keeps the previous
+// hand-picked fallback palette (rather than mirroring `light`) so dark-mode
+// devices — which get React Navigation's DarkTheme via useColorScheme() in
+// src/app/_layout.tsx — don't end up with light content colors on a dark
+// chrome. Re-running `npm run sync-figma-tokens` only touches `light`; wire
+// `dark` up to real Figma tokens once that mode exists there.
 export const Colors = {
-  light,
-  dark: light,
+  light: {
+    text: semanticColors["label-normal"],
+    background: semanticColors["background-normal"],
+    backgroundElement: semanticColors["fill-normal"],
+    backgroundSelected: semanticColors["fill-strong"],
+    textSecondary: semanticColors["label-subtle"],
+  },
+  dark: {
+    text: "#ffffff",
+    background: "#000000",
+    backgroundElement: "#212225",
+    backgroundSelected: "#2E3135",
+    textSecondary: "#B0B4BA",
+  },
 } as const;
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
