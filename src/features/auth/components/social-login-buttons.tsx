@@ -28,7 +28,7 @@ async function handleAppleLogin() {
       credential.identityToken,
     );
     useAuthStore.getState().setAccessToken(accessToken);
-    console.log("apple login success!!!! ", { accessToken });
+    console.log("apple login success! ");
     router.replace("/home");
   } catch (error) {
     if (
@@ -63,7 +63,7 @@ async function handleKakaoLogin() {
     const { idToken: kakaoIdToken } = await kakaoLogin();
     const accessToken = await completeOAuthSignIn("kakao", kakaoIdToken);
     useAuthStore.getState().setAccessToken(accessToken);
-    console.log("kakao login success!!!! ", { accessToken });
+    console.log("kakao login success!");
     router.replace("/home");
   } catch (error) {
     if (axios.isAxiosError(error)) {
