@@ -38,6 +38,8 @@ const config: ExpoConfig = {
   plugins: [
     "expo-router",
 
+    "expo-apple-authentication",
+
     [
       "expo-splash-screen",
       {
