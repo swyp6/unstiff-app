@@ -67,7 +67,11 @@ export default function SettingsScreen() {
             onPress={() => setIsLogoutDialogVisible(true)}
             title="로그아웃"
           />
-          <SettingsRow destructive title="회원 탈퇴" />
+          <SettingsRow
+            destructive
+            onPress={() => router.push("/mypage/settings/withdrawal")}
+            title="회원 탈퇴"
+          />
         </View>
       </View>
 
