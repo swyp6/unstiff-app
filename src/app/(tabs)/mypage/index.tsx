@@ -5,7 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
-import { useAuthStore } from "@/store/auth-store";
+import { logout } from "@/features/auth/logout";
 import { useOnboardingStore } from "@/store/onboarding-store";
 
 // No Figma design has been shared for this tab yet — placeholder screen with
@@ -17,10 +17,7 @@ export default function MyPageScreen() {
       {
         text: "로그아웃",
         style: "destructive",
-        onPress: () => {
-          useAuthStore.getState().logout();
-          router.replace("/splash");
-        },
+        onPress: logout,
       },
     ]);
   }
@@ -35,9 +32,8 @@ export default function MyPageScreen() {
           text: "초기화",
           style: "destructive",
           onPress: () => {
-            useAuthStore.getState().logout();
             useOnboardingStore.getState().resetOnboarding();
-            router.replace("/splash");
+            logout();
           },
         },
       ],

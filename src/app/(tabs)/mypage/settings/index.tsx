@@ -1,16 +1,21 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
+import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { logout } from "@/features/auth/logout";
+import { LogoutConfirmDialog } from "@/features/settings/components/logout-confirm-dialog";
 import {
   SettingsRow,
   SettingsSectionLabel,
 } from "@/features/settings/components/settings-list";
 
 export default function SettingsScreen() {
+  const [isLogoutDialogVisible, setIsLogoutDialogVisible] = useState(false);
+
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
       <View style={styles.header}>
@@ -57,10 +62,20 @@ export default function SettingsScreen() {
         </View>
 
         <View style={styles.actionSection}>
-          <SettingsRow destructive title="로그아웃" />
+          <SettingsRow
+            destructive
+            onPress={() => setIsLogoutDialogVisible(true)}
+            title="로그아웃"
+          />
           <SettingsRow destructive title="회원 탈퇴" />
         </View>
       </View>
+
+      <LogoutConfirmDialog
+        onCancel={() => setIsLogoutDialogVisible(false)}
+        onConfirm={logout}
+        visible={isLogoutDialogVisible}
+      />
     </SafeAreaView>
   );
 }
