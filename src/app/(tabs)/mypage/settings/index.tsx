@@ -56,8 +56,14 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <SettingsSectionLabel label="서비스" />
           <View>
-            <SettingsRow title="이용약관" />
-            <SettingsRow title="개인정보 처리방침" />
+            <SettingsRow
+              onPress={() => router.push("/mypage/settings/terms")}
+              title="이용약관"
+            />
+            <SettingsRow
+              onPress={() => router.push("/mypage/settings/privacy")}
+              title="개인정보 처리방침"
+            />
           </View>
         </View>
 
