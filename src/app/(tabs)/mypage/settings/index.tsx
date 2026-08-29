@@ -41,7 +41,10 @@ export default function SettingsScreen() {
               onPress={() => router.push("/mypage/settings/account")}
               title="계정 설정"
             />
-            <SettingsRow title="알림 설정" />
+            <SettingsRow
+              onPress={() => router.push("/mypage/settings/notification")}
+              title="알림 설정"
+            />
           </View>
         </View>
 
