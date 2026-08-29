@@ -1,10 +1,10 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
 import { Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { goBackOrReplace } from "@/features/settings/navigation";
 
 const ACCOUNT_DIVIDER_COLOR = "#E2E6EC";
 
@@ -38,7 +38,7 @@ export default function AccountScreen() {
             accessibilityLabel="뒤로가기"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace("/mypage/settings")}
             style={styles.backButton}
           >
             <Ionicons

@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -7,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { NotificationToggle } from "@/features/settings/components/notification-toggle";
+import { goBackOrReplace } from "@/features/settings/navigation";
 
 const NOTIFICATION_DIVIDER_COLOR = "#E2E6EC";
 const SECTION_LABEL_COLOR = "#9BA5B7";
@@ -62,7 +62,7 @@ export default function NotificationSettingsScreen() {
             accessibilityLabel="뒤로가기"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace("/mypage/settings")}
             style={styles.backButton}
           >
             <Ionicons

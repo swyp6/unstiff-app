@@ -1,11 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
+import { goBackOrReplace } from "@/features/settings/navigation";
 
 type LegalArticleData = {
   title: string;
@@ -44,7 +44,7 @@ export function LegalDocumentScreen({
             accessibilityLabel="뒤로가기"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace("/mypage/settings")}
             style={styles.backButton}
           >
             <Ionicons
@@ -99,6 +99,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flex: 1,
     paddingHorizontal: 24,
   },
   version: {
@@ -109,8 +110,9 @@ const styles = StyleSheet.create({
     borderColor: semanticColors["line-normal"],
     borderRadius: 12,
     borderWidth: 1,
-    height: 526,
+    flex: 1,
     marginTop: 28,
+    maxHeight: 526,
     overflow: "hidden",
     width: "100%",
   },

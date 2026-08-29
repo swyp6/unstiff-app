@@ -12,6 +12,7 @@ import {
   SettingsRow,
   SettingsSectionLabel,
 } from "@/features/settings/components/settings-list";
+import { goBackOrReplace } from "@/features/settings/navigation";
 
 export default function SettingsScreen() {
   const [isLogoutDialogVisible, setIsLogoutDialogVisible] = useState(false);
@@ -24,7 +25,7 @@ export default function SettingsScreen() {
             accessibilityLabel="뒤로가기"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace("/mypage")}
             style={styles.backButton}
           >
             <Ionicons

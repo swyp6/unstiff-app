@@ -1,11 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
 import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
+import { goBackOrReplace } from "@/features/settings/navigation";
 
 const WARNING_MESSAGES = [
   "운동 기록과 등록한 사진",
@@ -35,6 +35,7 @@ function WithdrawalCheckbox({ value, onValueChange }: WithdrawalCheckboxProps) {
       accessibilityLabel="안내 내용을 확인했어요"
       accessibilityRole="checkbox"
       accessibilityState={{ checked: value }}
+      hitSlop={12}
       onPress={() => onValueChange(!value)}
       style={styles.checkboxRow}
     >
@@ -73,7 +74,7 @@ export default function WithdrawalScreen() {
             accessibilityLabel="뒤로가기"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={() => router.back()}
+            onPress={() => goBackOrReplace("/mypage/settings")}
             style={styles.backButton}
           >
             <Ionicons
