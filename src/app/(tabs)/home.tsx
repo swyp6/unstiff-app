@@ -504,6 +504,7 @@ export default function HomeScreen() {
               <StepCountCard />
             </View>
           )}
+          {Platform.OS === "android" && <StepCountCard />}
         </ScrollView>
       </SafeAreaView>
 

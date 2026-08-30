@@ -24,6 +24,8 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: false,
     package: "com.percent8.unstiff",
 
+    permissions: ["android.permission.health.READ_STEPS"],
+
     blockedPermissions: [
       "android.permission.ACCESS_COARSE_LOCATION",
       "android.permission.ACCESS_FINE_LOCATION",
@@ -39,6 +41,8 @@ const config: ExpoConfig = {
     "expo-router",
 
     "expo-apple-authentication",
+
+    "react-native-health-connect",
 
     [
       "@react-native-google-signin/google-signin",
@@ -68,6 +72,9 @@ const config: ExpoConfig = {
       "expo-build-properties",
       {
         android: {
+          compileSdkVersion: 36,
+          targetSdkVersion: 36,
+          minSdkVersion: 26,
           extraMavenRepos: [
             "https://devrepo.kakao.com/nexus/content/groups/public/",
           ],
