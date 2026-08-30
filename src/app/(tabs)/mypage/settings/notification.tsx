@@ -6,10 +6,11 @@ import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { NotificationToggle } from "@/features/settings/components/notification-toggle";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
-import { SETTINGS_DIVIDER_COLOR } from "@/features/settings/components/settings-list";
+import {
+  SettingsSectionLabel,
+  SETTINGS_DIVIDER_COLOR,
+} from "@/features/settings/components/settings-list";
 import { goBackOrReplace } from "@/features/settings/navigation";
-
-const SECTION_LABEL_COLOR = "#9BA5B7";
 
 const SERVICE_NOTIFICATION_ITEMS = [
   { key: "dailyQuestion", title: "오늘의 질문" },
@@ -49,12 +50,11 @@ function NotificationSettingRow({
   );
 }
 
+// Domain-named wrapper so notification-specific label styling has a place to
+// diverge later without touching the shared settings component; today it
+// intentionally forwards straight through to keep colors/theming in sync.
 function NotificationSectionLabel({ label }: { label: string }) {
-  return (
-    <ThemedText style={styles.sectionLabel} typography="caption-1-medium">
-      {label}
-    </ThemedText>
-  );
+  return <SettingsSectionLabel label={label} />;
 }
 
 export default function NotificationSettingsScreen() {
@@ -119,10 +119,6 @@ const styles = StyleSheet.create({
   section: {
     gap: 8,
     marginBottom: 32,
-  },
-  sectionLabel: {
-    color: SECTION_LABEL_COLOR,
-    lineHeight: 18,
   },
   row: {
     alignItems: "center",
