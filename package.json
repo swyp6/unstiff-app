@@ -8,6 +8,7 @@
     "@expo/ui": "~57.0.14",
     "@expo/vector-icons": "^15.0.2",
     "@kingstinct/react-native-healthkit": "^14.1.0",
+    "@react-native-google-signin/google-signin": "^16.1.4",
     "@react-native-seoul/kakao-login": "^6.0.4",
     "axios": "^1.19.0",
     "class-variance-authority": "^0.7.1",

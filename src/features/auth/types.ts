@@ -1,4 +1,4 @@
-export type OAuthProvider = "apple" | "kakao";
+export type OAuthProvider = "apple" | "kakao" | "google";
 
 export type SignInStatus = "AUTHENTICATED" | "SIGN_UP_REQUIRED";
 
@@ -14,7 +14,7 @@ export type SignUpResponse = {
 
 export type UserProfile = {
   id: number;
-  authType: "APPLE" | "KAKAO";
+  authType: "APPLE" | "KAKAO" | "GOOGLE";
   createdAt: string;
   updatedAt: string;
 };
