@@ -40,11 +40,7 @@ async function handleGoogleLogin() {
     console.log("google login success!");
     router.replace("/home");
   } catch (error) {
-    if (
-      isErrorWithCode(error) &&
-      (error.code === statusCodes.SIGN_IN_CANCELLED ||
-        error.code === statusCodes.IN_PROGRESS)
-    ) {
+    if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return;
     }
 
