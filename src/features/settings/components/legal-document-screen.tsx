@@ -1,10 +1,10 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
+import { SettingsHeader } from "@/features/settings/components/settings-header";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
 type LegalArticleData = {
@@ -38,25 +38,10 @@ export function LegalDocumentScreen({
 }: LegalDocumentScreenProps) {
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerSide}>
-          <Pressable
-            accessibilityLabel="뒤로가기"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => goBackOrReplace("/mypage/settings")}
-            style={styles.backButton}
-          >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="chevron-back"
-              size={20}
-            />
-          </Pressable>
-        </View>
-        <ThemedText typography="body-1-medium">{title}</ThemedText>
-        <View style={styles.headerSide} />
-      </View>
+      <SettingsHeader
+        onBack={() => goBackOrReplace("/mypage/settings")}
+        title={title}
+      />
 
       <View style={styles.content}>
         <ThemedText style={styles.version} typography="caption-1-regular">
@@ -81,21 +66,6 @@ export function LegalDocumentScreen({
 const styles = StyleSheet.create({
   screen: {
     backgroundColor: semanticColors["background-normal"],
-    flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    height: 72,
-    paddingHorizontal: 24,
-  },
-  backButton: {
-    alignItems: "flex-start",
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  headerSide: {
     flex: 1,
   },
   content: {

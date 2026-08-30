@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, Switch, View } from "react-native";
 
 import { semanticColors } from "@/constants/tokens";
 
@@ -16,45 +16,31 @@ export function NotificationToggle({
   accessibilityLabel,
 }: NotificationToggleProps) {
   return (
-    <Pressable
-      accessibilityLabel={accessibilityLabel}
-      accessibilityRole="switch"
-      accessibilityState={{ checked: value }}
-      hitSlop={9}
-      onPress={() => onValueChange(!value)}
-      style={styles.toggle}
-    >
-      <View style={[styles.track, value ? styles.trackOn : styles.trackOff]}>
-        <View style={[styles.knob, value && styles.knobOn]} />
-      </View>
-    </Pressable>
+    <View style={styles.toggleContainer}>
+      <Switch
+        accessibilityLabel={accessibilityLabel}
+        ios_backgroundColor={semanticColors["fill-strong"]}
+        onValueChange={onValueChange}
+        style={styles.toggle}
+        thumbColor={semanticColors["control-thumb"]}
+        trackColor={{
+          false: semanticColors["fill-strong"],
+          true: TRACK_ON_COLOR,
+        }}
+        value={value}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  toggleContainer: {
+    alignItems: "center",
+    height: 26,
+    justifyContent: "center",
+    width: 44,
+  },
   toggle: {
-    height: 26,
-    width: 44,
-  },
-  track: {
-    borderRadius: 999,
-    height: 26,
-    padding: 2,
-    width: 44,
-  },
-  trackOn: {
-    backgroundColor: TRACK_ON_COLOR,
-  },
-  trackOff: {
-    backgroundColor: semanticColors["fill-strong"],
-  },
-  knob: {
-    backgroundColor: semanticColors["control-thumb"],
-    borderRadius: 11,
-    height: 22,
-    width: 22,
-  },
-  knobOn: {
-    transform: [{ translateX: 18 }],
+    transform: [{ scaleX: 44 / 51 }, { scaleY: 26 / 31 }],
   },
 });

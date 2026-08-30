@@ -1,15 +1,25 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { NotificationToggle } from "@/features/settings/components/notification-toggle";
+import { SettingsHeader } from "@/features/settings/components/settings-header";
+import { SETTINGS_DIVIDER_COLOR } from "@/features/settings/components/settings-list";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
-const NOTIFICATION_DIVIDER_COLOR = "#E2E6EC";
 const SECTION_LABEL_COLOR = "#9BA5B7";
+
+const SERVICE_NOTIFICATION_ITEMS = [
+  { key: "dailyQuestion", title: "오늘의 질문" },
+  { key: "workoutPlan", title: "운동 계획" },
+  { key: "dailyMission", title: "데일리 미션" },
+  { key: "recordReminder", title: "기록 리마인드" },
+] as const;
+
+type ServiceNotificationKey =
+  (typeof SERVICE_NOTIFICATION_ITEMS)[number]["key"];
 
 type NotificationSettingRowProps = {
   title: string;
@@ -49,32 +59,21 @@ function NotificationSectionLabel({ label }: { label: string }) {
 
 export default function NotificationSettingsScreen() {
   const [allNotifications, setAllNotifications] = useState(true);
-  const [dailyQuestion, setDailyQuestion] = useState(true);
-  const [workoutPlan, setWorkoutPlan] = useState(true);
-  const [dailyMission, setDailyMission] = useState(true);
-  const [recordReminder, setRecordReminder] = useState(false);
+  const [notificationSettings, setNotificationSettings] = useState<
+    Record<ServiceNotificationKey, boolean>
+  >({
+    dailyQuestion: true,
+    workoutPlan: true,
+    dailyMission: true,
+    recordReminder: false,
+  });
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerSide}>
-          <Pressable
-            accessibilityLabel="뒤로가기"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => goBackOrReplace("/mypage/settings")}
-            style={styles.backButton}
-          >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="chevron-back"
-              size={20}
-            />
-          </Pressable>
-        </View>
-        <ThemedText typography="body-1-medium">알림설정</ThemedText>
-        <View style={styles.headerSide} />
-      </View>
+      <SettingsHeader
+        onBack={() => goBackOrReplace("/mypage/settings")}
+        title="알림설정"
+      />
 
       <View style={styles.content}>
         <View style={styles.section}>
@@ -89,26 +88,19 @@ export default function NotificationSettingsScreen() {
         <View style={styles.section}>
           <NotificationSectionLabel label="서비스 알림" />
           <View>
-            <NotificationSettingRow
-              onValueChange={setDailyQuestion}
-              title="오늘의 질문"
-              value={dailyQuestion}
-            />
-            <NotificationSettingRow
-              onValueChange={setWorkoutPlan}
-              title="운동 계획"
-              value={workoutPlan}
-            />
-            <NotificationSettingRow
-              onValueChange={setDailyMission}
-              title="데일리 미션"
-              value={dailyMission}
-            />
-            <NotificationSettingRow
-              onValueChange={setRecordReminder}
-              title="기록 리마인드"
-              value={recordReminder}
-            />
+            {SERVICE_NOTIFICATION_ITEMS.map((item) => (
+              <NotificationSettingRow
+                key={item.key}
+                onValueChange={(value) =>
+                  setNotificationSettings((current) => ({
+                    ...current,
+                    [item.key]: value,
+                  }))
+                }
+                title={item.title}
+                value={notificationSettings[item.key]}
+              />
+            ))}
           </View>
         </View>
       </View>
@@ -119,21 +111,6 @@ export default function NotificationSettingsScreen() {
 const styles = StyleSheet.create({
   screen: {
     backgroundColor: semanticColors["background-normal"],
-    flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    height: 72,
-    paddingHorizontal: 24,
-  },
-  backButton: {
-    alignItems: "flex-start",
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  headerSide: {
     flex: 1,
   },
   content: {
@@ -164,7 +141,7 @@ const styles = StyleSheet.create({
     color: semanticColors["label-normal"],
   },
   divider: {
-    backgroundColor: NOTIFICATION_DIVIDER_COLOR,
+    backgroundColor: SETTINGS_DIVIDER_COLOR,
     bottom: 0,
     height: 1,
     left: 0,

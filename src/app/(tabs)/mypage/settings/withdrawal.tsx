@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
+import { SettingsHeader } from "@/features/settings/components/settings-header";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
 const WARNING_MESSAGES = [
@@ -68,25 +69,10 @@ export default function WithdrawalScreen() {
       edges={["top", "left", "right", "bottom"]}
       style={styles.screen}
     >
-      <View style={styles.header}>
-        <View style={styles.headerSide}>
-          <Pressable
-            accessibilityLabel="뒤로가기"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => goBackOrReplace("/mypage/settings")}
-            style={styles.backButton}
-          >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="chevron-back"
-              size={20}
-            />
-          </Pressable>
-        </View>
-        <ThemedText typography="body-1-medium">회원 탈퇴</ThemedText>
-        <View style={styles.headerSide} />
-      </View>
+      <SettingsHeader
+        onBack={() => goBackOrReplace("/mypage/settings")}
+        title="회원 탈퇴"
+      />
 
       <View style={styles.content}>
         <View style={styles.mainContent}>
@@ -138,21 +124,6 @@ export default function WithdrawalScreen() {
 const styles = StyleSheet.create({
   screen: {
     backgroundColor: semanticColors["background-normal"],
-    flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    height: 72,
-    paddingHorizontal: 24,
-  },
-  backButton: {
-    alignItems: "flex-start",
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  headerSide: {
     flex: 1,
   },
   content: {

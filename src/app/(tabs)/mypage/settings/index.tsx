@@ -1,79 +1,71 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
-import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { logout } from "@/features/auth/logout";
-import { LogoutConfirmDialog } from "@/features/settings/components/logout-confirm-dialog";
+import { SettingsHeader } from "@/features/settings/components/settings-header";
 import {
   SettingsRow,
   SettingsSectionLabel,
 } from "@/features/settings/components/settings-list";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
+const ACCOUNT_ITEMS = [
+  { title: "계정 설정", href: "/mypage/settings/account" },
+  { title: "알림 설정", href: "/mypage/settings/notification" },
+] as const;
+
+const SERVICE_ITEMS = [
+  { title: "이용약관", href: "/mypage/settings/terms" },
+  { title: "개인정보 처리방침", href: "/mypage/settings/privacy" },
+] as const;
+
 export default function SettingsScreen() {
-  const [isLogoutDialogVisible, setIsLogoutDialogVisible] = useState(false);
+  function handleLogout() {
+    Alert.alert("로그아웃", "로그아웃 하시겠어요?", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "로그아웃",
+        style: "destructive",
+        onPress: logout,
+      },
+    ]);
+  }
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
-      <View style={styles.header}>
-        <View style={styles.headerSide}>
-          <Pressable
-            accessibilityLabel="뒤로가기"
-            accessibilityRole="button"
-            hitSlop={12}
-            onPress={() => goBackOrReplace("/mypage")}
-            style={styles.backButton}
-          >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="chevron-back"
-              size={20}
-            />
-          </Pressable>
-        </View>
-        <ThemedText typography="body-1-medium">설정</ThemedText>
-        <View style={styles.headerSide} />
-      </View>
+      <SettingsHeader onBack={() => goBackOrReplace("/mypage")} title="설정" />
 
       <View style={styles.content}>
         <View style={styles.section}>
           <SettingsSectionLabel label="계정" />
           <View>
-            <SettingsRow
-              onPress={() => router.push("/mypage/settings/account")}
-              title="계정 설정"
-            />
-            <SettingsRow
-              onPress={() => router.push("/mypage/settings/notification")}
-              title="알림 설정"
-            />
+            {ACCOUNT_ITEMS.map((item) => (
+              <SettingsRow
+                key={item.href}
+                onPress={() => router.push(item.href)}
+                title={item.title}
+              />
+            ))}
           </View>
         </View>
 
         <View style={styles.section}>
           <SettingsSectionLabel label="서비스" />
           <View>
-            <SettingsRow
-              onPress={() => router.push("/mypage/settings/terms")}
-              title="이용약관"
-            />
-            <SettingsRow
-              onPress={() => router.push("/mypage/settings/privacy")}
-              title="개인정보 처리방침"
-            />
+            {SERVICE_ITEMS.map((item) => (
+              <SettingsRow
+                key={item.href}
+                onPress={() => router.push(item.href)}
+                title={item.title}
+              />
+            ))}
           </View>
         </View>
 
         <View style={styles.actionSection}>
-          <SettingsRow
-            destructive
-            onPress={() => setIsLogoutDialogVisible(true)}
-            title="로그아웃"
-          />
+          <SettingsRow destructive onPress={handleLogout} title="로그아웃" />
           <SettingsRow
             destructive
             onPress={() => router.push("/mypage/settings/withdrawal")}
@@ -81,12 +73,6 @@ export default function SettingsScreen() {
           />
         </View>
       </View>
-
-      <LogoutConfirmDialog
-        onCancel={() => setIsLogoutDialogVisible(false)}
-        onConfirm={logout}
-        visible={isLogoutDialogVisible}
-      />
     </SafeAreaView>
   );
 }
@@ -94,21 +80,6 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   screen: {
     backgroundColor: semanticColors["background-normal"],
-    flex: 1,
-  },
-  header: {
-    alignItems: "center",
-    flexDirection: "row",
-    height: 72,
-    paddingHorizontal: 24,
-  },
-  backButton: {
-    alignItems: "flex-start",
-    height: 44,
-    justifyContent: "center",
-    width: 44,
-  },
-  headerSide: {
     flex: 1,
   },
   content: {
