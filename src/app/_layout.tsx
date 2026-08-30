@@ -17,11 +17,13 @@ import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { usePushNotifications } from "@/hooks/use-push-notifications";
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  usePushNotifications();
   // Font names match tokens.ts's `typography` fontFamily values — see
   // scripts/sync-figma-tokens.js's WEIGHT_SUFFIX/*_FONT_PREFIX constants.
   const [fontsLoaded, fontError] = useFonts({

@@ -12,6 +12,7 @@ const config: ExpoConfig = {
   ios: {
     icon: "./assets/images/icon.png",
     bundleIdentifier: "com.percent8.unstiff",
+    googleServicesFile: "./GoogleService-Info.plist",
   },
 
   android: {
@@ -23,6 +24,7 @@ const config: ExpoConfig = {
     },
     predictiveBackGestureEnabled: false,
     package: "com.percent8.unstiff",
+    googleServicesFile: "./google-services.json",
 
     blockedPermissions: [
       "android.permission.ACCESS_COARSE_LOCATION",
@@ -39,6 +41,16 @@ const config: ExpoConfig = {
     "expo-router",
 
     "expo-apple-authentication",
+
+    [
+      "@react-native-firebase/app",
+      {
+        ios: {
+          disableSPM: true,
+        },
+      },
+    ],
+    "@react-native-firebase/messaging",
 
     [
       "expo-splash-screen",
@@ -62,6 +74,14 @@ const config: ExpoConfig = {
         android: {
           extraMavenRepos: [
             "https://devrepo.kakao.com/nexus/content/groups/public/",
+          ],
+        },
+        ios: {
+          extraPods: [
+            {
+              name: "GoogleUtilities",
+              modular_headers: true,
+            },
           ],
         },
       },
