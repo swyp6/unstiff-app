@@ -41,6 +41,14 @@ const config: ExpoConfig = {
     "expo-apple-authentication",
 
     [
+      "@react-native-google-signin/google-signin",
+      {
+        iosUrlScheme:
+          "com.googleusercontent.apps.1028453278024-br2ckjt71jf84v6eg5nsqv86g7eonrhv",
+      },
+    ],
+
+    [
       "expo-splash-screen",
       {
         backgroundColor: "#208AEF",

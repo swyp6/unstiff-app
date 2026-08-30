@@ -1,3 +1,9 @@
+import {
+  GoogleSignin,
+  isErrorWithCode,
+  isSuccessResponse,
+  statusCodes,
+} from "@react-native-google-signin/google-signin";
 import { login as kakaoLogin } from "@react-native-seoul/kakao-login";
 import axios from "axios";
 import * as AppleAuthentication from "expo-apple-authentication";
@@ -8,6 +14,52 @@ import { completeOAuthSignIn } from "@/features/auth/api";
 import { useAuthStore } from "@/store/auth-store";
 
 import { SocialLoginButton } from "./social-login-button";
+
+GoogleSignin.configure({
+  webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+  iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+});
+
+async function handleGoogleLogin() {
+  console.log("구글 로그인 클릭");
+  try {
+    await GoogleSignin.hasPlayServices();
+    const response = await GoogleSignin.signIn();
+
+    if (!isSuccessResponse(response)) {
+      return;
+    }
+
+    const googleIdToken = response.data.idToken;
+    if (!googleIdToken) {
+      throw new Error("Google sign-in did not return an idToken");
+    }
+
+    const accessToken = await completeOAuthSignIn("google", googleIdToken);
+    useAuthStore.getState().setAccessToken(accessToken);
+    console.log("google login success!");
+    router.replace("/home");
+  } catch (error) {
+    if (
+      isErrorWithCode(error) &&
+      (error.code === statusCodes.SIGN_IN_CANCELLED ||
+        error.code === statusCodes.IN_PROGRESS)
+    ) {
+      return;
+    }
+
+    if (axios.isAxiosError(error)) {
+      console.error("google login failed", {
+        status: error.response?.status,
+        data: error.response?.data,
+        url: error.config?.url,
+      });
+    } else {
+      console.error("google login failed", error);
+    }
+    Alert.alert("로그인 실패", "Google 로그인 중 문제가 발생했습니다.");
+  }
+}
 
 async function handleAppleLogin() {
   console.log("애플 로그인 클릭");
@@ -97,7 +149,7 @@ export function SocialLoginButtons() {
       <SocialLoginButton
         provider="google"
         label="Google로 계속하기"
-        onPress={() => console.log("google login pressed")}
+        onPress={handleGoogleLogin}
       />
     </View>
   );
