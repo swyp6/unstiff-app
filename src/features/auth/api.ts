@@ -3,7 +3,7 @@ import { apiClient } from "@/lib/api-client";
 import type {
   OAuth2SignInResponse,
   OAuthProvider,
-  SignUpResponse,
+  TermsListResponse,
   UserProfile,
 } from "./types";
 
@@ -11,15 +11,6 @@ export async function signIn(provider: OAuthProvider, credential: string) {
   const { data } = await apiClient.post<OAuth2SignInResponse>(
     `/api/v1/oauth2/${provider}/sign-in`,
     { credential },
-  );
-  return data;
-}
-
-export async function signUp(onboardingToken: string) {
-  const { data } = await apiClient.post<SignUpResponse>(
-    "/api/v1/sign-up",
-    undefined,
-    { headers: { "Jpd-Onboarding-Token": onboardingToken } },
   );
   return data;
 }
@@ -33,24 +24,21 @@ export async function unregister() {
   await apiClient.delete("/api/v1/users/me");
 }
 
-// Shared by every provider: exchange a provider credential for our own
-// accessToken, transparently completing sign-up when the backend reports
-// this is a first-time user (sign-up needs no extra input beyond the
-// onboarding token, so no separate screen is required).
-export async function completeOAuthSignIn(
-  provider: OAuthProvider,
-  credential: string,
-) {
-  const result = await signIn(provider, credential);
+export async function getTerms() {
+  const { data } = await apiClient.get<TermsListResponse>("/api/v1/terms");
+  return data;
+}
 
-  if (result.status === "AUTHENTICATED" && result.accessToken) {
-    return result.accessToken;
-  }
+// `newUser` on the sign-in response only reflects whether an account was
+// just created in *this* call, not whether required terms are agreed — a
+// user who closes the app mid-onboarding keeps a valid accessToken and
+// would never see `newUser: true` again. Terms agreement is checked here
+// against the server's actual state instead.
+export async function hasUnagreedRequiredTerms() {
+  const { terms } = await getTerms();
+  return terms.some((term) => term.required && !term.agreed);
+}
 
-  if (result.status === "SIGN_UP_REQUIRED" && result.onboardingToken) {
-    const { accessToken } = await signUp(result.onboardingToken);
-    return accessToken;
-  }
-
-  throw new Error(`Unexpected sign-in response: ${JSON.stringify(result)}`);
+export async function agreeToTerms(termsDocumentIds: number[]) {
+  await apiClient.post("/api/v1/terms/agreements", { termsDocumentIds });
 }

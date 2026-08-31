@@ -1,15 +1,8 @@
 export type OAuthProvider = "apple" | "kakao" | "google";
 
-export type SignInStatus = "AUTHENTICATED" | "SIGN_UP_REQUIRED";
-
 export type OAuth2SignInResponse = {
-  status: SignInStatus;
-  accessToken?: string;
-  onboardingToken?: string;
-};
-
-export type SignUpResponse = {
   accessToken: string;
+  newUser: boolean;
 };
 
 export type UserProfile = {
@@ -17,4 +10,21 @@ export type UserProfile = {
   authType: "APPLE" | "KAKAO" | "GOOGLE";
   createdAt: string;
   updatedAt: string;
+};
+
+export type TermsType = "SERVICE" | "PRIVACY" | "MARKETING";
+
+export type Term = {
+  id: number;
+  type: TermsType;
+  title: string;
+  required: boolean;
+  contentUrl: string;
+  agreed: boolean;
+  reagreementRequired: boolean;
+  agreedAt: string | null;
+};
+
+export type TermsListResponse = {
+  terms: Term[];
 };

@@ -10,7 +10,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { Alert, Platform, View } from "react-native";
 
-import { completeOAuthSignIn } from "@/features/auth/api";
+import { hasUnagreedRequiredTerms, signIn } from "@/features/auth/api";
 import { useAuthStore } from "@/store/auth-store";
 
 import { SocialLoginButton } from "./social-login-button";
@@ -35,10 +35,12 @@ async function handleGoogleLogin() {
       throw new Error("Google sign-in did not return an idToken");
     }
 
-    const accessToken = await completeOAuthSignIn("google", googleIdToken);
+    const { accessToken } = await signIn("google", googleIdToken);
     useAuthStore.getState().setAccessToken(accessToken);
     console.log("google login success!");
-    router.replace("/home");
+    router.replace(
+      (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
+    );
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return;
@@ -71,13 +73,12 @@ async function handleAppleLogin() {
       throw new Error("Apple sign-in did not return an identityToken");
     }
 
-    const accessToken = await completeOAuthSignIn(
-      "apple",
-      credential.identityToken,
-    );
+    const { accessToken } = await signIn("apple", credential.identityToken);
     useAuthStore.getState().setAccessToken(accessToken);
     console.log("apple login success! ");
-    router.replace("/home");
+    router.replace(
+      (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
+    );
   } catch (error) {
     if (
       error &&
@@ -109,10 +110,12 @@ async function handleKakaoLogin() {
     // confirmed with the backend team, requires OpenID Connect enabled on
     // the Kakao app, which it is).
     const { idToken: kakaoIdToken } = await kakaoLogin();
-    const accessToken = await completeOAuthSignIn("kakao", kakaoIdToken);
+    const { accessToken } = await signIn("kakao", kakaoIdToken);
     useAuthStore.getState().setAccessToken(accessToken);
     console.log("kakao login success!");
-    router.replace("/home");
+    router.replace(
+      (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
+    );
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("kakao login failed", {
