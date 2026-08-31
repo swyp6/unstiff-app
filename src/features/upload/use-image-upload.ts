@@ -1,10 +1,9 @@
 import * as ImagePicker from "expo-image-picker";
 import { useCallback, useState } from "react";
 
-import { getUploadSignature } from "./api";
-import { ImageUploadError, uploadImageToCloudinary } from "./cloudinary";
-import { resizeImageForUpload } from "./resize";
+import { ImageUploadError, logImageUploadError } from "./cloudinary";
 import type { ImageUploadType } from "./types";
+import { uploadPickedImage } from "./upload-image";
 
 type ImagePickSource = "library" | "camera";
 
@@ -50,18 +49,12 @@ export function useImageUpload(type: ImageUploadType) {
 
         setState({ status: "uploading" });
 
-        const resized = await resizeImageForUpload(asset.uri, asset.width);
-        const signature = await getUploadSignature(type);
-        const uploaded = await uploadImageToCloudinary(
-          resized.uri,
-          resized.mimeType,
-          resized.fileSize,
-          signature,
-        );
+        const secureUrl = await uploadPickedImage(asset.uri, asset.width, type);
 
         setState({ status: "idle" });
-        return uploaded.secure_url;
+        return secureUrl;
       } catch (error) {
+        logImageUploadError("image upload failed", error);
         const message =
           error instanceof ImageUploadError
             ? error.message

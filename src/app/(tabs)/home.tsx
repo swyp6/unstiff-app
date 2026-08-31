@@ -1,6 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Link, useIsFocused } from "expo-router";
-import { useState } from "react";
+import { Image } from "expo-image";
+import { Link, router, useIsFocused } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Modal,
   Platform,
@@ -16,6 +17,8 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
 import { StepCountCard } from "@/features/healthkit/components/step-count-card";
+import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
+import { CloudinaryImage } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
@@ -39,6 +42,7 @@ type WorkoutPlanItem = {
   subtitle: string;
   isMission: boolean;
   isDone: boolean;
+  photoUrl?: string;
 };
 
 function buildCalendarWeeks(reference: Date): (number | null)[][] {
@@ -71,12 +75,30 @@ export default function HomeScreen() {
   const [hasDeclinedMission, setHasDeclinedMission] = useState(false);
   const [isMissionPopupVisible, setIsMissionPopupVisible] = useState(true);
 
+  // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
+  // 거쳐 전달한다 — 대기 중인 계획 항목을 완료 처리하고 사진 URL을 붙인다.
+  useEffect(() => {
+    return useDailyPhotoStore.subscribe((state) => {
+      if (!state.result) return;
+      const { planItemId, secureUrl } = state.result;
+      setPlanItems((items) =>
+        items.map((item) =>
+          item.id === planItemId
+            ? { ...item, isDone: true, photoUrl: secureUrl }
+            : item,
+        ),
+      );
+      useDailyPhotoStore.getState().clearResult();
+    });
+  }, []);
+
   const today = new Date();
   const weeks = buildCalendarWeeks(today);
   const monthLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월`;
 
   const doneCount = planItems.filter((item) => item.isDone).length;
   const isTodayRecorded = doneCount > 0;
+  const todayPhotoUrl = planItems.find((item) => item.photoUrl)?.photoUrl;
   const monthlyRecordCount =
     MOCK_PHOTO_DAYS.size +
     (isTodayRecorded && !MOCK_PHOTO_DAYS.has(today.getDate()) ? 1 : 0);
@@ -122,6 +144,19 @@ export default function HomeScreen() {
         item.id === id ? { ...item, isDone: !item.isDone } : item,
       ),
     );
+  }
+
+  // 완료 처리는 인증 사진 촬영을 거쳐야 하므로 카메라 화면으로 이동한다.
+  // 완료 취소는 사진 없이 바로 되돌릴 수 있다.
+  function handleTogglePress(item: WorkoutPlanItem) {
+    if (item.isDone) {
+      togglePlanItemDone(item.id);
+      return;
+    }
+    router.push({
+      pathname: "/camera",
+      params: { title: item.title, planItemId: item.id },
+    });
   }
 
   return (
@@ -208,20 +243,23 @@ export default function HomeScreen() {
                     MOCK_PHOTO_DAYS.has(day) || (isToday && isTodayRecorded);
                   const hasMultiplePhotos = MOCK_MULTI_PHOTO_DAYS.has(day);
 
-                  const textColor = isToday
-                    ? semanticColors["label-normal"]
-                    : hasPhoto
-                      ? semanticColors["label-normal"]
-                      : day > today.getDate()
-                        ? semanticColors["label-disabled"]
-                        : semanticColors["label-subtle"];
+                  const textColor =
+                    isToday && todayPhotoUrl
+                      ? "#ffffff"
+                      : isToday
+                        ? semanticColors["label-normal"]
+                        : hasPhoto
+                          ? semanticColors["label-normal"]
+                          : day > today.getDate()
+                            ? semanticColors["label-disabled"]
+                            : semanticColors["label-subtle"];
 
                   return (
                     <View
                       key={dayIndex}
                       className={
                         isToday
-                          ? `h-[60px] w-[43px] items-start rounded-lg border-2 p-1.5 ${
+                          ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
                               isTodayRecorded
                                 ? "border-solid border-label-normal bg-fill-normal"
                                 : "border-dashed border-label-normal"
@@ -231,6 +269,21 @@ export default function HomeScreen() {
                             : "h-[60px] w-[43px] items-start p-1.5"
                       }
                     >
+                      {isToday && todayPhotoUrl && (
+                        <>
+                          <Image
+                            source={{
+                              uri: CloudinaryImage.w200_h200(todayPhotoUrl),
+                            }}
+                            style={{ position: "absolute", inset: 0 }}
+                            contentFit="cover"
+                          />
+                          <View
+                            className="absolute inset-0"
+                            style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
+                          />
+                        </>
+                      )}
                       {hasMultiplePhotos && !isToday && (
                         <View
                           className="absolute -top-1 left-2 h-[52px] w-[35px] rounded-lg border-[1.5px] border-background-normal bg-fill-subtle"
@@ -429,7 +482,7 @@ export default function HomeScreen() {
                               accessibilityLabel={
                                 item.isDone ? "완료 취소" : "완료로 표시"
                               }
-                              onPress={() => togglePlanItemDone(item.id)}
+                              onPress={() => handleTogglePress(item)}
                               className={
                                 item.isDone
                                   ? "size-6 items-center justify-center rounded-full bg-label-normal"
