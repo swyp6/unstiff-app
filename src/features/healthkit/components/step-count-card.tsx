@@ -1,9 +1,13 @@
 import { useState } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Platform, Pressable, StyleSheet } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
+import {
+  getTodayStepCount as getTodayHealthConnectStepCount,
+  requestStepCountAuthorization as requestHealthConnectStepCountAuthorization,
+} from "@/features/health-connect/api";
 
 import { getTodayStepCount, requestStepCountAuthorization } from "../api";
 
@@ -17,8 +21,13 @@ export function StepCountCard() {
     setErrorMessage(null);
 
     try {
-      await requestStepCountAuthorization();
-      setStepCount(await getTodayStepCount());
+      if (Platform.OS === "android") {
+        await requestHealthConnectStepCountAuthorization();
+        setStepCount(await getTodayHealthConnectStepCount());
+      } else if (Platform.OS === "ios") {
+        await requestStepCountAuthorization();
+        setStepCount(await getTodayStepCount());
+      }
     } catch (error) {
       setStepCount(null);
       setErrorMessage(
