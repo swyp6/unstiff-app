@@ -95,6 +95,16 @@ const config: ExpoConfig = {
       },
     ],
 
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "운동 기록 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
+
     "./modules/kakao-map/app.plugin.js",
 
     [
