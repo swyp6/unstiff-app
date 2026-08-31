@@ -57,10 +57,14 @@ export default function TermsAgreementScreen() {
   const [terms, setTerms] = useState<Term[] | null>(null);
   const [agreements, setAgreements] = useState<Record<number, boolean>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     getTerms()
       .then((result) => {
+        if (cancelled) return;
         setTerms(result.terms);
         setAgreements(
           Object.fromEntries(
@@ -69,9 +73,17 @@ export default function TermsAgreementScreen() {
         );
       })
       .catch(() => {
-        Alert.alert("오류", "약관 정보를 불러오지 못했습니다.");
+        if (!cancelled) setLoadError(true);
       });
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
+
+  function retry() {
+    setLoadError(false);
+    setReloadKey((key) => key + 1);
+  }
 
   const allAgreed = useMemo(
     () => terms !== null && terms.every((term) => agreements[term.id]),
@@ -106,6 +118,33 @@ export default function TermsAgreementScreen() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={[styles.screen, styles.loadingScreen]}>
+        <ThemedText
+          style={styles.errorText}
+          themeColor="textSecondary"
+          typography="body-2-medium"
+        >
+          약관 정보를 불러오지 못했습니다.
+        </ThemedText>
+        <Pressable
+          accessibilityLabel="다시 시도"
+          accessibilityRole="button"
+          onPress={retry}
+          style={styles.retryButton}
+        >
+          <ThemedText
+            style={styles.continueButtonText}
+            typography="body-1-medium"
+          >
+            다시 시도
+          </ThemedText>
+        </Pressable>
+      </SafeAreaView>
+    );
   }
 
   if (!terms) {
@@ -189,7 +228,20 @@ const styles = StyleSheet.create({
   },
   loadingScreen: {
     alignItems: "center",
+    gap: 16,
     justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  errorText: {
+    textAlign: "center",
+  },
+  retryButton: {
+    alignItems: "center",
+    backgroundColor: semanticColors["primary-normal"],
+    borderRadius: radius.default,
+    height: 44,
+    justifyContent: "center",
+    paddingHorizontal: 24,
   },
   content: {
     flex: 1,
