@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useNavigation } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -62,17 +62,21 @@ export default function CameraScreen() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
+  const navigation = useNavigation();
 
   // 업로드 도중 사용자가 닫기/뒤로가기로 이 화면을 벗어날 수 있다. 업로드
   // 자체(및 setResult)는 화면을 나가도 계속 끝까지 진행되어야 하지만,
   // 그 시점에 router.back()을 또 호출하면 그 사이 사용자가 이동해 있을
   // 수도 있는 엉뚱한 화면을 팝시켜버리므로 이 화면에 남아있을 때만 부른다.
+  // unmount 시점(화면 전환 애니메이션 이후)엔 이미 늦을 수 있어, 제거가
+  // 시작되는 즉시(버튼 탭·제스처·하드웨어 back 공통) 동기적으로 도는
+  // beforeRemove에서 플래그를 세운다.
   const hasLeftRef = useRef(false);
   useEffect(() => {
-    return () => {
+    return navigation.addListener("beforeRemove", () => {
       hasLeftRef.current = true;
-    };
-  }, []);
+    });
+  }, [navigation]);
 
   async function handleCapture() {
     try {
