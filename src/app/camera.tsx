@@ -181,10 +181,17 @@ export default function CameraScreen() {
             />
           ) : permission?.granted ? (
             <CameraView
+              // facing이 바뀌면 강제로 재마운트해 새 카메라 세션이 열릴 때까지
+              // (onCameraReady가 다시 불릴 때까지) 촬영이 막히도록 한다.
+              key={facing}
               ref={cameraRef}
               style={{ flex: 1 }}
               facing={facing}
               onCameraReady={() => setIsCameraReady(true)}
+              onMountError={(mountError) => {
+                setIsCameraReady(false);
+                setError(mountError.message || "카메라를 열지 못했어요.");
+              }}
             />
           ) : (
             <Pressable
@@ -280,11 +287,12 @@ export default function CameraScreen() {
                 className="size-12 items-center justify-center rounded-full bg-white/[0.16]"
                 accessibilityRole="button"
                 accessibilityLabel="카메라 전환"
-                onPress={() =>
+                onPress={() => {
+                  setIsCameraReady(false);
                   setFacing((current) =>
                     current === "back" ? "front" : "back",
-                  )
-                }
+                  );
+                }}
               >
                 <Ionicons
                   name="camera-reverse-outline"
