@@ -16,6 +16,7 @@ const CAMERA_BG = "#191f28";
 type CapturedPhoto = {
   uri: string;
   width: number;
+  height: number;
 };
 
 function ViewfinderCorner({
@@ -62,34 +63,51 @@ export default function CameraScreen() {
   const cameraRef = useRef<CameraView>(null);
 
   async function handleCapture() {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) {
-        setError("카메라 접근 권한이 필요합니다.");
+    try {
+      if (!permission?.granted) {
+        const result = await requestPermission();
+        if (!result.granted) {
+          setError("카메라 접근 권한이 필요합니다.");
+        }
+        return;
       }
-      return;
-    }
 
-    const result = await cameraRef.current?.takePictureAsync();
-    if (result) setPhoto({ uri: result.uri, width: result.width });
+      const result = await cameraRef.current?.takePictureAsync();
+      if (result) {
+        setError(null);
+        setPhoto({
+          uri: result.uri,
+          width: result.width,
+          height: result.height,
+        });
+      }
+    } catch (captureError) {
+      logImageUploadError("camera capture failed", captureError);
+      setError("사진 촬영에 실패했어요. 다시 시도해 주세요.");
+    }
   }
 
   async function handlePickFromLibrary() {
-    const libraryPermission =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!libraryPermission.granted) {
-      setError("사진 보관함 접근 권한이 필요합니다.");
-      return;
+    try {
+      const libraryPermission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!libraryPermission.granted) {
+        setError("사진 보관함 접근 권한이 필요합니다.");
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+      });
+      if (result.canceled) return;
+
+      const asset = result.assets[0];
+      setError(null);
+      setPhoto({ uri: asset.uri, width: asset.width, height: asset.height });
+    } catch (pickError) {
+      logImageUploadError("photo library pick failed", pickError);
+      setError("사진을 불러오지 못했어요. 다시 시도해 주세요.");
     }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: "images",
-    });
-    if (result.canceled) return;
-
-    const asset = result.assets[0];
-    setError(null);
-    setPhoto({ uri: asset.uri, width: asset.width });
   }
 
   async function handleUsePhoto() {
@@ -101,6 +119,7 @@ export default function CameraScreen() {
       const secureUrl = await uploadPickedImage(
         photo.uri,
         photo.width,
+        photo.height,
         "DAILY_PHOTO",
       );
       useDailyPhotoStore.getState().setResult({ planItemId, secureUrl });
