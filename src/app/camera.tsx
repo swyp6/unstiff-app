@@ -61,29 +61,15 @@ export default function CameraScreen() {
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
 
-  if (!permission) return null;
-
-  if (!permission.granted) {
-    return (
-      <View
-        className="flex-1 items-center justify-center gap-4 px-6"
-        style={{ backgroundColor: CAMERA_BG }}
-      >
-        <ThemedText typography="body-2-bold" style={{ color: "#ffffff" }}>
-          사진 촬영을 위해 카메라 접근 권한이 필요합니다.
-        </ThemedText>
-        <Pressable
-          className="rounded-2xl bg-white px-6 py-3"
-          accessibilityRole="button"
-          onPress={requestPermission}
-        >
-          <ThemedText typography="body-3-bold">권한 허용</ThemedText>
-        </Pressable>
-      </View>
-    );
-  }
-
   async function handleCapture() {
+    if (!permission?.granted) {
+      const result = await requestPermission();
+      if (!result.granted) {
+        setError("카메라 접근 권한이 필요합니다.");
+      }
+      return;
+    }
+
     const result = await cameraRef.current?.takePictureAsync();
     if (result) setPhoto({ uri: result.uri, width: result.width });
   }
@@ -151,8 +137,24 @@ export default function CameraScreen() {
               className="flex-1"
               resizeMode="cover"
             />
-          ) : (
+          ) : permission?.granted ? (
             <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} />
+          ) : (
+            <Pressable
+              className="flex-1 items-center justify-center gap-4 px-8"
+              accessibilityRole="button"
+              onPress={requestPermission}
+            >
+              <ThemedText
+                typography="body-2-bold"
+                style={{ color: "#ffffff", textAlign: "center" }}
+              >
+                카메라로 촬영하려면{"\n"}접근 권한이 필요합니다
+              </ThemedText>
+              <View className="rounded-2xl bg-white px-6 py-3">
+                <ThemedText typography="body-3-bold">권한 허용</ThemedText>
+              </View>
+            </Pressable>
           )}
           <ViewfinderCorner position="tl" />
           <ViewfinderCorner position="tr" />
