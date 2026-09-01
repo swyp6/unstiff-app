@@ -58,6 +58,7 @@ export default function CameraScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
+  const [isCameraReady, setIsCameraReady] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
@@ -82,6 +83,11 @@ export default function CameraScreen() {
         }
         return;
       }
+
+      // expo-camera는 onCameraReady 콜백 전에 takePictureAsync를 호출하지
+      // 말라고 명시한다 — 셔터 버튼이 비활성화돼 있어도 혹시 모를 호출을
+      // 한 번 더 막는다.
+      if (!isCameraReady) return;
 
       const result = await cameraRef.current?.takePictureAsync();
       if (result) {
@@ -170,7 +176,12 @@ export default function CameraScreen() {
               resizeMode="cover"
             />
           ) : permission?.granted ? (
-            <CameraView ref={cameraRef} style={{ flex: 1 }} facing={facing} />
+            <CameraView
+              ref={cameraRef}
+              style={{ flex: 1 }}
+              facing={facing}
+              onCameraReady={() => setIsCameraReady(true)}
+            />
           ) : (
             <Pressable
               className="flex-1 items-center justify-center gap-4 px-8"
@@ -214,7 +225,10 @@ export default function CameraScreen() {
                 className="flex-1 items-center justify-center rounded-[14px] bg-white/[0.16] py-4"
                 accessibilityRole="button"
                 disabled={isUploading}
-                onPress={() => setPhoto(null)}
+                onPress={() => {
+                  setPhoto(null);
+                  setIsCameraReady(false);
+                }}
               >
                 <ThemedText
                   typography="body-3-bold"
@@ -249,9 +263,13 @@ export default function CameraScreen() {
                 className="items-center justify-center rounded-full border-2 border-white/60 p-[7px]"
                 accessibilityRole="button"
                 accessibilityLabel="촬영"
+                disabled={!isCameraReady}
                 onPress={handleCapture}
               >
-                <View className="size-[58px] rounded-full bg-white" />
+                <View
+                  className="size-[58px] rounded-full bg-white"
+                  style={{ opacity: isCameraReady ? 1 : 0.4 }}
+                />
               </Pressable>
 
               <Pressable
