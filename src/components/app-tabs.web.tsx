@@ -24,8 +24,8 @@ export default function AppTabs() {
           <TabTrigger name="home" href="/home" asChild>
             <TabButton icon="home">Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="xp" href="/xp" asChild>
-            <TabButton icon="star">XP</TabButton>
+          <TabTrigger name="chat" href="/chat" asChild>
+            <TabButton icon="chat">찌뿌둥</TabButton>
           </TabTrigger>
           <TabTrigger name="mypage" href="/mypage" asChild>
             <TabButton icon="person">마이페이지</TabButton>
@@ -36,11 +36,11 @@ export default function AppTabs() {
   );
 }
 
-type TabIconName = "home" | "star" | "person";
+type TabIconName = "home" | "chat" | "person";
 
 const IOS_SYMBOL_NAMES: Record<TabIconName, SFSymbol> = {
   home: "house",
-  star: "star",
+  chat: "bubble.left.and.bubble.right",
   person: "person",
 };
 
