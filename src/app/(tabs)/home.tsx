@@ -18,10 +18,14 @@ import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
 import { StepCountCard } from "@/features/healthkit/components/step-count-card";
 import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
-import { CloudinaryImage } from "@/features/upload/image-transform";
+import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+
+// 캘린더 날짜 셀(43x60pt) 표시 크기의 2배(레티나 기준)로 요청 — 프리셋
+// (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
+const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
 // Mock history for the current month — no records API exists yet, so this
 // stands in for "days with a photo" and "days with more than one photo"
@@ -273,7 +277,10 @@ export default function HomeScreen() {
                         <>
                           <Image
                             source={{
-                              uri: CloudinaryImage.w200_h200(todayPhotoUrl),
+                              uri: getOptimizedImageUrl(todayPhotoUrl, {
+                                ...CALENDAR_DAY_THUMBNAIL_SIZE,
+                                crop: "fill",
+                              }),
                             }}
                             style={{ position: "absolute", inset: 0 }}
                             contentFit="cover"
