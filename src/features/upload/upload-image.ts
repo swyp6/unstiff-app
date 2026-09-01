@@ -8,9 +8,10 @@ import type { ImageUploadType } from "./types";
 export async function uploadPickedImage(
   uri: string,
   width: number,
+  height: number,
   type: ImageUploadType,
 ): Promise<string> {
-  const resized = await resizeImageForUpload(uri, width);
+  const resized = await resizeImageForUpload(uri, width, height);
   const signature = await getUploadSignature(type);
   const uploaded = await uploadImageToCloudinary(
     resized.uri,

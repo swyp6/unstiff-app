@@ -49,7 +49,12 @@ export function useImageUpload(type: ImageUploadType) {
 
         setState({ status: "uploading" });
 
-        const secureUrl = await uploadPickedImage(asset.uri, asset.width, type);
+        const secureUrl = await uploadPickedImage(
+          asset.uri,
+          asset.width,
+          asset.height,
+          type,
+        );
 
         setState({ status: "idle" });
         return secureUrl;
