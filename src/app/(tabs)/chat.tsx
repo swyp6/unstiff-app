@@ -36,7 +36,9 @@ export default function ChatScreen() {
             onContentSizeChange={() =>
               listRef.current?.scrollToEnd({ animated: true })
             }
-            renderItem={({ item }) => <ChatBubble message={item} />}
+            renderItem={({ item }) => (
+              <ChatBubble message={item} onSelectOption={sendMessage} />
+            )}
             style={{ flex: 1 }}
           />
           <ChatInputBar onSend={sendMessage} />
