@@ -47,6 +47,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" />
           <Stack.Screen name="terms-agreement" />
           <Stack.Screen name="map" />
+          <Stack.Screen name="camera" options={{ presentation: "modal" }} />
           <Stack.Screen name="test" />
         </Stack>
       </ThemeProvider>

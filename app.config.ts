@@ -84,6 +84,27 @@ const config: ExpoConfig = {
 
     "expo-secure-store",
 
+    [
+      "expo-image-picker",
+      {
+        photosPermission:
+          "이미지를 업로드하기 위해 사진 보관함 접근 권한이 필요합니다.",
+        cameraPermission:
+          "이미지를 업로드하기 위해 카메라 접근 권한이 필요합니다.",
+        microphonePermission: false,
+      },
+    ],
+
+    [
+      "expo-camera",
+      {
+        cameraPermission:
+          "운동 기록 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
+        microphonePermission: false,
+        recordAudioAndroid: false,
+      },
+    ],
+
     "./modules/kakao-map/app.plugin.js",
 
     [
