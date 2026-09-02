@@ -14,7 +14,7 @@ const SEND_FAILED_MESSAGE =
 function createMessage(
   role: ChatMessage["role"],
   text: string,
-  extra?: Pick<ChatMessage, "mission" | "options">,
+  extra?: Pick<ChatMessage, "mission" | "options" | "excludeFromHistory">,
 ): ChatMessage {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -25,11 +25,17 @@ function createMessage(
   };
 }
 
+// SEND_FAILED_MESSAGE 같은 로컬 전용 안내 메시지는 excludeFromHistory로 표시해
+// 다음 요청의 API history에서 제외한다 — 그렇지 않으면 AI가 이 문구를 자신의
+// 이전 응답으로 착각할 수 있다.
 function toApiMessages(messages: ChatMessage[]): AiChatMessageItem[] {
-  return messages.slice(-MAX_HISTORY_MESSAGES).map((message) => ({
-    role: message.role === "user" ? "USER" : "ASSISTANT",
-    content: message.text,
-  }));
+  return messages
+    .filter((message) => !message.excludeFromHistory)
+    .slice(-MAX_HISTORY_MESSAGES)
+    .map((message) => ({
+      role: message.role === "user" ? "USER" : "ASSISTANT",
+      content: message.text,
+    }));
 }
 
 type ChatState = {
@@ -45,7 +51,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   isTyping: false,
   sendMessage: (text) => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || get().isTyping) return;
 
     const userMessage = createMessage("user", trimmed);
     const historyForRequest = [...get().messages, userMessage];
@@ -81,7 +87,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({
           messages: [
             ...state.messages,
-            createMessage("assistant", SEND_FAILED_MESSAGE),
+            createMessage("assistant", SEND_FAILED_MESSAGE, {
+              excludeFromHistory: true,
+            }),
           ],
           isTyping: false,
         }));

@@ -10,9 +10,14 @@ const BUBBLE_RADIUS = 20;
 type ChatBubbleProps = {
   message: ChatMessage;
   onSelectOption?: (text: string) => void;
+  optionsDisabled?: boolean;
 };
 
-export function ChatBubble({ message, onSelectOption }: ChatBubbleProps) {
+export function ChatBubble({
+  message,
+  onSelectOption,
+  optionsDisabled,
+}: ChatBubbleProps) {
   const isUser = message.role === "user";
 
   return (
@@ -53,8 +58,12 @@ export function ChatBubble({ message, onSelectOption }: ChatBubbleProps) {
             <Pressable
               key={option}
               accessibilityRole="button"
+              disabled={optionsDisabled}
               onPress={() => onSelectOption?.(option)}
-              style={styles.optionChip}
+              style={[
+                styles.optionChip,
+                optionsDisabled && styles.optionChipDisabled,
+              ]}
             >
               <ThemedText typography="body-3-medium" themeColor="text">
                 {option}
@@ -119,5 +128,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 8,
+  },
+  optionChipDisabled: {
+    opacity: 0.4,
   },
 });

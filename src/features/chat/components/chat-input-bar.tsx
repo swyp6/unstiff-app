@@ -6,11 +6,12 @@ import { semanticColors } from "@/constants/tokens";
 
 type ChatInputBarProps = {
   onSend: (text: string) => void;
+  disabled?: boolean;
 };
 
-export function ChatInputBar({ onSend }: ChatInputBarProps) {
+export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
   const [text, setText] = useState("");
-  const canSend = text.trim().length > 0;
+  const canSend = text.trim().length > 0 && !disabled;
 
   function handleSend() {
     if (!canSend) return;
