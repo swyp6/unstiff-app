@@ -21,11 +21,14 @@ export default function AppTabs() {
         />
       </NativeTabs.Trigger>
 
-      <NativeTabs.Trigger name="xp">
-        <NativeTabs.Trigger.Label>XP</NativeTabs.Trigger.Label>
+      <NativeTabs.Trigger name="chat">
+        <NativeTabs.Trigger.Label>찌뿌둥</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
-          sf={{ default: "star", selected: "star.fill" }}
-          md="star"
+          sf={{
+            default: "bubble.left.and.bubble.right",
+            selected: "bubble.left.and.bubble.right.fill",
+          }}
+          md="chat_bubble"
         />
       </NativeTabs.Trigger>
 
