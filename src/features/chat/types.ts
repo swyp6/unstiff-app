@@ -8,6 +8,8 @@ export type ChatMessage = {
   createdAt: string;
   mission?: AiChatMissionPayload;
   options?: string[];
+  // 로컬 전용 안내(예: 전송 실패 메시지) — 다음 요청의 API history에서 제외한다.
+  excludeFromHistory?: boolean;
 };
 
 // DTOs mirroring POST /api/v1/chat/ai/send (see swagger: AiChat* schemas).

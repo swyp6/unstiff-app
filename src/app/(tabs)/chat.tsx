@@ -37,11 +37,15 @@ export default function ChatScreen() {
               listRef.current?.scrollToEnd({ animated: true })
             }
             renderItem={({ item }) => (
-              <ChatBubble message={item} onSelectOption={sendMessage} />
+              <ChatBubble
+                message={item}
+                onSelectOption={sendMessage}
+                optionsDisabled={isTyping}
+              />
             )}
             style={{ flex: 1 }}
           />
-          <ChatInputBar onSend={sendMessage} />
+          <ChatInputBar disabled={isTyping} onSend={sendMessage} />
         </KeyboardAvoidingView>
       </SafeAreaView>
     </ThemedView>
