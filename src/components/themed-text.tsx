@@ -60,35 +60,37 @@ export function ThemedText({
 
 const styles = StyleSheet.create({
   small: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 500,
   },
   smallBold: {
+    fontFamily: "Pretendard-Bold",
     fontSize: 14,
     lineHeight: 20,
-    fontWeight: 700,
   },
   default: {
+    fontFamily: "Pretendard-Medium",
     fontSize: 16,
     lineHeight: 24,
-    fontWeight: 500,
   },
   title: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 48,
-    fontWeight: 600,
     lineHeight: 52,
   },
   subtitle: {
+    fontFamily: "Pretendard-SemiBold",
     fontSize: 32,
     lineHeight: 44,
-    fontWeight: 600,
   },
   link: {
+    fontFamily: "Pretendard-Regular",
     lineHeight: 30,
     fontSize: 14,
   },
   linkPrimary: {
+    fontFamily: "Pretendard-Regular",
     lineHeight: 30,
     fontSize: 14,
     color: "#3c87f7",
