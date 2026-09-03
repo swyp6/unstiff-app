@@ -1,8 +1,10 @@
+import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { semanticColors } from "@/constants/tokens";
+import { LEGAL_URLS } from "@/constants/legal-urls";
 import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
 import {
@@ -17,9 +19,17 @@ const ACCOUNT_ITEMS = [
 ] as const;
 
 const SERVICE_ITEMS = [
-  { title: "이용약관", href: "/mypage/settings/terms" },
-  { title: "개인정보 처리방침", href: "/mypage/settings/privacy" },
+  { title: "이용약관", url: LEGAL_URLS.terms },
+  { title: "개인정보 처리방침", url: LEGAL_URLS.privacy },
 ] as const;
+
+async function openLegalDocument(url: string) {
+  try {
+    await WebBrowser.openBrowserAsync(url);
+  } catch {
+    Alert.alert("오류", "페이지를 열지 못했습니다. 잠시 후 다시 시도해주세요.");
+  }
+}
 
 export default function SettingsScreen() {
   function handleLogout() {
@@ -56,8 +66,8 @@ export default function SettingsScreen() {
           <View>
             {SERVICE_ITEMS.map((item) => (
               <SettingsRow
-                key={item.href}
-                onPress={() => router.push(item.href)}
+                key={item.url}
+                onPress={() => void openLegalDocument(item.url)}
                 title={item.title}
               />
             ))}
