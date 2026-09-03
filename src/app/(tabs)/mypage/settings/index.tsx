@@ -23,6 +23,14 @@ const SERVICE_ITEMS = [
   { title: "개인정보 처리방침", url: LEGAL_URLS.privacy },
 ] as const;
 
+async function openLegalDocument(url: string) {
+  try {
+    await WebBrowser.openBrowserAsync(url);
+  } catch {
+    Alert.alert("오류", "페이지를 열지 못했습니다. 잠시 후 다시 시도해주세요.");
+  }
+}
+
 export default function SettingsScreen() {
   function handleLogout() {
     Alert.alert("로그아웃", "로그아웃 하시겠어요?", [
@@ -59,7 +67,7 @@ export default function SettingsScreen() {
             {SERVICE_ITEMS.map((item) => (
               <SettingsRow
                 key={item.url}
-                onPress={() => WebBrowser.openBrowserAsync(item.url)}
+                onPress={() => void openLegalDocument(item.url)}
                 title={item.title}
               />
             ))}

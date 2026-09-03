@@ -4,7 +4,9 @@
 
 @layer base {
   html {
-    font-family: Inter, "Noto Sans KR", sans-serif;
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR",
+      "Segoe UI", sans-serif;
     word-break: keep-all;
   }
 
@@ -33,6 +35,6 @@
   }
 
   .legal-document p {
-    @apply mt-2 text-t02 font-normal text-label-disabled;
+    @apply mt-2 text-t02 font-normal text-label-subtle;
   }
 }
