@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: Inter, "Noto Sans KR", sans-serif;
+    word-break: keep-all;
+  }
+
+  body {
+    @apply m-0 bg-background-normal text-label-normal antialiased;
+  }
+}
+
+@layer components {
+  .legal-page {
+    @apply mx-auto min-h-screen w-full max-w-[800px] px-6 py-8 sm:py-12;
+    padding-top: max(2rem, env(safe-area-inset-top));
+    padding-bottom: max(2rem, env(safe-area-inset-bottom));
+  }
+
+  .legal-document {
+    @apply mt-7 rounded-default border border-line-normal bg-fill-subtle p-4;
+  }
+
+  .legal-document h2 {
+    @apply text-t03 font-medium text-label-subtle;
+  }
+
+  .legal-document h2:not(:first-child) {
+    @apply mt-6;
+  }
+
+  .legal-document p {
+    @apply mt-2 text-t02 font-normal text-label-disabled;
+  }
+}

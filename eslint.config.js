@@ -6,6 +6,6 @@ module.exports = defineConfig([
   expoConfig,
   {
     // Figma plugin sandbox globals (figma, __html__) aren't part of this app's runtime.
-    ignores: ["dist/*", "figma-plugin/**"],
+    ignores: ["dist/*", "figma-plugin/**", "legal/**"],
   },
 ]);

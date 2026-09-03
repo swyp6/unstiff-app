@@ -1,8 +1,10 @@
+import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { semanticColors } from "@/constants/tokens";
+import { LEGAL_URLS } from "@/constants/legal-urls";
 import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
 import {
@@ -17,8 +19,8 @@ const ACCOUNT_ITEMS = [
 ] as const;
 
 const SERVICE_ITEMS = [
-  { title: "이용약관", href: "/mypage/settings/terms" },
-  { title: "개인정보 처리방침", href: "/mypage/settings/privacy" },
+  { title: "이용약관", url: LEGAL_URLS.terms },
+  { title: "개인정보 처리방침", url: LEGAL_URLS.privacy },
 ] as const;
 
 export default function SettingsScreen() {
@@ -56,8 +58,8 @@ export default function SettingsScreen() {
           <View>
             {SERVICE_ITEMS.map((item) => (
               <SettingsRow
-                key={item.href}
-                onPress={() => router.push(item.href)}
+                key={item.url}
+                onPress={() => WebBrowser.openBrowserAsync(item.url)}
                 title={item.title}
               />
             ))}
