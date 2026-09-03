@@ -16,7 +16,7 @@ export type ThemedTextProps = TextProps & {
     | "code";
   /**
    * A named style from the Figma foundation's typography scale (e.g.
-   * "title-1-bold", "en-body-2-regular" — see src/constants/tokens.ts).
+   * "title-1-bold", "body-2-regular" — see src/constants/tokens.ts).
    * Overrides `type`'s font styling when set.
    */
   typography?: keyof typeof typography;
