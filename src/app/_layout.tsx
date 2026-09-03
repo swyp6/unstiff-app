@@ -1,15 +1,5 @@
 import "@/global.css";
 
-import {
-  Inter_400Regular,
-  Inter_500Medium,
-  Inter_700Bold,
-} from "@expo-google-fonts/inter";
-import {
-  NotoSansKR_400Regular,
-  NotoSansKR_500Medium,
-  NotoSansKR_700Bold,
-} from "@expo-google-fonts/noto-sans-kr";
 import { useFonts } from "expo-font";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -23,14 +13,12 @@ SplashScreen.preventAutoHideAsync();
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   // Font names match tokens.ts's `typography` fontFamily values — see
-  // scripts/sync-figma-tokens.js's WEIGHT_SUFFIX/*_FONT_PREFIX constants.
+  // scripts/sync-figma-tokens.js's WEIGHT_SUFFIX/FONT_FAMILY_PREFIX constants.
   const [fontsLoaded, fontError] = useFonts({
-    Inter_400Regular,
-    Inter_500Medium,
-    Inter_700Bold,
-    NotoSansKR_400Regular,
-    NotoSansKR_500Medium,
-    NotoSansKR_700Bold,
+    "Pretendard-Regular": require("../../assets/fonts/Pretendard-Regular.otf"),
+    "Pretendard-Medium": require("../../assets/fonts/Pretendard-Medium.otf"),
+    "Pretendard-SemiBold": require("../../assets/fonts/Pretendard-SemiBold.otf"),
+    "Pretendard-Bold": require("../../assets/fonts/Pretendard-Bold.otf"),
   });
 
   if (!fontsLoaded && !fontError) return null;

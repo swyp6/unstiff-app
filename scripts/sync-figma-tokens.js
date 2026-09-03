@@ -51,22 +51,22 @@ const TYPOGRAPHY_SCALE = [
   },
 ];
 
-// Maps to the exact font family names `useFonts()` registers for
-// @expo-google-fonts/noto-sans-kr and @expo-google-fonts/inter (see
-// src/app/_layout.tsx) — RN needs the weight baked into the family name,
-// setting `fontWeight` alongside a specific weighted custom font is unreliable
-// on Android, so weight is intentionally not a separate style property here.
+// Maps to the exact font family names `useFonts()` registers for the local
+// Pretendard static font files (see src/app/_layout.tsx) — RN needs the
+// weight baked into the family name, setting `fontWeight` alongside a
+// specific weighted custom font is unreliable on Android, so weight is
+// intentionally not a separate style property here.
 const WEIGHT_SUFFIX = {
-  regular: "400Regular",
-  medium: "500Medium",
-  bold: "700Bold",
+  regular: "Regular",
+  medium: "Medium",
+  bold: "Bold",
 };
-const KOREAN_FONT_PREFIX = "NotoSansKR";
-const ENGLISH_FONT_PREFIX = "Inter";
+const FONT_FAMILY_PREFIX = "Pretendard";
 
 // Known primitive color palette names vs. semantic ("color/...") names.
 const PRIMITIVE_GROUPS = [
   "charcoal",
+  "orange",
   "sky",
   "neutral",
   "red",
@@ -168,16 +168,11 @@ function buildTokens(apiResponse) {
       );
     }
     for (const weight of scale.weights) {
-      for (const [suffix, fontPrefix] of [
-        ["", KOREAN_FONT_PREFIX],
-        ["en-", ENGLISH_FONT_PREFIX],
-      ]) {
-        typography[`${suffix}${scale.name}-${weight}`] = {
-          fontFamily: `${fontPrefix}_${WEIGHT_SUFFIX[weight]}`,
-          fontSize: size,
-          lineHeight,
-        };
-      }
+      typography[`${scale.name}-${weight}`] = {
+        fontFamily: `${FONT_FAMILY_PREFIX}-${WEIGHT_SUFFIX[weight]}`,
+        fontSize: size,
+        lineHeight,
+      };
     }
   }
 
