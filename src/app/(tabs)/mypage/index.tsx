@@ -1,90 +1,99 @@
 import { router } from "expo-router";
-import { Alert, Pressable } from "react-native";
+import { useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Spacing } from "@/constants/theme";
-import { logout } from "@/features/auth/logout";
-import { useOnboardingStore } from "@/store/onboarding-store";
+import { semanticColors } from "@/constants/tokens";
+import { ActivityBarChart } from "@/features/mypage/components/activity/activity-bar-chart";
+import { ActivityCompositionCard } from "@/features/mypage/components/activity/activity-composition-card";
+import { RecentActivityList } from "@/features/mypage/components/activity/recent-activity-list";
+import { BadgeGrid } from "@/features/mypage/components/badges/badge-grid";
+import { MyPageHeader } from "@/features/mypage/components/mypage-header";
+import {
+  MyPageTabs,
+  type MyPageTabKey,
+} from "@/features/mypage/components/mypage-tabs";
+import { ProfileCard } from "@/features/mypage/components/profile-card";
+import { StreakDotMatrix } from "@/features/mypage/components/streak/streak-dot-matrix";
+import { StreakRingGraph } from "@/features/mypage/components/streak/streak-ring-graph";
+import { StreakSummaryCard } from "@/features/mypage/components/streak/streak-summary-card";
+import {
+  MOCK_ACTIVITY,
+  MOCK_BADGES,
+  MOCK_STREAK,
+} from "@/features/mypage/mock-data";
 
-// No Figma design has been shared for this tab yet — placeholder screen with
-// just the settings entry and logout actions wired up.
 export default function MyPageScreen() {
-  function handleLogout() {
-    Alert.alert("로그아웃", "로그아웃 하시겠어요?", [
-      { text: "취소", style: "cancel" },
-      {
-        text: "로그아웃",
-        style: "destructive",
-        onPress: logout,
-      },
-    ]);
-  }
-
-  function handleLogoutAndResetOnboarding() {
-    Alert.alert(
-      "로그아웃 + 온보딩 초기화",
-      "로그아웃하고 온보딩부터 다시 보시겠어요?",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "초기화",
-          style: "destructive",
-          onPress: () => {
-            useOnboardingStore.getState().resetOnboarding();
-            logout();
-          },
-        },
-      ],
-    );
-  }
+  const [activeTab, setActiveTab] = useState<MyPageTabKey>("streak");
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView
-        style={{
-          flex: 1,
-          paddingHorizontal: Spacing.three,
-          gap: Spacing.three,
-        }}
+    <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
+      <MyPageHeader onPressSettings={() => router.push("/mypage/settings")} />
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
       >
-        <ThemedText
-          typography="title-2-bold"
-          style={{ marginTop: Spacing.two, marginBottom: Spacing.one }}
-        >
-          마이페이지
-        </ThemedText>
+        <ProfileCard />
 
-        <Pressable
-          className="items-center rounded-2xl border border-line-normal py-4"
-          accessibilityRole="button"
-          accessibilityLabel="설정"
-          onPress={() => router.push("/mypage/settings")}
-        >
-          <ThemedText typography="body-2-bold">설정</ThemedText>
-        </Pressable>
+        <View style={styles.tabsSection}>
+          <MyPageTabs active={activeTab} onChange={setActiveTab} />
 
-        <Pressable
-          className="items-center rounded-2xl border border-line-normal py-4"
-          accessibilityRole="button"
-          accessibilityLabel="로그아웃"
-          onPress={handleLogout}
-        >
-          <ThemedText typography="body-2-bold">로그아웃</ThemedText>
-        </Pressable>
+          <View style={styles.tabContent}>
+            {activeTab === "streak" && (
+              <>
+                <StreakSummaryCard
+                  currentStreakDays={MOCK_STREAK.currentStreakDays}
+                />
+                <StreakRingGraph
+                  lastMonthRate={MOCK_STREAK.lastMonthRate}
+                  monthLabel={MOCK_STREAK.monthLabel}
+                  thisMonthRate={MOCK_STREAK.thisMonthRate}
+                />
+                <StreakDotMatrix weeks={MOCK_STREAK.weeks} />
+              </>
+            )}
 
-        <Pressable
-          className="items-center rounded-2xl border border-line-normal py-4"
-          accessibilityRole="button"
-          accessibilityLabel="로그아웃 후 온보딩 초기화"
-          onPress={handleLogoutAndResetOnboarding}
-        >
-          <ThemedText typography="body-2-bold" themeColor="textSecondary">
-            로그아웃 + 온보딩 초기화
-          </ThemedText>
-        </Pressable>
-      </SafeAreaView>
-    </ThemedView>
+            {activeTab === "badge" && <BadgeGrid badges={MOCK_BADGES} />}
+
+            {activeTab === "activity" && (
+              <>
+                <ActivityBarChart
+                  deltaLabel={MOCK_ACTIVITY.deltaLabel}
+                  totalDays={MOCK_ACTIVITY.totalDays}
+                  weekly={MOCK_ACTIVITY.weekly}
+                />
+                <ActivityCompositionCard
+                  dailyMissionCount={MOCK_ACTIVITY.dailyMissionCount}
+                  workoutPlanCount={MOCK_ACTIVITY.workoutPlanCount}
+                />
+                <RecentActivityList items={MOCK_ACTIVITY.recent} />
+              </>
+            )}
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    backgroundColor: semanticColors["fill-subtle"],
+    flex: 1,
+  },
+  content: {
+    gap: 16,
+    paddingBottom: 32,
+    paddingHorizontal: 20,
+    paddingTop: 18,
+  },
+  tabsSection: {
+    backgroundColor: semanticColors["background-normal"],
+    borderRadius: 12,
+  },
+  tabContent: {
+    gap: 16,
+    paddingTop: 16,
+  },
+});
