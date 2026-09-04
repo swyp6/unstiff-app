@@ -79,10 +79,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       fetchAiChatHistory(CONVERSATION_TYPE, { size: HISTORY_PAGE_SIZE }),
     ])
       .then(([{ available }, history]) => {
-        // 히스토리는 최신순으로 내려오므로 화면에 보여줄 때는 뒤집는다.
-        const historyMessages = [...history.items]
-          .reverse()
-          .map(fromHistoryItem);
+        // 히스토리는 오래된 순(오름차순)으로 내려와 화면에 보여줄 순서와 같다.
+        const historyMessages = history.items.map(fromHistoryItem);
 
         if (historyMessages.length > 0) {
           const lastMessage = historyMessages[historyMessages.length - 1];

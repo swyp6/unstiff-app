@@ -1,28 +1,35 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { AI_NAME } from "@/features/chat/constants";
 import type { ChatMessage } from "@/features/chat/types";
 
-// 버튼/카드에 쓰이는 radius.default(10)보다 크게 잡은, 말풍선 전용 로컬 값.
-const BUBBLE_RADIUS = 20;
+import { ChatAvatar } from "./chat-avatar";
+
+const BOT_AVATAR_SIZE = 28;
+// 봇 말풍선을 아바타+이름 아래 이름 텍스트에 맞춰 들여쓰기(아바타 너비 + gap).
+const BOT_BUBBLE_INDENT = BOT_AVATAR_SIZE + 8;
 
 type ChatBubbleProps = {
   message: ChatMessage;
-  onSelectOption?: (text: string) => void;
-  optionsDisabled?: boolean;
 };
 
-export function ChatBubble({
-  message,
-  onSelectOption,
-  optionsDisabled,
-}: ChatBubbleProps) {
+export function ChatBubble({ message }: ChatBubbleProps) {
   const isUser = message.role === "user";
 
   return (
     <View style={[styles.column, isUser && styles.columnUser]}>
-      <View style={[styles.row, isUser && styles.rowUser]}>
+      {!isUser && (
+        <View style={styles.botHeader}>
+          <ChatAvatar size={BOT_AVATAR_SIZE} />
+          <ThemedText style={styles.botName} typography="caption-1-medium">
+            {AI_NAME}
+          </ThemedText>
+        </View>
+      )}
+
+      <View style={[styles.row, isUser ? styles.rowUser : styles.rowBot]}>
         <View
           style={[
             styles.bubble,
@@ -37,27 +44,6 @@ export function ChatBubble({
           </ThemedText>
         </View>
       </View>
-
-      {!!message.options?.length && (
-        <View style={styles.optionsRow}>
-          {message.options.map((option) => (
-            <Pressable
-              key={option}
-              accessibilityRole="button"
-              disabled={optionsDisabled}
-              onPress={() => onSelectOption?.(option)}
-              style={[
-                styles.optionChip,
-                optionsDisabled && styles.optionChipDisabled,
-              ]}
-            >
-              <ThemedText typography="body-3-medium" themeColor="text">
-                {option}
-              </ThemedText>
-            </Pressable>
-          ))}
-        </View>
-      )}
     </View>
   );
 }
@@ -70,42 +56,45 @@ const styles = StyleSheet.create({
   columnUser: {
     alignItems: "flex-end",
   },
+  botHeader: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  botName: {
+    color: semanticColors["label-subtle"],
+  },
   row: {
     flexDirection: "row",
   },
   rowUser: {
     justifyContent: "flex-end",
   },
+  rowBot: {
+    paddingLeft: BOT_BUBBLE_INDENT,
+  },
   bubble: {
-    borderRadius: BUBBLE_RADIUS,
-    maxWidth: "78%",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+    maxWidth: "68%",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
   bubbleAssistant: {
     backgroundColor: semanticColors["fill-normal"],
+    borderColor: semanticColors["line-normal"],
+    borderWidth: 1,
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 18,
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 18,
   },
   bubbleUser: {
-    backgroundColor: semanticColors["accent-normal"],
+    backgroundColor: semanticColors["label-normal"],
+    borderBottomLeftRadius: 18,
+    borderBottomRightRadius: 4,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
   },
   textUser: {
     color: semanticColors["label-inverse"],
-  },
-  optionsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    maxWidth: "90%",
-  },
-  optionChip: {
-    backgroundColor: semanticColors["fill-subtle"],
-    borderColor: semanticColors["line-normal"],
-    borderRadius: 16,
-    borderWidth: 1,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-  },
-  optionChipDisabled: {
-    opacity: 0.4,
   },
 });
