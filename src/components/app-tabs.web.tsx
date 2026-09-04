@@ -22,13 +22,16 @@ export default function AppTabs() {
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/home" asChild>
-            <TabButton icon="home">Home</TabButton>
+            <TabButton icon="home">홈</TabButton>
+          </TabTrigger>
+          <TabTrigger name="capture" href="/capture" asChild>
+            <TabButton icon="camera">카메라</TabButton>
           </TabTrigger>
           <TabTrigger name="chat" href="/chat" asChild>
-            <TabButton icon="chat">찌뿌둥</TabButton>
+            <TabButton icon="chat">채팅</TabButton>
           </TabTrigger>
           <TabTrigger name="mypage" href="/mypage" asChild>
-            <TabButton icon="person">마이페이지</TabButton>
+            <TabButton icon="person">마이</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>
@@ -36,10 +39,11 @@ export default function AppTabs() {
   );
 }
 
-type TabIconName = "home" | "chat" | "person";
+type TabIconName = "home" | "camera" | "chat" | "person";
 
 const IOS_SYMBOL_NAMES: Record<TabIconName, SFSymbol> = {
   home: "house",
+  camera: "camera",
   chat: "bubble.left.and.bubble.right",
   person: "person",
 };
@@ -58,13 +62,13 @@ export function TabButton({
         style={styles.tabButtonView}
       >
         <SymbolView
-          tintColor={isFocused ? colors.text : colors.textSecondary}
+          tintColor={isFocused ? colors.textSecondary : colors.textDisabled}
           name={{ ios: IOS_SYMBOL_NAMES[icon], web: icon }}
           size={14}
         />
         <ThemedText
           type="small"
-          themeColor={isFocused ? "text" : "textSecondary"}
+          themeColor={isFocused ? "textSecondary" : "textDisabled"}
         >
           {children}
         </ThemedText>

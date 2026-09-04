@@ -20,6 +20,8 @@ export const Colors = {
     backgroundElement: semanticColors["fill-normal"],
     backgroundSelected: semanticColors["fill-strong"],
     textSecondary: semanticColors["label-subtle"],
+    textDisabled: semanticColors["label-disabled"],
+    border: semanticColors["line-normal"],
   },
   dark: {
     text: "#ffffff",
@@ -27,6 +29,8 @@ export const Colors = {
     backgroundElement: "#212225",
     backgroundSelected: "#2E3135",
     textSecondary: "#B0B4BA",
+    textDisabled: "#6B7280",
+    border: "#2E3135",
   },
 } as const;
 
