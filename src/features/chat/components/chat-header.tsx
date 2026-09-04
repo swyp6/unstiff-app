@@ -1,18 +1,23 @@
 import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { AI_NAME } from "@/features/chat/constants";
+import { semanticColors } from "@/constants/tokens";
 
-import { ChatAvatar } from "./chat-avatar";
+type ChatHeaderProps = {
+  // 가장 최근 메시지의 시각 — 아직 대화가 시작되지 않았으면 생략한다.
+  subtitle?: string;
+};
 
-// 탭 루트 화면이라 뒤로가기 버튼은 없음 — SettingsHeader와 높이/여백 컨벤션만 맞춘다.
-export function ChatHeader() {
+// 탭 루트 화면이라 뒤로가기 버튼은 없음 — 제목 아래에 마지막 대화 시각만 보여준다.
+export function ChatHeader({ subtitle }: ChatHeaderProps) {
   return (
     <View style={styles.header}>
-      <ChatAvatar size={36} />
-      <ThemedText style={styles.name} typography="heading-1-medium">
-        {AI_NAME}
-      </ThemedText>
+      <ThemedText typography="body-2-bold">대화</ThemedText>
+      {!!subtitle && (
+        <ThemedText style={styles.subtitle} typography="caption-2-regular">
+          {subtitle}
+        </ThemedText>
+      )}
     </View>
   );
 }
@@ -20,12 +25,13 @@ export function ChatHeader() {
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    height: 72,
-    paddingHorizontal: 24,
+    borderBottomColor: semanticColors["line-normal"],
+    borderBottomWidth: 1,
+    gap: 2,
+    height: 56,
+    justifyContent: "center",
   },
-  name: {
-    marginTop: 1,
+  subtitle: {
+    color: semanticColors["label-disabled"],
   },
 });

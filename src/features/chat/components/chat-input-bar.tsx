@@ -23,6 +23,7 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
     <View style={styles.container}>
       <TextInput
         multiline
+        editable={!disabled}
         maxLength={1000}
         onChangeText={setText}
         placeholder="메시지를 입력하세요"
@@ -55,17 +56,17 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: "flex-end",
+    borderTopColor: semanticColors["line-normal"],
+    borderTopWidth: 1,
     flexDirection: "row",
-    gap: 8,
-    paddingBottom: 8,
-    paddingHorizontal: 16,
-    paddingTop: 8,
+    gap: 12,
+    paddingBottom: 12,
+    paddingHorizontal: 20,
+    paddingTop: 12,
   },
   input: {
-    backgroundColor: semanticColors["fill-subtle"],
-    borderColor: semanticColors["line-normal"],
+    backgroundColor: semanticColors["fill-normal"],
     borderRadius: 22,
-    borderWidth: 1,
     color: semanticColors["label-normal"],
     flex: 1,
     fontSize: 16,
@@ -76,13 +77,13 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: semanticColors["fill-strong"],
-    borderRadius: 18,
-    height: 36,
+    backgroundColor: semanticColors["fill-normal"],
+    borderRadius: 22,
+    height: 44,
     justifyContent: "center",
-    width: 36,
+    width: 44,
   },
   sendButtonActive: {
-    backgroundColor: semanticColors["accent-normal"],
+    backgroundColor: semanticColors["label-normal"],
   },
 });
