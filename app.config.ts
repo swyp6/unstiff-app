@@ -1,5 +1,13 @@
 import type { ExpoConfig } from "expo/config";
 
+// Set by EAS Build to the profile name (e.g. "production", "preview",
+// "development"); undefined for local builds. Only a "production" profile
+// should get a production APNs environment — everything else needs
+// development, or push notifications silently fail against the wrong APNs
+// environment for that provisioning profile.
+const apsEnvironment =
+  process.env.EAS_BUILD_PROFILE === "production" ? "production" : "development";
+
 const config: ExpoConfig = {
   name: "unstiff",
   slug: "unstiff",
@@ -14,7 +22,7 @@ const config: ExpoConfig = {
     bundleIdentifier: "com.percent8.unstiff",
     googleServicesFile: "./GoogleService-Info.plist",
     entitlements: {
-      "aps-environment": "development",
+      "aps-environment": apsEnvironment,
     },
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
