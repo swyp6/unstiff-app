@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 import { registerPushDevice } from "@/features/notifications/api";
 import {
@@ -9,7 +9,11 @@ import {
 import { useAuthStore } from "@/store/auth-store";
 
 // Registers this device's FCM token with the backend once the user is
-// signed in, and re-registers whenever FCM rotates the token.
+// signed in, and re-registers whenever FCM rotates the token or the app
+// returns to the foreground. The foreground check matters because the FCM
+// refresh listener only fires while JS is running — a rotation that
+// happens while backgrounded would otherwise go unnoticed until some
+// unrelated accessToken change.
 export function useRegisterPushToken() {
   const accessToken = useAuthStore((state) => state.accessToken);
 
@@ -23,24 +27,36 @@ export function useRegisterPushToken() {
     // time it finally resolves.
     let cancelled = false;
 
-    getFcmToken()
-      .then((token) => {
-        if (cancelled || !token) return;
-        return registerPushDevice(token);
-      })
-      .catch((error) =>
-        console.log("[push] failed to register device token", error),
-      );
+    function syncToken() {
+      getFcmToken()
+        .then((token) => {
+          if (cancelled || !token) return;
+          return registerPushDevice(token);
+        })
+        .catch((error) =>
+          console.log("[push] failed to register device token", error),
+        );
+    }
 
-    const unsubscribe = subscribeToFcmTokenRefresh((token) => {
+    syncToken();
+
+    const unsubscribeRefresh = subscribeToFcmTokenRefresh((token) => {
       registerPushDevice(token).catch((error) =>
         console.log("[push] failed to register refreshed token", error),
       );
     });
 
+    const appStateSubscription = AppState.addEventListener(
+      "change",
+      (nextState) => {
+        if (nextState === "active") syncToken();
+      },
+    );
+
     return () => {
       cancelled = true;
-      unsubscribe();
+      unsubscribeRefresh();
+      appStateSubscription.remove();
     };
   }, [accessToken]);
 }
