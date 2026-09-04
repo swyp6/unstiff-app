@@ -86,10 +86,10 @@ export default function ChatScreen() {
             />
           )}
           {!isTyping &&
-            canSend &&
             lastMessage?.role === "assistant" &&
             !!lastMessage.options?.length && (
               <ChatOptionsBar
+                disabled={!canSend}
                 options={lastMessage.options}
                 onSelect={sendMessage}
               />
