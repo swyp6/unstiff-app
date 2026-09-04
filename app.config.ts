@@ -12,6 +12,13 @@ const config: ExpoConfig = {
   ios: {
     icon: "./assets/images/icon.png",
     bundleIdentifier: "com.percent8.unstiff",
+    googleServicesFile: "./GoogleService-Info.plist",
+    entitlements: {
+      "aps-environment": "development",
+    },
+    infoPlist: {
+      UIBackgroundModes: ["remote-notification"],
+    },
   },
 
   android: {
@@ -23,8 +30,12 @@ const config: ExpoConfig = {
     },
     predictiveBackGestureEnabled: false,
     package: "com.percent8.unstiff",
+    googleServicesFile: "./google-services.json",
 
-    permissions: ["android.permission.health.READ_STEPS"],
+    permissions: [
+      "android.permission.health.READ_STEPS",
+      "android.permission.POST_NOTIFICATIONS",
+    ],
 
     blockedPermissions: [
       "android.permission.ACCESS_COARSE_LOCATION",
@@ -39,6 +50,9 @@ const config: ExpoConfig = {
 
   plugins: [
     "expo-router",
+
+    ["@react-native-firebase/app", { ios: { disableSPM: true } }],
+    "@react-native-firebase/messaging",
 
     "expo-apple-authentication",
 
