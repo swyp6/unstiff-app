@@ -38,20 +38,6 @@ export function ChatBubble({
         </View>
       </View>
 
-      {message.mission && (
-        <View style={styles.missionCard}>
-          <ThemedText typography="body-2-bold" themeColor="text">
-            {message.mission.title}
-          </ThemedText>
-          <ThemedText
-            style={styles.missionDescription}
-            typography="body-3-regular"
-          >
-            {message.mission.description}
-          </ThemedText>
-        </View>
-      )}
-
       {!!message.options?.length && (
         <View style={styles.optionsRow}>
           {message.options.map((option) => (
@@ -104,16 +90,6 @@ const styles = StyleSheet.create({
   },
   textUser: {
     color: semanticColors["label-inverse"],
-  },
-  missionCard: {
-    backgroundColor: semanticColors["accent-subtle"],
-    borderRadius: 16,
-    gap: 4,
-    maxWidth: "78%",
-    padding: 14,
-  },
-  missionDescription: {
-    color: semanticColors["label-subtle"],
   },
   optionsRow: {
     flexDirection: "row",

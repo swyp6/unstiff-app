@@ -6,36 +6,53 @@ export type ChatMessage = {
   role: ChatRole;
   text: string;
   createdAt: string;
-  mission?: AiChatMissionPayload;
   options?: string[];
-  // 로컬 전용 안내(예: 전송 실패 메시지) — 다음 요청의 API history에서 제외한다.
-  excludeFromHistory?: boolean;
+  // 이 메시지로 오늘 대화가 종료되었는지 — true면 이후 메시지를 보낼 수 없다.
+  stop?: boolean;
 };
 
-// DTOs mirroring POST /api/v1/chat/ai/send (see swagger: AiChat* schemas).
-export type AiConversationType = "DAILY_MISSION" | "DAILY_DISCOVERY";
+// DTOs mirroring the AI 캐릭터 대화 API (see swagger: AiChat* schemas).
+export type AiConversationType = "DAILY_DISCOVERY";
 export type AiChatApiRole = "USER" | "ASSISTANT";
 
-export type AiChatMessageItem = {
-  role: AiChatApiRole;
-  content: string;
-};
-
+// POST /api/v1/chat/ai/send — message를 생략하면 오늘의 대화 시작을 요청하는 것으로
+// 서버가 처리한다. 서버가 대화를 저장하므로 히스토리를 함께 보낼 필요는 없다.
 export type AiChatSendRequest = {
   conversationType: AiConversationType;
-  personalizationContext?: string;
-  messages: AiChatMessageItem[];
-};
-
-export type AiChatMissionPayload = {
-  title: string;
-  description: string;
+  message?: string;
 };
 
 export type AiChatMessageResponse = {
   role: AiChatApiRole;
   content: string;
-  mission?: AiChatMissionPayload;
   options?: string[];
+  stop: boolean;
   createdAt: string;
+};
+
+// POST /api/v1/chat/ai/enter
+export type AiChatEnterResponse = {
+  available: boolean;
+};
+
+// GET /api/v1/chat/ai/messages
+export type CursorRequest = {
+  cursor?: number;
+  size?: number;
+};
+
+export type AiChatHistoryItem = {
+  id: number;
+  type: AiConversationType;
+  role: AiChatApiRole;
+  message: string;
+  options?: string[];
+  stop: boolean;
+  createdAt: string;
+};
+
+export type CursorResponse<T> = {
+  items: T[];
+  nextCursor?: number;
+  hasNext: boolean;
 };
