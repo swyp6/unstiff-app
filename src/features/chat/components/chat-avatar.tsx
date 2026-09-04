@@ -40,7 +40,9 @@ export function ChatAvatar({ size = 36, imageUri }: ChatAvatarProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    backgroundColor: semanticColors["fill-subtle"],
+    backgroundColor: semanticColors["fill-normal"],
+    borderColor: semanticColors["line-normal"],
+    borderWidth: 1,
     justifyContent: "center",
     overflow: "hidden",
   },
