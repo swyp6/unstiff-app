@@ -16,20 +16,31 @@ export function useRegisterPushToken() {
   useEffect(() => {
     if (Platform.OS === "web" || !accessToken) return;
 
+    // Guards against a slow getFcmToken() from a previous account still
+    // resolving after accessToken has already changed (e.g. quick
+    // logout/login) — without this, a stale call could register the
+    // device against whichever account happens to be signed in by the
+    // time it finally resolves.
+    let cancelled = false;
+
     getFcmToken()
       .then((token) => {
-        console.log("[push] FCM token:", token);
-        if (token) return registerPushDevice(token);
+        if (cancelled || !token) return;
+        return registerPushDevice(token);
       })
       .catch((error) =>
         console.log("[push] failed to register device token", error),
       );
 
-    return subscribeToFcmTokenRefresh((token) => {
-      console.log("[push] FCM token refreshed:", token);
+    const unsubscribe = subscribeToFcmTokenRefresh((token) => {
       registerPushDevice(token).catch((error) =>
         console.log("[push] failed to register refreshed token", error),
       );
     });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [accessToken]);
 }
