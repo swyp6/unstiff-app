@@ -1,0 +1,184 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
+import type { ReactNode } from "react";
+import { Pressable, StyleSheet, View } from "react-native";
+
+import { ThemedText } from "@/components/themed-text";
+import { semanticColors } from "@/constants/tokens";
+
+export function WorkoutPlanDragIndicator() {
+  return <View style={styles.dragIndicator} />;
+}
+
+export function WorkoutPlanHeader({
+  title,
+  onBack,
+  action,
+}: {
+  title: string;
+  onBack: () => void;
+  action?: ReactNode;
+}) {
+  return (
+    <View style={styles.header}>
+      <Pressable
+        accessibilityLabel="뒤로가기"
+        accessibilityRole="button"
+        hitSlop={8}
+        onPress={onBack}
+        style={styles.headerSide}
+      >
+        <Ionicons
+          color={semanticColors["label-normal"]}
+          name="chevron-back"
+          size={22}
+        />
+      </Pressable>
+      <ThemedText
+        numberOfLines={1}
+        style={styles.headerTitle}
+        typography="title-2-bold"
+      >
+        {title}
+      </ThemedText>
+      <View style={[styles.headerSide, styles.headerAction]}>{action}</View>
+    </View>
+  );
+}
+
+export function SectionLabel({ children }: { children: ReactNode }) {
+  return (
+    <ThemedText style={styles.sectionLabel} typography="caption-1-bold">
+      {children}
+    </ThemedText>
+  );
+}
+
+export function SelectionRow({
+  value,
+  onPress,
+  accessibilityLabel,
+}: {
+  value: string;
+  onPress?: () => void;
+  accessibilityLabel?: string;
+}) {
+  const content = (
+    <>
+      <ThemedText typography="body-2-bold">{value}</ThemedText>
+      <View style={styles.selectionValue}>
+        {onPress && (
+          <Ionicons
+            color={semanticColors["label-subtle"]}
+            name="chevron-forward"
+            size={24}
+          />
+        )}
+      </View>
+    </>
+  );
+
+  if (!onPress) return <View style={styles.selectionRow}>{content}</View>;
+
+  return (
+    <Pressable
+      accessibilityLabel={accessibilityLabel}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.selectionPressable,
+        pressed && styles.pressed,
+      ]}
+    >
+      <View pointerEvents="none" style={styles.selectionRow}>
+        {content}
+      </View>
+    </Pressable>
+  );
+}
+
+export function PrimaryActionButton({
+  label,
+  onPress,
+}: {
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => pressed && styles.pressed}
+    >
+      <View style={styles.primaryButton}>
+        <ThemedText style={styles.primaryText} typography="body-2-bold">
+          {label}
+        </ThemedText>
+      </View>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  dragIndicator: {
+    alignSelf: "center",
+    backgroundColor: semanticColors["fill-normal"],
+    borderRadius: 2,
+    height: 4,
+    marginBottom: 18,
+    marginTop: 8,
+    width: 36,
+  },
+  header: {
+    alignItems: "center",
+    flexDirection: "row",
+    minHeight: 68,
+  },
+  headerSide: {
+    alignItems: "flex-start",
+    height: 44,
+    justifyContent: "center",
+    width: 44,
+  },
+  headerAction: {
+    alignItems: "flex-end",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+  },
+  sectionLabel: {
+    color: semanticColors["label-normal"],
+    marginBottom: 6,
+  },
+  selectionRow: {
+    alignItems: "center",
+    backgroundColor: semanticColors["fill-subtle"],
+    borderRadius: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    height: 50,
+    paddingHorizontal: 16,
+  },
+  selectionPressable: {
+    minHeight: 50,
+    width: "100%",
+  },
+  selectionValue: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 8,
+  },
+  primaryButton: {
+    alignItems: "center",
+    backgroundColor: semanticColors["label-normal"],
+    borderRadius: 14,
+    justifyContent: "center",
+    height: 54,
+  },
+  primaryText: {
+    color: semanticColors["label-inverse"],
+  },
+  pressed: {
+    opacity: 0.7,
+  },
+});
