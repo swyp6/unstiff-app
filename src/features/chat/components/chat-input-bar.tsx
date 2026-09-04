@@ -23,6 +23,7 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
     <View style={styles.container}>
       <TextInput
         multiline
+        editable={!disabled}
         maxLength={1000}
         onChangeText={setText}
         placeholder="메시지를 입력하세요"
