@@ -259,9 +259,27 @@ export default function HomeScreen() {
   const [savedWorkoutPlans, setSavedWorkoutPlans] = useState(
     INITIAL_SAVED_WORKOUT_PLANS,
   );
-  const [todayWorkouts, setTodayWorkouts] = useState<TodayWorkoutInstance[]>(
-    [],
-  );
+  // 날짜별 오늘의 운동 목록. 오늘뿐 아니라 미래 날짜에 담아둔 운동도 그 날짜의
+  // 캘린더 점 표시(hasScheduledWorkout)에 반영해야 해서 날짜 문자열로 나눠
+  // 저장한다.
+  const [workoutsByDate, setWorkoutsByDate] = useState<
+    Record<string, TodayWorkoutInstance[]>
+  >({});
+
+  function getWorkoutsForDate(date: Date): TodayWorkoutInstance[] {
+    return workoutsByDate[date.toDateString()] ?? [];
+  }
+
+  function updateWorkoutsForDate(
+    date: Date,
+    updater: (workouts: TodayWorkoutInstance[]) => TodayWorkoutInstance[],
+  ) {
+    const key = date.toDateString();
+    setWorkoutsByDate((current) => ({
+      ...current,
+      [key]: updater(current[key] ?? []),
+    }));
+  }
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   // "신규 운동 계획 추가"로 연 빈 계획 초안. null이면 시트가 안 보인다.
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
@@ -295,7 +313,7 @@ export default function HomeScreen() {
       if (planItemId === MISSION_PLAN_ITEM_ID) {
         setMissionStatus("completed");
       } else {
-        setTodayWorkouts((workouts) =>
+        updateWorkoutsForDate(new Date(), (workouts) =>
           workouts.map((workout) =>
             workout.id === planItemId
               ? { ...workout, isDone: true, photoUrl: secureUrl }
@@ -329,7 +347,7 @@ export default function HomeScreen() {
       regainedFocusWithPending &&
       pendingRecordPlanItemId !== MISSION_PLAN_ITEM_ID
     ) {
-      setTodayWorkouts((workouts) =>
+      updateWorkoutsForDate(new Date(), (workouts) =>
         workouts.map((workout) =>
           workout.id === pendingRecordPlanItemId
             ? { ...workout, isDone: false }
@@ -343,6 +361,8 @@ export default function HomeScreen() {
   }, [isFocused, pendingRecordPlanItemId]);
 
   const today = new Date();
+  const todayWorkouts = getWorkoutsForDate(today);
+  const selectedDateWorkouts = getWorkoutsForDate(selectedCalendarDate);
   const weeks = buildCalendarWeeks(viewedMonth);
   const previousMonthDate = new Date(
     viewedMonth.getFullYear(),
@@ -408,6 +428,9 @@ export default function HomeScreen() {
       commitMonthChange(-1);
       return;
     }
+    // Reanimated shared value — .value assignment is the intended API, not
+    // a mutation of a hook's return value.
+    // eslint-disable-next-line react-hooks/immutability
     dragX.value = withTiming(calendarWidth, { duration: 220 }, (finished) => {
       "worklet";
       if (finished) scheduleOnRN(commitMonthChange, -1);
@@ -419,6 +442,7 @@ export default function HomeScreen() {
       commitMonthChange(1);
       return;
     }
+    // eslint-disable-next-line react-hooks/immutability
     dragX.value = withTiming(-calendarWidth, { duration: 220 }, (finished) => {
       "worklet";
       if (finished) scheduleOnRN(commitMonthChange, 1);
@@ -435,6 +459,7 @@ export default function HomeScreen() {
         .onUpdate((event) => {
           "worklet";
           if (!calendarWidth) return;
+          // eslint-disable-next-line react-hooks/immutability
           dragX.value = Math.max(
             -calendarWidth,
             Math.min(calendarWidth, event.translationX),
@@ -445,6 +470,7 @@ export default function HomeScreen() {
           if (!calendarWidth) return;
 
           if (event.translationX < -MONTH_SWIPE_THRESHOLD) {
+            // eslint-disable-next-line react-hooks/immutability
             dragX.value = withTiming(
               -calendarWidth,
               { duration: 220 },
@@ -489,9 +515,19 @@ export default function HomeScreen() {
             (isToday && isTodayRecorded);
           const hasMultiplePhotos =
             isThisMonth && MOCK_MULTI_PHOTO_DAYS.has(day);
+          const cellDate = new Date(
+            monthDate.getFullYear(),
+            monthDate.getMonth(),
+            day,
+          );
           const isFutureDay =
-            new Date(monthDate.getFullYear(), monthDate.getMonth(), day) >
+            cellDate >
             new Date(today.getFullYear(), today.getMonth(), today.getDate());
+          // 미래 날짜에 이미 담아둔 운동이 있으면 점으로 표시한다(Figma node
+          // 2918-4983의 31일 셀). 사진 배경(hasPhoto)은 지난 날짜 전용이라
+          // 미래 날짜와 겹칠 일이 없다.
+          const hasScheduledWorkout =
+            isFutureDay && getWorkoutsForDate(cellDate).length > 0;
 
           const textColor =
             isToday && todayPhotoUrl
@@ -509,11 +545,7 @@ export default function HomeScreen() {
               key={dayIndex}
               accessibilityRole="button"
               accessibilityLabel={`${monthDate.getMonth() + 1}월 ${day}일`}
-              onPress={() =>
-                setSelectedCalendarDate(
-                  new Date(monthDate.getFullYear(), monthDate.getMonth(), day),
-                )
-              }
+              onPress={() => setSelectedCalendarDate(cellDate)}
               className="h-[60px] w-[43px]"
             >
               {/* 메인 카드보다 먼저 그려야 "뒤에 깔린" 것처럼 보인다 — 형제로
@@ -559,6 +591,9 @@ export default function HomeScreen() {
                 >
                   {day}
                 </ThemedText>
+                {hasScheduledWorkout && (
+                  <View className="absolute bottom-1.5 left-5 h-1 w-1 rounded-full bg-label-normal" />
+                )}
               </View>
             </Pressable>
           );
@@ -570,8 +605,8 @@ export default function HomeScreen() {
   const selectedPlan =
     savedWorkoutPlans.find((plan) => plan.id === selectedPlanId) ?? null;
 
-  function addSavedPlanToToday(plan: WorkoutPlanDraft) {
-    setTodayWorkouts((workouts) => [
+  function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
+    updateWorkoutsForDate(date, (workouts) => [
       ...workouts,
       createTodayWorkoutInstance(plan),
     ]);
@@ -586,7 +621,7 @@ export default function HomeScreen() {
     // 있을 때만 오늘의 운동에도 같이 추가한다(기본값은 꺼짐).
     setSavedWorkoutPlans((plans) => [...plans, plan]);
     if (addToToday) {
-      addSavedPlanToToday(plan);
+      addSavedPlanToDate(plan, today);
     }
     setNewPlanDraft(null);
   }
@@ -599,7 +634,7 @@ export default function HomeScreen() {
     if (!workout) return;
 
     if (workout.isDone) {
-      setTodayWorkouts((workouts) =>
+      updateWorkoutsForDate(today, (workouts) =>
         workouts.map((item) =>
           item.id === instanceId ? { ...item, isDone: false } : item,
         ),
@@ -607,7 +642,7 @@ export default function HomeScreen() {
       return;
     }
 
-    setTodayWorkouts((workouts) =>
+    updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) =>
         item.id === instanceId ? { ...item, isDone: true } : item,
       ),
@@ -653,7 +688,7 @@ export default function HomeScreen() {
     if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
       setMissionStatus("accepted");
     } else {
-      setTodayWorkouts((workouts) =>
+      updateWorkoutsForDate(today, (workouts) =>
         workouts.map((workout) =>
           workout.id === pendingRecordPlanItemId
             ? { ...workout, isDone: false }
@@ -806,16 +841,25 @@ export default function HomeScreen() {
           {isSelectedDateToday || isSelectedDateFuture ? (
             <TodayWorkoutCard
               dateLabel={isSelectedDateToday ? todayLabel : selectedDateLabel}
+              emptyStateLabel={
+                isSelectedDateToday
+                  ? "오늘 담은 운동이 없어요"
+                  : "담은 운동이 없어요"
+              }
               expanded={isTodayCardExpanded}
               onAddNewPlan={openNewPlanSheet}
-              onAddSavedPlan={addSavedPlanToToday}
+              onAddSavedPlan={(plan) =>
+                addSavedPlanToDate(plan, selectedCalendarDate)
+              }
               onOpenSavedPlan={setSelectedPlanId}
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
               }
               onToggleTodayWorkout={toggleTodayWorkoutDone}
+              readOnly={!isSelectedDateToday}
               savedWorkoutPlans={savedWorkoutPlans}
-              todayWorkouts={todayWorkouts}
+              title={isSelectedDateToday ? "오늘의 운동" : "예정된 운동"}
+              todayWorkouts={selectedDateWorkouts}
             />
           ) : (
             <DayRecordCard

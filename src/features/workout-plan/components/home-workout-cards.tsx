@@ -187,6 +187,12 @@ type TodayWorkoutCardProps = {
   onAddSavedPlan: (plan: WorkoutPlanDraft) => void;
   onOpenSavedPlan: (planId: string) => void;
   onAddNewPlan: () => void;
+  // 오늘이 아닌 미래 날짜를 보고 있을 때(Figma node 2910-4774/2918-4983):
+  // 제목·빈 상태 문구가 바뀌고, 아직 안 지난 날이라 완료 체크는 없앤다 —
+  // 수정(⋮)은 미래 날짜에도 그대로 가능해야 한다.
+  title?: string;
+  emptyStateLabel?: string;
+  readOnly?: boolean;
 };
 
 export function TodayWorkoutCard({
@@ -199,6 +205,9 @@ export function TodayWorkoutCard({
   onAddSavedPlan,
   onOpenSavedPlan,
   onAddNewPlan,
+  title = "오늘의 운동",
+  emptyStateLabel = "오늘 담은 운동이 없어요",
+  readOnly = false,
 }: TodayWorkoutCardProps) {
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
 
@@ -210,13 +219,13 @@ export function TodayWorkoutCard({
         onPress={onToggleExpanded}
       >
         <View className="flex-row items-center gap-2">
-          <ThemedText typography="body-2-bold">오늘의 운동</ThemedText>
+          <ThemedText typography="body-2-bold">{title}</ThemedText>
           <ThemedText typography="caption-1-medium" themeColor="textSecondary">
             {dateLabel}
           </ThemedText>
         </View>
         <View className="flex-row items-center gap-3">
-          {todayWorkouts.length > 0 && (
+          {!readOnly && todayWorkouts.length > 0 && (
             <ThemedText typography="caption-1-bold" themeColor="textSecondary">
               {doneCount} / {todayWorkouts.length}
             </ThemedText>
@@ -236,7 +245,7 @@ export function TodayWorkoutCard({
           {todayWorkouts.length === 0 ? (
             <View className="items-center py-6">
               <ThemedText typography="body-3-medium" themeColor="textSecondary">
-                오늘 담은 운동이 없어요
+                {emptyStateLabel}
               </ThemedText>
             </View>
           ) : (
@@ -244,7 +253,9 @@ export function TodayWorkoutCard({
               <TodayWorkoutRow
                 key={workout.id}
                 onOpenDetail={() => onOpenSavedPlan(workout.sourcePlanId)}
-                onToggle={() => onToggleTodayWorkout(workout.id)}
+                onToggle={
+                  readOnly ? undefined : () => onToggleTodayWorkout(workout.id)
+                }
                 workout={workout}
               />
             ))
@@ -301,31 +312,33 @@ function TodayWorkoutRow({
   onOpenDetail,
 }: {
   workout: TodayWorkoutInstance;
-  onToggle: () => void;
-  onOpenDetail: () => void;
+  onToggle?: () => void;
+  onOpenDetail?: () => void;
 }) {
   return (
     <View className="flex-row items-center gap-3 border-b border-line-subtle py-3">
-      <Pressable
-        accessibilityLabel={workout.isDone ? "완료 취소" : "완료로 표시"}
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: workout.isDone }}
-        className={
-          workout.isDone
-            ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal"
-            : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
-        }
-        hitSlop={8}
-        onPress={onToggle}
-      >
-        {workout.isDone && (
-          <Ionicons
-            color={semanticColors["label-inverse"]}
-            name="checkmark"
-            size={16}
-          />
-        )}
-      </Pressable>
+      {onToggle && (
+        <Pressable
+          accessibilityLabel={workout.isDone ? "완료 취소" : "완료로 표시"}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: workout.isDone }}
+          className={
+            workout.isDone
+              ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal"
+              : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
+          }
+          hitSlop={8}
+          onPress={onToggle}
+        >
+          {workout.isDone && (
+            <Ionicons
+              color={semanticColors["label-inverse"]}
+              name="checkmark"
+              size={16}
+            />
+          )}
+        </Pressable>
+      )}
       <View className="flex-1 gap-0.5">
         <ThemedText
           typography="body-3-bold"
@@ -345,19 +358,21 @@ function TodayWorkoutRow({
           {workout.subtitle}
         </ThemedText>
       </View>
-      <Pressable
-        accessibilityLabel={`${workout.title} 상세 보기`}
-        accessibilityRole="button"
-        className="h-[34px] w-[34px] items-center justify-center"
-        hitSlop={4}
-        onPress={onOpenDetail}
-      >
-        <Ionicons
-          color={semanticColors["label-subtle"]}
-          name="ellipsis-vertical"
-          size={20}
-        />
-      </Pressable>
+      {onOpenDetail && (
+        <Pressable
+          accessibilityLabel={`${workout.title} 상세 보기`}
+          accessibilityRole="button"
+          className="h-[34px] w-[34px] items-center justify-center"
+          hitSlop={4}
+          onPress={onOpenDetail}
+        >
+          <Ionicons
+            color={semanticColors["label-subtle"]}
+            name="ellipsis-vertical"
+            size={20}
+          />
+        </Pressable>
+      )}
     </View>
   );
 }
