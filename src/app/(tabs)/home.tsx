@@ -79,6 +79,32 @@ const INITIAL_SAVED_WORKOUT_PLANS: WorkoutPlanDraft[] = [
   },
 ];
 
+type DayRecord = {
+  missionTitle: string;
+  workouts: { title: string; subtitle: string }[];
+};
+
+// 오늘이 아닌 날을 탭했을 때 보여줄 목데이터. MOCK_PHOTO_DAYS/MOCK_MULTI_PHOTO_DAYS
+// (이번 달 캘린더에 사진 배경으로 이미 표시 중인 날짜)와 신호를 맞춰서, 캘린더에서
+// 사진이 있는 것처럼 보이는 날을 탭하면 실제로 미션·운동 기록이 나오게 한다.
+function getMockDayRecord(date: Date, today: Date): DayRecord | null {
+  const isSameMonthAsToday =
+    date.getFullYear() === today.getFullYear() &&
+    date.getMonth() === today.getMonth();
+  if (!isSameMonthAsToday || !MOCK_PHOTO_DAYS.has(date.getDate())) return null;
+
+  const workoutCount = MOCK_MULTI_PHOTO_DAYS.has(date.getDate()) ? 2 : 1;
+  return {
+    missionTitle: MISSION_TITLE,
+    workouts: INITIAL_SAVED_WORKOUT_PLANS.slice(0, workoutCount).map(
+      (plan) => ({
+        title: plan.title,
+        subtitle: getWorkoutPlanSummary(plan),
+      }),
+    ),
+  };
+}
+
 let nextTodayWorkoutInstanceId = 0;
 
 function createTodayWorkoutInstance(
@@ -113,6 +139,60 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
   return weeks;
 }
 
+// 오늘이 아닌 날을 탭했을 때 보여주는 읽기 전용 카드. 미션 "받기"/운동 체크 같은
+// 상호작용은 없다 — 그 날의 미션·운동 기록을 보여주기만 한다.
+function DayRecordCard({
+  dateLabel,
+  record,
+}: {
+  dateLabel: string;
+  record: DayRecord | null;
+}) {
+  return (
+    <View className="gap-4 rounded-[20px] border border-line-normal bg-background-normal px-5 py-[18px]">
+      <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+        {dateLabel}
+      </ThemedText>
+
+      {record ? (
+        <>
+          <View className="flex-row items-center gap-2">
+            <Ionicons
+              name="checkmark-circle"
+              size={18}
+              color={semanticColors["label-normal"]}
+            />
+            <ThemedText typography="body-3-bold">
+              {record.missionTitle}
+            </ThemedText>
+          </View>
+          <View className="gap-3">
+            {record.workouts.map((workout, index) => (
+              <View key={index} className="gap-0.5">
+                <ThemedText typography="body-3-bold">
+                  {workout.title}
+                </ThemedText>
+                <ThemedText
+                  typography="caption-1-regular"
+                  themeColor="textSecondary"
+                >
+                  {workout.subtitle}
+                </ThemedText>
+              </View>
+            ))}
+          </View>
+        </>
+      ) : (
+        <View className="items-center py-6">
+          <ThemedText typography="body-3-medium" themeColor="textSecondary">
+            이 날의 기록이 없어요
+          </ThemedText>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const theme = useTheme();
   // Native tabs render every tab's screen eagerly, so without this guard the
@@ -140,6 +220,12 @@ export default function HomeScreen() {
   >(null);
   const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  // 캘린더에서 탭한 날짜. 오늘이면 실제 미션/오늘의 운동(상호작용 가능)을 보여주고,
+  // 다른 날이면 그날의 미션·운동 목데이터를 읽기 전용으로 보여준다 — 미션 "받기"는
+  // 오늘 날짜에만 가능하므로 다른 날엔 그 UI 자체를 노출하지 않는다.
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(
+    () => new Date(),
+  );
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
   // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
@@ -225,6 +311,12 @@ export default function HomeScreen() {
   const todayPhotoUrl = todayWorkouts.find(
     (workout) => workout.photoUrl,
   )?.photoUrl;
+  const isSelectedDateToday =
+    selectedCalendarDate.toDateString() === today.toDateString();
+  const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
+  const selectedDayRecord = isSelectedDateToday
+    ? null
+    : getMockDayRecord(selectedCalendarDate, today);
 
   // 드래그 중엔 캘린더가 손가락을 그대로 따라가다가(dragX), 손을 떼면 임계값을
   // 넘었는지에 따라 다음/이전 달 패널 쪽으로 마저 넘어가거나(withTiming) 제자리로
@@ -347,8 +439,15 @@ export default function HomeScreen() {
                     : semanticColors["label-subtle"];
 
           return (
-            <View
+            <Pressable
               key={dayIndex}
+              accessibilityRole="button"
+              accessibilityLabel={`${monthDate.getMonth() + 1}월 ${day}일`}
+              onPress={() =>
+                setSelectedCalendarDate(
+                  new Date(monthDate.getFullYear(), monthDate.getMonth(), day),
+                )
+              }
               className={
                 isToday
                   ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
@@ -391,7 +490,7 @@ export default function HomeScreen() {
               >
                 {day}
               </ThemedText>
-            </View>
+            </Pressable>
           );
         })}
       </View>
@@ -633,29 +732,38 @@ export default function HomeScreen() {
             </View>
           </GestureDetector>
 
-          <MissionCard
-            canDismiss={hasCompletedTodayWorkout}
-            onAccept={() => setMissionStatus("accepted")}
-            onDismiss={() => setMissionStatus("dismissed")}
-            onReveal={() => setMissionStatus("revealed")}
-            onToggleComplete={handleMissionCompletePress}
-            status={missionStatus}
-          />
+          {isSelectedDateToday ? (
+            <>
+              <MissionCard
+                canDismiss={hasCompletedTodayWorkout}
+                onAccept={() => setMissionStatus("accepted")}
+                onDismiss={() => setMissionStatus("dismissed")}
+                onReveal={() => setMissionStatus("revealed")}
+                onToggleComplete={handleMissionCompletePress}
+                status={missionStatus}
+              />
 
-          <TodayWorkoutCard
-            dateLabel={todayLabel}
-            expanded={isTodayCardExpanded}
-            onAddNewPlan={addQuickSavedPlan}
-            onAddSavedPlan={addSavedPlanToToday}
-            onOpenSavedPlan={setSelectedPlanId}
-            onRecordWorkout={() => console.log("운동 기록하기 pressed")}
-            onToggleExpanded={() =>
-              setIsTodayCardExpanded((expanded) => !expanded)
-            }
-            onToggleTodayWorkout={toggleTodayWorkoutDone}
-            savedWorkoutPlans={savedWorkoutPlans}
-            todayWorkouts={todayWorkouts}
-          />
+              <TodayWorkoutCard
+                dateLabel={todayLabel}
+                expanded={isTodayCardExpanded}
+                onAddNewPlan={addQuickSavedPlan}
+                onAddSavedPlan={addSavedPlanToToday}
+                onOpenSavedPlan={setSelectedPlanId}
+                onRecordWorkout={() => console.log("운동 기록하기 pressed")}
+                onToggleExpanded={() =>
+                  setIsTodayCardExpanded((expanded) => !expanded)
+                }
+                onToggleTodayWorkout={toggleTodayWorkoutDone}
+                savedWorkoutPlans={savedWorkoutPlans}
+                todayWorkouts={todayWorkouts}
+              />
+            </>
+          ) : (
+            <DayRecordCard
+              dateLabel={selectedDateLabel}
+              record={selectedDayRecord}
+            />
+          )}
 
           <View className="flex-row items-center gap-3.5 rounded-2xl bg-fill-subtle px-[18px] py-4">
             <Ionicons name="camera-outline" size={26} color={theme.text} />
