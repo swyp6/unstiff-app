@@ -139,6 +139,22 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
   return weeks;
 }
 
+// 요일 라벨 행. 달 전환 시 날짜 그리드와 같이 슬라이드되도록 각 달 패널
+// 안쪽에 렌더링한다 — 셋 다 내용은 같지만 패널마다 하나씩 필요하다.
+function WeekdayHeaderRow() {
+  return (
+    <View className="flex-row items-center justify-between">
+      {WEEKDAY_LABELS.map((label) => (
+        <View key={label} className="w-[43px] items-center">
+          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+            {label}
+          </ThemedText>
+        </View>
+      ))}
+    </View>
+  );
+}
+
 // 오늘이 아닌 날을 탭했을 때 보여주는 읽기 전용 카드. 미션 "받기"/운동 체크 같은
 // 상호작용은 없다 — 그 날의 미션·운동 기록을 보여주기만 한다.
 function DayRecordCard({
@@ -299,8 +315,10 @@ export default function HomeScreen() {
   const previousMonthWeeks = buildCalendarWeeks(previousMonthDate);
   const nextMonthWeeks = buildCalendarWeeks(nextMonthDate);
   // 달마다 주(week) 수가 다르므로(4~6주), 옆 달 패널의 높이에 캘린더 전체가
-  // 끌려가지 않도록 현재 달 기준으로 뷰포트 높이를 고정한다.
-  const calendarViewportHeight = weeks.length * 60 + (weeks.length - 1) * 6;
+  // 끌려가지 않도록 현재 달 기준으로 뷰포트 높이를 고정한다. 요일 행(16px)도
+  // 이제 패널 안에서 같이 슬라이드되므로 그 높이 + gap(6px)까지 더한다.
+  const calendarViewportHeight =
+    16 + 6 + weeks.length * 60 + (weeks.length - 1) * 6;
   const monthLabel = `${viewedMonth.getFullYear()}년 ${viewedMonth.getMonth() + 1}월`;
   const todayLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
@@ -313,10 +331,16 @@ export default function HomeScreen() {
   )?.photoUrl;
   const isSelectedDateToday =
     selectedCalendarDate.toDateString() === today.toDateString();
+  // 오늘 이후(미래) 날짜는 아직 안 지난 날이라 "운동 추가"는 계속 가능해야
+  // 하고, 미션 "받기"만 오늘에만 되는 것이므로 제외한다. isSelectedDateToday를
+  // 먼저 걸러낸 뒤 비교하므로 시각(time-of-day) 차이는 결과에 영향 없다.
+  const isSelectedDateFuture =
+    !isSelectedDateToday && selectedCalendarDate > today;
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
-  const selectedDayRecord = isSelectedDateToday
-    ? null
-    : getMockDayRecord(selectedCalendarDate, today);
+  const selectedDayRecord =
+    isSelectedDateToday || isSelectedDateFuture
+      ? null
+      : getMockDayRecord(selectedCalendarDate, today);
 
   // 드래그 중엔 캘린더가 손가락을 그대로 따라가다가(dragX), 손을 떼면 임계값을
   // 넘었는지에 따라 다음/이전 달 패널 쪽으로 마저 넘어가거나(withTiming) 제자리로
@@ -690,24 +714,10 @@ export default function HomeScreen() {
 
           <GestureDetector gesture={monthSwipeGesture}>
             <View
-              className="gap-1.5"
               onLayout={(event) =>
                 setCalendarWidth(event.nativeEvent.layout.width)
               }
             >
-              <View className="flex-row items-center justify-between">
-                {WEEKDAY_LABELS.map((label) => (
-                  <View key={label} className="w-[43px] items-center">
-                    <ThemedText
-                      typography="caption-1-bold"
-                      themeColor="textSecondary"
-                    >
-                      {label}
-                    </ThemedText>
-                  </View>
-                ))}
-              </View>
-
               {calendarWidth > 0 && (
                 <View
                   style={{
@@ -726,12 +736,15 @@ export default function HomeScreen() {
                     ]}
                   >
                     <View style={{ width: calendarWidth, gap: 6 }}>
+                      <WeekdayHeaderRow />
                       {renderMonthGrid(previousMonthWeeks, previousMonthDate)}
                     </View>
                     <View style={{ width: calendarWidth, gap: 6 }}>
+                      <WeekdayHeaderRow />
                       {renderMonthGrid(weeks, viewedMonth)}
                     </View>
                     <View style={{ width: calendarWidth, gap: 6 }}>
+                      <WeekdayHeaderRow />
                       {renderMonthGrid(nextMonthWeeks, nextMonthDate)}
                     </View>
                   </Animated.View>
@@ -740,32 +753,32 @@ export default function HomeScreen() {
             </View>
           </GestureDetector>
 
-          {isSelectedDateToday ? (
-            <>
-              <MissionCard
-                canDismiss={hasCompletedTodayWorkout}
-                onAccept={() => setMissionStatus("accepted")}
-                onDismiss={() => setMissionStatus("dismissed")}
-                onReveal={() => setMissionStatus("revealed")}
-                onToggleComplete={handleMissionCompletePress}
-                status={missionStatus}
-              />
+          {isSelectedDateToday && (
+            <MissionCard
+              canDismiss={hasCompletedTodayWorkout}
+              onAccept={() => setMissionStatus("accepted")}
+              onDismiss={() => setMissionStatus("dismissed")}
+              onReveal={() => setMissionStatus("revealed")}
+              onToggleComplete={handleMissionCompletePress}
+              status={missionStatus}
+            />
+          )}
 
-              <TodayWorkoutCard
-                dateLabel={todayLabel}
-                expanded={isTodayCardExpanded}
-                onAddNewPlan={addQuickSavedPlan}
-                onAddSavedPlan={addSavedPlanToToday}
-                onOpenSavedPlan={setSelectedPlanId}
-                onRecordWorkout={() => console.log("운동 기록하기 pressed")}
-                onToggleExpanded={() =>
-                  setIsTodayCardExpanded((expanded) => !expanded)
-                }
-                onToggleTodayWorkout={toggleTodayWorkoutDone}
-                savedWorkoutPlans={savedWorkoutPlans}
-                todayWorkouts={todayWorkouts}
-              />
-            </>
+          {isSelectedDateToday || isSelectedDateFuture ? (
+            <TodayWorkoutCard
+              dateLabel={isSelectedDateToday ? todayLabel : selectedDateLabel}
+              expanded={isTodayCardExpanded}
+              onAddNewPlan={addQuickSavedPlan}
+              onAddSavedPlan={addSavedPlanToToday}
+              onOpenSavedPlan={setSelectedPlanId}
+              onRecordWorkout={() => console.log("운동 기록하기 pressed")}
+              onToggleExpanded={() =>
+                setIsTodayCardExpanded((expanded) => !expanded)
+              }
+              onToggleTodayWorkout={toggleTodayWorkoutDone}
+              savedWorkoutPlans={savedWorkoutPlans}
+              todayWorkouts={todayWorkouts}
+            />
           ) : (
             <DayRecordCard
               dateLabel={selectedDateLabel}
