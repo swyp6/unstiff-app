@@ -27,7 +27,7 @@ import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
 
-const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 캘린더 날짜 셀(43x60pt) 표시 크기의 2배(레티나 기준)로 요청 — 프리셋
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
@@ -82,7 +82,7 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
   const year = reference.getFullYear();
   const month = reference.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0..Sun=6
+  const firstWeekday = new Date(year, month, 1).getDay(); // Sun=0..Sat=6
 
   const days: (number | null)[] = [
     ...Array(firstWeekday).fill(null),
@@ -115,11 +115,14 @@ export default function HomeScreen() {
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
   const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
     useState(false);
-  // 체크 탭 즉시 missionStatus를 "completed"로 낙관적으로 바꾸지만, 기록
-  // 방식(사진 촬영/앨범/사진 없이)이 아직 확정되지 않은 동안에는 true로
-  // 남겨둔다 — 확정 없이 홈으로 돌아오면 이 플래그를 보고 rollback한다.
-  const [isMissionCompletionPending, setIsMissionCompletionPending] =
-    useState(false);
+  // 체크 탭 즉시 완료 상태를 낙관적으로 바꾸지만, 기록 방식(사진 촬영/앨범/
+  // 사진 없이)이 아직 확정되지 않은 동안에는 어떤 항목(미션 또는 특정 오늘의
+  // 운동 instance)이 대기 중인지 이 id로 남겨둔다 — 확정 없이 홈으로
+  // 돌아오면 이 값을 보고 rollback한다. null이면 대기 중인 항목이 없다.
+  const [pendingRecordPlanItemId, setPendingRecordPlanItemId] = useState<
+    string | null
+  >(null);
+  const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
   // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
@@ -130,7 +133,6 @@ export default function HomeScreen() {
       const { planItemId, secureUrl } = state.result;
       if (planItemId === MISSION_PLAN_ITEM_ID) {
         setMissionStatus("completed");
-        setIsMissionCompletionPending(false);
       } else {
         setTodayWorkouts((workouts) =>
           workouts.map((workout) =>
@@ -140,23 +142,44 @@ export default function HomeScreen() {
           ),
         );
       }
+      setPendingRecordPlanItemId(null);
       useDailyPhotoStore.getState().clearResult();
     });
   }, []);
 
   // 카메라 close, 앨범 선택 취소 후 이탈, 업로드 실패 등 기록을 확정하지
-  // 못한 채(=isMissionCompletionPending이 여전히 true인 채) 홈 탭으로
-  // 다시 포커스가 돌아오면 낙관적으로 켰던 체크를 되돌린다. isFocused가
-  // 마운트 시점부터 이미 true이므로 "false→true 전환"만 감지해야 한다.
+  // 못한 채(=pendingRecordPlanItemId가 여전히 남은 채) 홈 탭으로 다시
+  // 포커스가 돌아오면 낙관적으로 켰던 체크를 되돌린다. isFocused가 마운트
+  // 시점부터 이미 true이므로 "false→true 전환"만 감지해야 한다.
   const wasFocusedRef = useRef(isFocused);
   useEffect(() => {
     const wasFocused = wasFocusedRef.current;
     wasFocusedRef.current = isFocused;
-    if (!wasFocused && isFocused && isMissionCompletionPending) {
+    const regainedFocusWithPending =
+      !wasFocused && isFocused && pendingRecordPlanItemId !== null;
+
+    if (
+      regainedFocusWithPending &&
+      pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID
+    ) {
       setMissionStatus("accepted");
-      setIsMissionCompletionPending(false);
     }
-  }, [isFocused, isMissionCompletionPending]);
+    if (
+      regainedFocusWithPending &&
+      pendingRecordPlanItemId !== MISSION_PLAN_ITEM_ID
+    ) {
+      setTodayWorkouts((workouts) =>
+        workouts.map((workout) =>
+          workout.id === pendingRecordPlanItemId
+            ? { ...workout, isDone: false }
+            : workout,
+        ),
+      );
+    }
+    if (regainedFocusWithPending) {
+      setPendingRecordPlanItemId(null);
+    }
+  }, [isFocused, pendingRecordPlanItemId]);
 
   const today = new Date();
   const weeks = buildCalendarWeeks(today);
@@ -201,14 +224,28 @@ export default function HomeScreen() {
     ]);
   }
 
+  // 오늘의 미션 체크와 동일한 패턴: 빈 체크를 탭하면 즉시 낙관적으로 완료
+  // 처리하는 동시에 같은 이벤트에서 기록 방식 선택 모달을 연다. 이미 완료된
+  // 항목을 다시 누르면(완료 취소) 모달 없이 즉시 되돌린다.
   function toggleTodayWorkoutDone(instanceId: string) {
+    const workout = todayWorkouts.find((item) => item.id === instanceId);
+    if (!workout) return;
+
+    if (workout.isDone) {
+      setTodayWorkouts((workouts) =>
+        workouts.map((item) =>
+          item.id === instanceId ? { ...item, isDone: false } : item,
+        ),
+      );
+      return;
+    }
+
     setTodayWorkouts((workouts) =>
-      workouts.map((workout) =>
-        workout.id === instanceId
-          ? { ...workout, isDone: !workout.isDone }
-          : workout,
+      workouts.map((item) =>
+        item.id === instanceId ? { ...item, isDone: true } : item,
       ),
     );
+    openRecordMethodModal(instanceId, workout.title);
   }
 
   function updateSavedPlan(updatedPlan: WorkoutPlanDraft) {
@@ -225,15 +262,19 @@ export default function HomeScreen() {
   // 빈 체크를 탭하면 즉시(optimistic) 체크 UI를 켜는 동시에 같은 이벤트에서
   // 기록 방식 선택 모달을 연다 — 모달 결과를 기다렸다가 그때 체크하지 않는다.
   // 이미 체크된 상태를 다시 누르면(완료 취소) 기존처럼 즉시 되돌린다.
+  function openRecordMethodModal(planItemId: string, title: string) {
+    setPendingRecordPlanItemId(planItemId);
+    setRecordModalTitle(title);
+    setIsRecordMethodModalVisible(true);
+  }
+
   function handleMissionCompletePress() {
     if (missionStatus === "completed") {
       setMissionStatus("accepted");
-      setIsMissionCompletionPending(false);
       return;
     }
     setMissionStatus("completed");
-    setIsMissionCompletionPending(true);
-    setIsRecordMethodModalVisible(true);
+    openRecordMethodModal(MISSION_PLAN_ITEM_ID, MISSION_TITLE);
   }
 
   // 기록 방식 모달을 고르지 않고 닫으면(백드롭 탭) 낙관적으로 켰던 체크를
@@ -241,32 +282,44 @@ export default function HomeScreen() {
   // 각자 별도 핸들러가 모달을 닫으므로 여기로 오지 않는다.
   function dismissRecordMethodModal() {
     setIsRecordMethodModalVisible(false);
-    if (isMissionCompletionPending) {
+    if (!pendingRecordPlanItemId) return;
+    if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
       setMissionStatus("accepted");
-      setIsMissionCompletionPending(false);
+    } else {
+      setTodayWorkouts((workouts) =>
+        workouts.map((workout) =>
+          workout.id === pendingRecordPlanItemId
+            ? { ...workout, isDone: false }
+            : workout,
+        ),
+      );
     }
+    setPendingRecordPlanItemId(null);
   }
 
-  function completeMissionWithoutPhoto() {
+  function completeRecordWithoutPhoto() {
     setIsRecordMethodModalVisible(false);
-    setIsMissionCompletionPending(false);
+    setPendingRecordPlanItemId(null);
   }
 
-  function startMissionPhotoCapture() {
-    setIsRecordMethodModalVisible(false);
-    router.push({
-      pathname: "/camera",
-      params: { title: MISSION_TITLE, planItemId: MISSION_PLAN_ITEM_ID },
-    });
-  }
-
-  function startMissionLibraryPick() {
+  function startRecordPhotoCapture() {
     setIsRecordMethodModalVisible(false);
     router.push({
       pathname: "/camera",
       params: {
-        title: MISSION_TITLE,
-        planItemId: MISSION_PLAN_ITEM_ID,
+        title: recordModalTitle,
+        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
+      },
+    });
+  }
+
+  function startRecordLibraryPick() {
+    setIsRecordMethodModalVisible(false);
+    router.push({
+      pathname: "/camera",
+      params: {
+        title: recordModalTitle,
+        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
         source: "library",
       },
     });
@@ -491,10 +544,10 @@ export default function HomeScreen() {
 
       <RecordMethodModal
         onClose={dismissRecordMethodModal}
-        onPickFromLibrary={startMissionLibraryPick}
-        onSkipPhoto={completeMissionWithoutPhoto}
-        onTakePhoto={startMissionPhotoCapture}
-        title={MISSION_TITLE}
+        onPickFromLibrary={startRecordLibraryPick}
+        onSkipPhoto={completeRecordWithoutPhoto}
+        onTakePhoto={startRecordPhotoCapture}
+        title={recordModalTitle}
         visible={isRecordMethodModalVisible && isFocused}
       />
     </ThemedView>
