@@ -192,7 +192,7 @@ export function WorkoutPlanDetailBottomSheet({
     <WorkoutPlanBottomSheet
       expanded={isParentExpanded}
       fullHeight
-      initialHeightRatio={749 / 808}
+      initialHeightRatio={713 / 814}
       onClose={onClose}
       onExpanded={handleParentExpanded}
       onExpandedChange={setIsParentExpanded}
@@ -351,7 +351,6 @@ const styles = StyleSheet.create({
   content: {
     gap: 20,
     paddingBottom: 20,
-    paddingHorizontal: 20,
     paddingTop: 19,
   },
   titleEditArea: {
@@ -410,7 +409,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 16,
-    paddingHorizontal: 20,
     paddingTop: 16,
   },
   deleteButton: {

@@ -126,7 +126,7 @@ export function PrimaryActionButton({
       >
         <ThemedText
           style={[styles.primaryText, disabled && styles.primaryTextDisabled]}
-          typography="body-2-bold"
+          typography="body-1-bold"
         >
           {label}
         </ThemedText>
