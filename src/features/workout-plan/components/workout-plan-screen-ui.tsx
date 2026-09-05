@@ -107,18 +107,27 @@ export function SelectionRow({
 export function PrimaryActionButton({
   label,
   onPress,
+  disabled = false,
 }: {
   label: string;
   onPress: () => void;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => pressed && styles.pressed}
+      style={({ pressed }) => pressed && !disabled && styles.pressed}
     >
-      <View style={styles.primaryButton}>
-        <ThemedText style={styles.primaryText} typography="body-2-bold">
+      <View
+        style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
+      >
+        <ThemedText
+          style={[styles.primaryText, disabled && styles.primaryTextDisabled]}
+          typography="body-2-bold"
+        >
           {label}
         </ThemedText>
       </View>
@@ -185,6 +194,12 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: semanticColors["label-inverse"],
+  },
+  primaryButtonDisabled: {
+    backgroundColor: semanticColors["fill-subtle"],
+  },
+  primaryTextDisabled: {
+    color: semanticColors["label-disabled"],
   },
   pressed: {
     opacity: 0.7,

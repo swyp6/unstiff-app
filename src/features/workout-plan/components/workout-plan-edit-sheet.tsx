@@ -88,6 +88,11 @@ export function WorkoutPlanEditSheet({
   // saveLabel 그대로 쓴다.
   const displayedSaveLabel =
     showAddToTodayToggle && addToToday ? "오늘의 운동 추가하기" : saveLabel;
+  // 운동명·운동 종류·기록할 항목(4개 중 하나 이상) 셋 다 있어야 저장 가능.
+  const canSubmit =
+    draft.title.trim().length > 0 &&
+    draft.exerciseType.trim().length > 0 &&
+    draft.selectedGoalTypes.length > 0;
   const [isWorkoutTypeSheetVisible, setIsWorkoutTypeSheetVisible] =
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
@@ -393,6 +398,7 @@ export function WorkoutPlanEditSheet({
 
                     <View style={styles.actions}>
                       <PrimaryActionButton
+                        disabled={!canSubmit}
                         label={displayedSaveLabel}
                         onPress={() =>
                           closeSheet(() => onSave(draft, addToToday))
