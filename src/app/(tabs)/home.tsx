@@ -1,9 +1,24 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { Link, router, useIsFocused } from "expo-router";
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from "react-native-reanimated";
+import { scheduleOnRN } from "react-native-worklets";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -28,6 +43,7 @@ import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const MONTH_SWIPE_THRESHOLD = 60;
 
 // 캘린더 날짜 셀(43x60pt) 표시 크기의 2배(레티나 기준)로 요청 — 프리셋
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
@@ -123,6 +139,7 @@ export default function HomeScreen() {
     string | null
   >(null);
   const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
+  const [viewedMonth, setViewedMonth] = useState(() => new Date());
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
   // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
@@ -182,8 +199,23 @@ export default function HomeScreen() {
   }, [isFocused, pendingRecordPlanItemId]);
 
   const today = new Date();
-  const weeks = buildCalendarWeeks(today);
-  const monthLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월`;
+  const weeks = buildCalendarWeeks(viewedMonth);
+  const previousMonthDate = new Date(
+    viewedMonth.getFullYear(),
+    viewedMonth.getMonth() - 1,
+    1,
+  );
+  const nextMonthDate = new Date(
+    viewedMonth.getFullYear(),
+    viewedMonth.getMonth() + 1,
+    1,
+  );
+  const previousMonthWeeks = buildCalendarWeeks(previousMonthDate);
+  const nextMonthWeeks = buildCalendarWeeks(nextMonthDate);
+  // 달마다 주(week) 수가 다르므로(4~6주), 옆 달 패널의 높이에 캘린더 전체가
+  // 끌려가지 않도록 현재 달 기준으로 뷰포트 높이를 고정한다.
+  const calendarViewportHeight = weeks.length * 60 + (weeks.length - 1) * 6;
+  const monthLabel = `${viewedMonth.getFullYear()}년 ${viewedMonth.getMonth() + 1}월`;
   const todayLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
   const hasCompletedTodayWorkout = todayWorkouts.some(
@@ -193,9 +225,178 @@ export default function HomeScreen() {
   const todayPhotoUrl = todayWorkouts.find(
     (workout) => workout.photoUrl,
   )?.photoUrl;
-  const monthlyRecordCount =
-    MOCK_PHOTO_DAYS.size +
-    (isTodayRecorded && !MOCK_PHOTO_DAYS.has(today.getDate()) ? 1 : 0);
+
+  // 드래그 중엔 캘린더가 손가락을 그대로 따라가다가(dragX), 손을 떼면 임계값을
+  // 넘었는지에 따라 다음/이전 달 패널 쪽으로 마저 넘어가거나(withTiming) 제자리로
+  // 되돌아온다(withSpring). calendarWidth는 실제 달(가운데 패널) 기준 오프셋이다.
+  const dragX = useSharedValue(0);
+  const [calendarWidth, setCalendarWidth] = useState(0);
+
+  const commitMonthChange = useCallback((delta: 1 | -1) => {
+    setViewedMonth(
+      (month) => new Date(month.getFullYear(), month.getMonth() + delta, 1),
+    );
+  }, []);
+
+  // dragX를 여기서 바로 0으로 되돌리면 패널 내용(previousMonthWeeks 등)이 새
+  // viewedMonth로 다시 그려지기 전에 위치부터 가운데로 스냅돼 한 프레임 깜빡인다.
+  // useLayoutEffect로 재렌더가 커밋된 뒤에 리셋해서 내용과 위치가 같이 바뀌게 한다.
+  useLayoutEffect(() => {
+    dragX.value = 0;
+  }, [viewedMonth, dragX]);
+
+  function goToPreviousMonth() {
+    if (!calendarWidth) {
+      commitMonthChange(-1);
+      return;
+    }
+    dragX.value = withTiming(calendarWidth, { duration: 220 }, (finished) => {
+      "worklet";
+      if (finished) scheduleOnRN(commitMonthChange, -1);
+    });
+  }
+
+  function goToNextMonth() {
+    if (!calendarWidth) {
+      commitMonthChange(1);
+      return;
+    }
+    dragX.value = withTiming(-calendarWidth, { duration: 220 }, (finished) => {
+      "worklet";
+      if (finished) scheduleOnRN(commitMonthChange, 1);
+    });
+  }
+
+  // 세로 ScrollView 안에 있으므로 activeOffsetX/failOffsetY로 가로 스와이프일
+  // 때만 반응하고 세로 스크롤은 그대로 통과시킨다.
+  const monthSwipeGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .activeOffsetX([-10, 10])
+        .failOffsetY([-10, 10])
+        .onUpdate((event) => {
+          "worklet";
+          if (!calendarWidth) return;
+          dragX.value = Math.max(
+            -calendarWidth,
+            Math.min(calendarWidth, event.translationX),
+          );
+        })
+        .onEnd((event) => {
+          "worklet";
+          if (!calendarWidth) return;
+
+          if (event.translationX < -MONTH_SWIPE_THRESHOLD) {
+            dragX.value = withTiming(
+              -calendarWidth,
+              { duration: 220 },
+              (finished) => {
+                if (finished) scheduleOnRN(commitMonthChange, 1);
+              },
+            );
+          } else if (event.translationX > MONTH_SWIPE_THRESHOLD) {
+            dragX.value = withTiming(
+              calendarWidth,
+              { duration: 220 },
+              (finished) => {
+                if (finished) scheduleOnRN(commitMonthChange, -1);
+              },
+            );
+          } else {
+            dragX.value = withSpring(0);
+          }
+        }),
+    [calendarWidth, commitMonthChange, dragX],
+  );
+
+  const pagerAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: -calendarWidth + dragX.value }],
+  }));
+
+  function renderMonthGrid(monthWeeks: (number | null)[][], monthDate: Date) {
+    const isThisMonth =
+      monthDate.getFullYear() === today.getFullYear() &&
+      monthDate.getMonth() === today.getMonth();
+
+    return monthWeeks.map((week, weekIndex) => (
+      <View key={weekIndex} className="flex-row items-center justify-between">
+        {week.map((day, dayIndex) => {
+          if (day === null) {
+            return <View key={dayIndex} className="h-[60px] w-[43px]" />;
+          }
+
+          const isToday = isThisMonth && day === today.getDate();
+          const hasPhoto =
+            (isThisMonth && MOCK_PHOTO_DAYS.has(day)) ||
+            (isToday && isTodayRecorded);
+          const hasMultiplePhotos =
+            isThisMonth && MOCK_MULTI_PHOTO_DAYS.has(day);
+          const isFutureDay =
+            new Date(monthDate.getFullYear(), monthDate.getMonth(), day) >
+            new Date(today.getFullYear(), today.getMonth(), today.getDate());
+
+          const textColor =
+            isToday && todayPhotoUrl
+              ? "#ffffff"
+              : isToday
+                ? semanticColors["label-normal"]
+                : hasPhoto
+                  ? semanticColors["label-normal"]
+                  : isFutureDay
+                    ? semanticColors["label-disabled"]
+                    : semanticColors["label-subtle"];
+
+          return (
+            <View
+              key={dayIndex}
+              className={
+                isToday
+                  ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
+                      isTodayRecorded
+                        ? "border-solid border-label-normal bg-fill-normal"
+                        : "border-dashed border-label-normal"
+                    }`
+                  : hasPhoto
+                    ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
+                    : "h-[60px] w-[43px] items-start p-1.5"
+              }
+            >
+              {isToday && todayPhotoUrl && (
+                <>
+                  <Image
+                    source={{
+                      uri: getOptimizedImageUrl(todayPhotoUrl, {
+                        ...CALENDAR_DAY_THUMBNAIL_SIZE,
+                        crop: "fill",
+                      }),
+                    }}
+                    style={{ position: "absolute", inset: 0 }}
+                    contentFit="cover"
+                  />
+                  <View
+                    className="absolute inset-0"
+                    style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
+                  />
+                </>
+              )}
+              {hasMultiplePhotos && !isToday && (
+                <View
+                  className="absolute -top-1 left-2 h-[52px] w-[35px] rounded-lg border-[1.5px] border-background-normal bg-fill-subtle"
+                  style={{ zIndex: -1 }}
+                />
+              )}
+              <ThemedText
+                typography={isToday ? "caption-1-bold" : "caption-1-regular"}
+                style={{ color: textColor }}
+              >
+                {day}
+              </ThemedText>
+            </View>
+          );
+        })}
+      </View>
+    ));
+  }
 
   const selectedPlan =
     savedWorkoutPlans.find((plan) => plan.id === selectedPlanId) ?? null;
@@ -352,127 +553,85 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
-          <View className="gap-1.5">
-            <Pressable
-              className="flex-row items-center gap-1"
-              accessibilityRole="button"
-              accessibilityLabel="월 선택"
-              onPress={() => console.log("month picker pressed")}
-            >
-              <ThemedText typography="body-3-medium" themeColor="textSecondary">
-                {monthLabel}
-              </ThemedText>
-              <Ionicons
-                name="chevron-down"
-                size={12}
-                color={theme.textSecondary}
-              />
-            </Pressable>
-            <View className="flex-row items-baseline gap-1.5">
-              <ThemedText typography="display-1-bold">
-                {monthlyRecordCount}
-              </ThemedText>
-              <ThemedText typography="body-2-medium" themeColor="textSecondary">
-                일 기록 / 이번 달
-              </ThemedText>
-            </View>
-          </View>
-
-          <View className="gap-1.5">
-            <View className="flex-row items-center justify-between">
-              {WEEKDAY_LABELS.map((label) => (
-                <View key={label} className="w-[43px] items-center">
-                  <ThemedText
-                    typography="caption-1-bold"
-                    themeColor="textSecondary"
-                  >
-                    {label}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
-
-            {weeks.map((week, weekIndex) => (
-              <View
-                key={weekIndex}
-                className="flex-row items-center justify-between"
+          <View className="flex-row items-center justify-between">
+            <View className="flex-row items-center gap-1">
+              <Pressable
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="이전 달"
+                onPress={goToPreviousMonth}
               >
-                {week.map((day, dayIndex) => {
-                  if (day === null) {
-                    return (
-                      <View key={dayIndex} className="h-[60px] w-[43px]" />
-                    );
-                  }
+                <Ionicons name="caret-back" size={10} color={theme.text} />
+              </Pressable>
+              <ThemedText typography="title-3-bold">{monthLabel}</ThemedText>
+              <Pressable
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="다음 달"
+                onPress={goToNextMonth}
+              >
+                <Ionicons name="caret-forward" size={10} color={theme.text} />
+              </Pressable>
+            </View>
 
-                  const isToday = day === today.getDate();
-                  const hasPhoto =
-                    MOCK_PHOTO_DAYS.has(day) || (isToday && isTodayRecorded);
-                  const hasMultiplePhotos = MOCK_MULTI_PHOTO_DAYS.has(day);
-
-                  const textColor =
-                    isToday && todayPhotoUrl
-                      ? "#ffffff"
-                      : isToday
-                        ? semanticColors["label-normal"]
-                        : hasPhoto
-                          ? semanticColors["label-normal"]
-                          : day > today.getDate()
-                            ? semanticColors["label-disabled"]
-                            : semanticColors["label-subtle"];
-
-                  return (
-                    <View
-                      key={dayIndex}
-                      className={
-                        isToday
-                          ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
-                              isTodayRecorded
-                                ? "border-solid border-label-normal bg-fill-normal"
-                                : "border-dashed border-label-normal"
-                            }`
-                          : hasPhoto
-                            ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
-                            : "h-[60px] w-[43px] items-start p-1.5"
-                      }
-                    >
-                      {isToday && todayPhotoUrl && (
-                        <>
-                          <Image
-                            source={{
-                              uri: getOptimizedImageUrl(todayPhotoUrl, {
-                                ...CALENDAR_DAY_THUMBNAIL_SIZE,
-                                crop: "fill",
-                              }),
-                            }}
-                            style={{ position: "absolute", inset: 0 }}
-                            contentFit="cover"
-                          />
-                          <View
-                            className="absolute inset-0"
-                            style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
-                          />
-                        </>
-                      )}
-                      {hasMultiplePhotos && !isToday && (
-                        <View
-                          className="absolute -top-1 left-2 h-[52px] w-[35px] rounded-lg border-[1.5px] border-background-normal bg-fill-subtle"
-                          style={{ zIndex: -1 }}
-                        />
-                      )}
-                      <ThemedText
-                        typography={
-                          isToday ? "caption-1-bold" : "caption-1-regular"
-                        }
-                        style={{ color: textColor }}
-                      >
-                        {day}
-                      </ThemedText>
-                    </View>
-                  );
-                })}
-              </View>
-            ))}
+            <Pressable
+              className="flex-row items-center gap-1 rounded-full bg-fill-subtle px-3 py-1.5"
+              accessibilityRole="button"
+              accessibilityLabel="연속 스트릭"
+              onPress={() => console.log("streak badge pressed")}
+            >
+              <Ionicons name="flame" size={16} color={theme.text} />
+              <ThemedText typography="caption-1-medium">연속 스트릭</ThemedText>
+            </Pressable>
           </View>
+
+          <GestureDetector gesture={monthSwipeGesture}>
+            <View
+              className="gap-1.5"
+              onLayout={(event) =>
+                setCalendarWidth(event.nativeEvent.layout.width)
+              }
+            >
+              <View className="flex-row items-center justify-between">
+                {WEEKDAY_LABELS.map((label) => (
+                  <View key={label} className="w-[43px] items-center">
+                    <ThemedText
+                      typography="caption-1-bold"
+                      themeColor="textSecondary"
+                    >
+                      {label}
+                    </ThemedText>
+                  </View>
+                ))}
+              </View>
+
+              {calendarWidth > 0 && (
+                <View
+                  style={{
+                    height: calendarViewportHeight,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Animated.View
+                    style={[
+                      { flexDirection: "row", width: calendarWidth * 3 },
+                      pagerAnimatedStyle,
+                    ]}
+                  >
+                    <View style={{ width: calendarWidth, gap: 6 }}>
+                      {renderMonthGrid(previousMonthWeeks, previousMonthDate)}
+                    </View>
+                    <View style={{ width: calendarWidth, gap: 6 }}>
+                      {renderMonthGrid(weeks, viewedMonth)}
+                    </View>
+                    <View style={{ width: calendarWidth, gap: 6 }}>
+                      {renderMonthGrid(nextMonthWeeks, nextMonthDate)}
+                    </View>
+                  </Animated.View>
+                </View>
+              )}
+            </View>
+          </GestureDetector>
 
           <MissionCard
             canDismiss={hasCompletedTodayWorkout}
