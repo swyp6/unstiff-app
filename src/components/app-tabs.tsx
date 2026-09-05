@@ -11,18 +11,36 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}
+      // shadowColor is iOS-only (react-native-screens has no Android tab bar
+      // border prop) — the top divider only renders there.
+      shadowColor={colors.border}
+      iconColor={{
+        default: colors.textDisabled,
+        selected: colors.textSecondary,
+      }}
+      labelStyle={{
+        default: { color: colors.textDisabled },
+        selected: { color: colors.textSecondary },
+      }}
     >
       <NativeTabs.Trigger name="home">
-        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>홈</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: "house", selected: "house.fill" }}
           md="home"
         />
       </NativeTabs.Trigger>
 
+      <NativeTabs.Trigger name="capture">
+        <NativeTabs.Trigger.Label>카메라</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          sf={{ default: "camera", selected: "camera.fill" }}
+          md="photo_camera"
+        />
+      </NativeTabs.Trigger>
+
       <NativeTabs.Trigger name="chat">
-        <NativeTabs.Trigger.Label>찌뿌둥</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>채팅</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{
             default: "bubble.left.and.bubble.right",
@@ -33,7 +51,7 @@ export default function AppTabs() {
       </NativeTabs.Trigger>
 
       <NativeTabs.Trigger name="mypage">
-        <NativeTabs.Trigger.Label>마이페이지</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Label>마이</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           sf={{ default: "person", selected: "person.fill" }}
           md="person"
