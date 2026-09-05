@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { Link, router, useIsFocused } from "expo-router";
+import { router, useIsFocused } from "expo-router";
 import {
   useCallback,
   useEffect,
@@ -9,7 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { Pressable, ScrollView, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
@@ -24,7 +24,6 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
-import { StepCountCard } from "@/features/healthkit/components/step-count-card";
 import {
   MissionCard,
   type MissionStatus,
@@ -828,38 +827,6 @@ export default function HomeScreen() {
               }
             />
           )}
-
-          <View className="flex-row items-center gap-3.5 rounded-2xl bg-fill-subtle px-[18px] py-4">
-            <Ionicons name="camera-outline" size={26} color={theme.text} />
-            <View className="flex-1 gap-0.5">
-              <ThemedText typography="body-3-bold">
-                운동한 날을 사진으로 남겨보세요
-              </ThemedText>
-              <ThemedText
-                typography="caption-1-regular"
-                style={{ color: semanticColors["label-disabled"] }}
-              >
-                기록한 사진이 이 달력에 쌓여요
-              </ThemedText>
-            </View>
-          </View>
-
-          {Platform.OS === "ios" && (
-            <View className="gap-3">
-              <Link href="/map" asChild>
-                <Pressable
-                  className="h-11 items-center justify-center rounded-full bg-black px-6 dark:bg-white"
-                  style={({ pressed }) => pressed && { opacity: 0.7 }}
-                >
-                  <Text className="text-base font-semibold text-white dark:text-black">
-                    지도 들어가기
-                  </Text>
-                </Pressable>
-              </Link>
-              <StepCountCard />
-            </View>
-          )}
-          {Platform.OS === "android" && <StepCountCard />}
         </ScrollView>
       </SafeAreaView>
 

@@ -48,38 +48,38 @@ export function MissionCard({
         <ThemedText typography="caption-1-bold" themeColor="textSecondary">
           오늘의 미션
         </ThemedText>
-        {status === "revealed" && (
-          <View className="rounded-full bg-label-normal px-[9px] py-1">
-            <ThemedText
-              typography="caption-1-bold"
-              style={{
-                color: semanticColors["label-inverse"],
-                letterSpacing: 0.6,
-              }}
-            >
-              NEW
-            </ThemedText>
-          </View>
-        )}
-        {isAccepted && (
-          <View className="size-8 items-center justify-center">
-            {canDismiss && (
-              <Pressable
-                accessibilityLabel="오늘의 미션 닫기"
-                accessibilityRole="button"
-                className="size-8 items-center justify-center"
-                hitSlop={8}
-                onPress={onDismiss}
+        <View className="flex-row items-center gap-2">
+          {status === "revealed" && (
+            <View className="rounded-full bg-label-normal px-[9px] py-1">
+              <ThemedText
+                typography="caption-1-bold"
+                style={{
+                  color: semanticColors["label-inverse"],
+                  letterSpacing: 0.6,
+                }}
               >
-                <Ionicons
-                  color={semanticColors["label-subtle"]}
-                  name="close"
-                  size={20}
-                />
-              </Pressable>
-            )}
-          </View>
-        )}
+                NEW
+              </ThemedText>
+            </View>
+          )}
+          {/* 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
+              있으면(canDismiss) 미션 카드를 닫을 수 있다. */}
+          {canDismiss && (
+            <Pressable
+              accessibilityLabel="오늘의 미션 닫기"
+              accessibilityRole="button"
+              className="size-8 items-center justify-center"
+              hitSlop={8}
+              onPress={onDismiss}
+            >
+              <Ionicons
+                color={semanticColors["label-subtle"]}
+                name="close"
+                size={20}
+              />
+            </Pressable>
+          )}
+        </View>
       </View>
 
       {status === "scheduled" && (
