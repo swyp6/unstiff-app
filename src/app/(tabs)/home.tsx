@@ -582,11 +582,12 @@ export default function HomeScreen() {
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
 
-  function saveNewPlan(plan: WorkoutPlanDraft, saveAsRoutine: boolean) {
-    // 오늘의 운동에는 추가하지 않는다 — 새 루틴은 저장된 운동 계획에만 나타나고,
-    // 오늘 할지는 그 목록의 "+" 버튼으로 따로 고른다.
-    if (saveAsRoutine) {
-      setSavedWorkoutPlans((plans) => [...plans, plan]);
+  function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
+    // 새 루틴은 항상 저장된 운동 계획에 들어간다. "오늘만 할래요"가 켜져
+    // 있을 때만 오늘의 운동에도 같이 추가한다(기본값은 꺼짐).
+    setSavedWorkoutPlans((plans) => [...plans, plan]);
+    if (addToToday) {
+      addSavedPlanToToday(plan);
     }
     setNewPlanDraft(null);
   }
@@ -888,7 +889,7 @@ export default function HomeScreen() {
           onSave={saveNewPlan}
           saveLabel="루틴 추가하기"
           showDelete={false}
-          showSaveAsRoutineToggle
+          showAddToTodayToggle
           title="루틴 추가"
           value={newPlanDraft}
           visible

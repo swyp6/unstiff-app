@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -28,7 +29,6 @@ import ReanimatedAnimated, {
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
-import { NotificationToggle } from "@/features/settings/components/notification-toggle";
 import {
   formatStartTime,
   getIntensityLabel,
@@ -53,18 +53,19 @@ type WorkoutPlanEditSheetProps = {
   value: WorkoutPlanDraft;
   onClose: () => void;
   onDelete: () => void;
-  // 신규 추가 흐름에서만 saveAsRoutine이 의미 있다(아래 토글) — 편집 흐름은
+  // 신규 추가 흐름에서만 addToToday가 의미 있다(아래 토글) — 편집 흐름은
   // 이미 저장된 계획을 고치는 것뿐이라 두 번째 인자를 그냥 무시하면 된다.
-  onSave: (value: WorkoutPlanDraft, saveAsRoutine: boolean) => void;
+  onSave: (value: WorkoutPlanDraft, addToToday: boolean) => void;
   // 기존 계획 편집("운동 계획 편집"/"변경 저장"/삭제 링크 있음)과 신규 계획
-  // 추가("루틴 추가"/"오늘 운동으로 담기"/삭제 링크 없음, Figma node
+  // 추가("루틴 추가"/"루틴 추가하기"/삭제 링크 없음, Figma node
   // 2929-5701)가 필드 구성이 완전히 같아서 하나의 시트를 재사용한다.
   title?: string;
   saveLabel?: string;
   showDelete?: boolean;
-  // 신규 추가 흐름에서만 "루틴에 추가하기" on/off 토글을 보여준다 — 편집
-  // 흐름의 계획은 이미 루틴이므로 토글이 필요 없다.
-  showSaveAsRoutineToggle?: boolean;
+  // 신규 추가 흐름에서만 "오늘만 할래요" on/off 토글을 보여준다 — 편집
+  // 흐름의 계획은 이미 저장돼 있으니 토글이 필요 없다. 새 루틴은 항상 저장된
+  // 운동 계획에 들어가고, 이 토글이 켜져 있을 때만 오늘의 운동에도 추가된다.
+  showAddToTodayToggle?: boolean;
 };
 
 export function WorkoutPlanEditSheet({
@@ -76,12 +77,17 @@ export function WorkoutPlanEditSheet({
   title = "운동 계획 편집",
   saveLabel = "변경 저장",
   showDelete = true,
-  showSaveAsRoutineToggle = false,
+  showAddToTodayToggle = false,
 }: WorkoutPlanEditSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<WorkoutPlanDraft>(value);
-  const [saveAsRoutine, setSaveAsRoutine] = useState(true);
+  const [addToToday, setAddToToday] = useState(false);
+  // "오늘만 할래요"를 체크하면 버튼도 그 의미(오늘의 운동에 바로 추가)에
+  // 맞춰 바뀐다 — 편집 흐름(showAddToTodayToggle=false)은 항상 전달받은
+  // saveLabel 그대로 쓴다.
+  const displayedSaveLabel =
+    showAddToTodayToggle && addToToday ? "오늘의 운동 추가하기" : saveLabel;
   const [isWorkoutTypeSheetVisible, setIsWorkoutTypeSheetVisible] =
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
@@ -354,24 +360,42 @@ export function WorkoutPlanEditSheet({
                       />
                     </View>
 
-                    {showSaveAsRoutineToggle && (
-                      <View style={styles.toggleRow}>
-                        <ThemedText typography="body-2-bold">
-                          루틴에 추가하기
+                    {showAddToTodayToggle && (
+                      <Pressable
+                        accessibilityLabel="오늘만 할래요"
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: addToToday }}
+                        hitSlop={8}
+                        onPress={() => setAddToToday((checked) => !checked)}
+                        style={styles.toggleRow}
+                      >
+                        <View
+                          style={[
+                            styles.checkbox,
+                            addToToday
+                              ? styles.checkboxChecked
+                              : styles.checkboxUnchecked,
+                          ]}
+                        >
+                          {addToToday && (
+                            <Ionicons
+                              color={semanticColors["label-inverse"]}
+                              name="checkmark"
+                              size={14}
+                            />
+                          )}
+                        </View>
+                        <ThemedText typography="body-2-regular">
+                          오늘만 할래요
                         </ThemedText>
-                        <NotificationToggle
-                          accessibilityLabel="루틴에 추가하기"
-                          onValueChange={setSaveAsRoutine}
-                          value={saveAsRoutine}
-                        />
-                      </View>
+                      </Pressable>
                     )}
 
                     <View style={styles.actions}>
                       <PrimaryActionButton
-                        label={saveLabel}
+                        label={displayedSaveLabel}
                         onPress={() =>
-                          closeSheet(() => onSave(draft, saveAsRoutine))
+                          closeSheet(() => onSave(draft, addToToday))
                         }
                       />
                       {showDelete && (
@@ -522,8 +546,24 @@ const styles = StyleSheet.create({
   },
   toggleRow: {
     alignItems: "center",
+    alignSelf: "flex-start",
     flexDirection: "row",
-    justifyContent: "space-between",
+    gap: 8,
+    height: 20,
+  },
+  checkbox: {
+    alignItems: "center",
+    borderRadius: 4,
+    height: 20,
+    justifyContent: "center",
+    width: 20,
+  },
+  checkboxChecked: {
+    backgroundColor: semanticColors["label-normal"],
+  },
+  checkboxUnchecked: {
+    borderColor: semanticColors["line-strong"],
+    borderWidth: 1,
   },
   actions: {
     gap: 16,
