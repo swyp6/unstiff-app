@@ -14,7 +14,10 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
+import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
+import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import type { Term } from "@/features/auth/types";
+import { useSignupStore } from "@/store/signup-store";
 
 function isValidHttpUrl(value: string | null | undefined): value is string {
   if (!value) return false;
@@ -51,30 +54,6 @@ function handleBack() {
     return;
   }
   router.replace("/login");
-}
-
-function Header() {
-  return (
-    <View style={styles.header}>
-      <Pressable
-        accessibilityLabel="뒤로가기"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={handleBack}
-        style={styles.backButton}
-      >
-        <Ionicons
-          color={semanticColors["label-normal"]}
-          name="chevron-back"
-          size={20}
-        />
-      </Pressable>
-      <ThemedText style={styles.headerTitle} typography="body-1-medium">
-        회원가입
-      </ThemedText>
-      <View style={styles.headerSide} />
-    </View>
-  );
 }
 
 type CheckboxProps = {
@@ -229,7 +208,14 @@ export default function TermsAgreementScreen() {
         .filter((term) => agreements[term.id])
         .map((term) => term.id);
       await agreeToTerms(agreedIds);
-      router.replace("/home");
+      if (useSignupStore.getState().isNewUser) {
+        // Keep terms-agreement in the stack so nickname/profile-photo can
+        // `router.back()` here — unlike the final /home hop, this isn't a
+        // dead end for an existing user re-agreeing to updated terms.
+        router.push("/nickname");
+      } else {
+        router.replace("/home");
+      }
     } catch {
       Alert.alert("오류", "약관 동의 처리 중 문제가 발생했습니다.");
     } finally {
@@ -243,7 +229,7 @@ export default function TermsAgreementScreen() {
         edges={["top", "left", "right", "bottom"]}
         style={styles.screen}
       >
-        <Header />
+        <OnboardingHeader onBack={handleBack} title="회원가입" />
         <View style={styles.loadingScreen}>
           <ThemedText
             style={styles.errorText}
@@ -259,7 +245,7 @@ export default function TermsAgreementScreen() {
             style={styles.retryButton}
           >
             <ThemedText
-              style={styles.continueButtonText}
+              style={styles.retryButtonText}
               typography="body-1-medium"
             >
               다시 시도
@@ -276,7 +262,7 @@ export default function TermsAgreementScreen() {
         edges={["top", "left", "right", "bottom"]}
         style={styles.screen}
       >
-        <Header />
+        <OnboardingHeader onBack={handleBack} title="회원가입" />
         <View style={styles.loadingScreen}>
           <ActivityIndicator color={semanticColors["label-normal"]} />
         </View>
@@ -291,7 +277,7 @@ export default function TermsAgreementScreen() {
       edges={["top", "left", "right", "bottom"]}
       style={styles.screen}
     >
-      <Header />
+      <OnboardingHeader onBack={handleBack} title="회원가입" />
 
       <View style={styles.content}>
         <ThemedText style={styles.title} typography="title-3-bold">
@@ -341,27 +327,7 @@ export default function TermsAgreementScreen() {
       </View>
 
       <View style={styles.footer}>
-        <Pressable
-          accessibilityLabel="다음"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit }}
-          disabled={!canSubmit}
-          onPress={handleSubmit}
-          style={[
-            styles.continueButton,
-            !canSubmit && styles.continueButtonDisabled,
-          ]}
-        >
-          <ThemedText
-            style={[
-              styles.continueButtonText,
-              !canSubmit && styles.continueButtonTextDisabled,
-            ]}
-            typography="body-2-bold"
-          >
-            다음
-          </ThemedText>
-        </Pressable>
+        <OnboardingCtaButton disabled={!canSubmit} onPress={handleSubmit} />
       </View>
     </SafeAreaView>
   );
@@ -389,26 +355,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 24,
   },
-  header: {
-    alignItems: "center",
-    backgroundColor: semanticColors["background-normal"],
-    flexDirection: "row",
-    height: 52,
-    paddingHorizontal: 8,
-  },
-  backButton: {
-    alignItems: "center",
-    height: 48,
-    justifyContent: "center",
-    width: 48,
-  },
-  headerTitle: {
-    color: semanticColors["label-normal"],
-    flex: 1,
-    textAlign: "center",
-  },
-  headerSide: {
-    width: 48,
+  retryButtonText: {
+    color: semanticColors["primary-on"],
   },
   content: {
     flex: 1,
@@ -481,22 +429,5 @@ const styles = StyleSheet.create({
     paddingBottom: 24,
     paddingHorizontal: 20,
     paddingTop: 8,
-  },
-  continueButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: 20,
-    height: 52,
-    justifyContent: "center",
-    width: "100%",
-  },
-  continueButtonDisabled: {
-    backgroundColor: semanticColors["fill-strong"],
-  },
-  continueButtonText: {
-    color: semanticColors["primary-on"],
-  },
-  continueButtonTextDisabled: {
-    color: semanticColors["label-disabled"],
   },
 });
