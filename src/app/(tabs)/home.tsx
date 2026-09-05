@@ -1,15 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { Link, router, useIsFocused } from "expo-router";
-import { useEffect, useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
-} from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -17,11 +10,24 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
 import { StepCountCard } from "@/features/healthkit/components/step-count-card";
+import {
+  MissionCard,
+  type MissionStatus,
+  TodayWorkoutCard,
+  type TodayWorkoutInstance,
+} from "@/features/workout-plan/components/home-workout-cards";
+import { WorkoutPlanDetailBottomSheet } from "@/features/workout-plan/components/workout-plan-detail-bottom-sheet";
+import {
+  createMockWorkoutPlan,
+  getWorkoutPlanSummary,
+  type WorkoutPlanDraft,
+} from "@/features/workout-plan/model";
+import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
 import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
 
-const WEEKDAY_LABELS = ["월", "화", "수", "목", "금", "토", "일"];
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
 // 캘린더 날짜 셀(43x60pt) 표시 크기의 2배(레티나 기준)로 요청 — 프리셋
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
@@ -33,27 +39,50 @@ const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 const MOCK_PHOTO_DAYS = new Set([4, 5, 6, 8, 10, 11, 12, 13, 14, 17, 18]);
 const MOCK_MULTI_PHOTO_DAYS = new Set([6, 11]);
 
-const SUGGESTED_MISSION = {
-  title: "가볍게 15분 걷기",
-  subtitle: "최근 이틀 쉬었으니 가볍게 시작해요",
-  durationLabel: "15분",
-  tags: ["15분", "가볍게", "야외"],
-};
+// Matches the mission title MissionCard renders for its "revealed"/"accepted"
+// states — no missions API exists yet, so both are the same mock literal.
+const MISSION_TITLE = "15분 걷기";
+// Sentinel planItemId so the shared daily-photo-store result can be routed
+// to the mission's completion instead of a todayWorkouts entry — distinct
+// from the `today-${Date.now()}-${counter}` ids createTodayWorkoutInstance
+// generates.
+const MISSION_PLAN_ITEM_ID = "daily-mission";
 
-type WorkoutPlanItem = {
-  id: string;
-  title: string;
-  subtitle: string;
-  isMission: boolean;
-  isDone: boolean;
-  photoUrl?: string;
-};
+const INITIAL_SAVED_WORKOUT_PLANS: WorkoutPlanDraft[] = [
+  createMockWorkoutPlan("saved-plan-1", "15분 가볍게 뛰기"),
+  {
+    ...createMockWorkoutPlan("saved-plan-2", "퇴근 후 러닝"),
+    selectedGoalTypes: ["distance"],
+    goalValues: {
+      time: 30,
+      distance: 3,
+      reps: 10,
+      sets: 3,
+    },
+    memo: "퇴근 후 가볍게 달리기",
+  },
+];
+
+let nextTodayWorkoutInstanceId = 0;
+
+function createTodayWorkoutInstance(
+  plan: WorkoutPlanDraft,
+): TodayWorkoutInstance {
+  nextTodayWorkoutInstanceId += 1;
+  return {
+    id: `today-${Date.now()}-${nextTodayWorkoutInstanceId}`,
+    sourcePlanId: plan.id,
+    title: plan.title,
+    subtitle: getWorkoutPlanSummary(plan),
+    isDone: false,
+  };
+}
 
 function buildCalendarWeeks(reference: Date): (number | null)[][] {
   const year = reference.getFullYear();
   const month = reference.getMonth();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // Mon=0..Sun=6
+  const firstWeekday = new Date(year, month, 1).getDay(); // Sun=0..Sat=6
 
   const days: (number | null)[] = [
     ...Array(firstWeekday).fill(null),
@@ -71,95 +100,228 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
 export default function HomeScreen() {
   const theme = useTheme();
   // Native tabs render every tab's screen eagerly, so without this guard the
-  // mission popup could appear over the xp/mypage tabs — it should only ever
-  // show while the home tab is the one actually focused.
+  // workout plan detail bottom sheet's Modal could stay visible over the
+  // chat/mypage tabs after switching away without closing it first.
   const isFocused = useIsFocused();
   const [isTodayCardExpanded, setIsTodayCardExpanded] = useState(true);
-  const [planItems, setPlanItems] = useState<WorkoutPlanItem[]>([]);
-  const [hasDeclinedMission, setHasDeclinedMission] = useState(false);
-  const [isMissionPopupVisible, setIsMissionPopupVisible] = useState(true);
+  const [missionStatus, setMissionStatus] =
+    useState<MissionStatus>("scheduled");
+  const [savedWorkoutPlans, setSavedWorkoutPlans] = useState(
+    INITIAL_SAVED_WORKOUT_PLANS,
+  );
+  const [todayWorkouts, setTodayWorkouts] = useState<TodayWorkoutInstance[]>(
+    [],
+  );
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
+    useState(false);
+  // 체크 탭 즉시 완료 상태를 낙관적으로 바꾸지만, 기록 방식(사진 촬영/앨범/
+  // 사진 없이)이 아직 확정되지 않은 동안에는 어떤 항목(미션 또는 특정 오늘의
+  // 운동 instance)이 대기 중인지 이 id로 남겨둔다 — 확정 없이 홈으로
+  // 돌아오면 이 값을 보고 rollback한다. null이면 대기 중인 항목이 없다.
+  const [pendingRecordPlanItemId, setPendingRecordPlanItemId] = useState<
+    string | null
+  >(null);
+  const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
-  // 거쳐 전달한다 — 대기 중인 계획 항목을 완료 처리하고 사진 URL을 붙인다.
+  // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
+  // instance를 완료 처리하고 사진 URL을 붙인다.
   useEffect(() => {
     return useDailyPhotoStore.subscribe((state) => {
       if (!state.result) return;
       const { planItemId, secureUrl } = state.result;
-      setPlanItems((items) =>
-        items.map((item) =>
-          item.id === planItemId
-            ? { ...item, isDone: true, photoUrl: secureUrl }
-            : item,
-        ),
-      );
+      if (planItemId === MISSION_PLAN_ITEM_ID) {
+        setMissionStatus("completed");
+      } else {
+        setTodayWorkouts((workouts) =>
+          workouts.map((workout) =>
+            workout.id === planItemId
+              ? { ...workout, isDone: true, photoUrl: secureUrl }
+              : workout,
+          ),
+        );
+      }
+      setPendingRecordPlanItemId(null);
       useDailyPhotoStore.getState().clearResult();
     });
   }, []);
 
+  // 카메라 close, 앨범 선택 취소 후 이탈, 업로드 실패 등 기록을 확정하지
+  // 못한 채(=pendingRecordPlanItemId가 여전히 남은 채) 홈 탭으로 다시
+  // 포커스가 돌아오면 낙관적으로 켰던 체크를 되돌린다. isFocused가 마운트
+  // 시점부터 이미 true이므로 "false→true 전환"만 감지해야 한다.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    const wasFocused = wasFocusedRef.current;
+    wasFocusedRef.current = isFocused;
+    const regainedFocusWithPending =
+      !wasFocused && isFocused && pendingRecordPlanItemId !== null;
+
+    if (
+      regainedFocusWithPending &&
+      pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID
+    ) {
+      setMissionStatus("accepted");
+    }
+    if (
+      regainedFocusWithPending &&
+      pendingRecordPlanItemId !== MISSION_PLAN_ITEM_ID
+    ) {
+      setTodayWorkouts((workouts) =>
+        workouts.map((workout) =>
+          workout.id === pendingRecordPlanItemId
+            ? { ...workout, isDone: false }
+            : workout,
+        ),
+      );
+    }
+    if (regainedFocusWithPending) {
+      setPendingRecordPlanItemId(null);
+    }
+  }, [isFocused, pendingRecordPlanItemId]);
+
   const today = new Date();
   const weeks = buildCalendarWeeks(today);
   const monthLabel = `${today.getFullYear()}년 ${today.getMonth() + 1}월`;
-
-  const doneCount = planItems.filter((item) => item.isDone).length;
+  const todayLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
+  const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
+  const hasCompletedTodayWorkout = todayWorkouts.some(
+    (workout) => workout.isDone,
+  );
   const isTodayRecorded = doneCount > 0;
-  const todayPhotoUrl = planItems.find((item) => item.photoUrl)?.photoUrl;
+  const todayPhotoUrl = todayWorkouts.find(
+    (workout) => workout.photoUrl,
+  )?.photoUrl;
   const monthlyRecordCount =
     MOCK_PHOTO_DAYS.size +
     (isTodayRecorded && !MOCK_PHOTO_DAYS.has(today.getDate()) ? 1 : 0);
 
-  const cardVariant: "mission" | "empty" | "planned" =
-    planItems.length > 0 ? "planned" : hasDeclinedMission ? "empty" : "mission";
+  const selectedPlan =
+    savedWorkoutPlans.find((plan) => plan.id === selectedPlanId) ?? null;
 
-  function acceptMission() {
-    setPlanItems((items) => [
-      ...items,
-      {
-        id: "mission",
-        title: SUGGESTED_MISSION.title,
-        subtitle: SUGGESTED_MISSION.durationLabel,
-        isMission: true,
-        isDone: false,
-      },
+  function addSavedPlanToToday(plan: WorkoutPlanDraft) {
+    setTodayWorkouts((workouts) => [
+      ...workouts,
+      createTodayWorkoutInstance(plan),
     ]);
-    setIsMissionPopupVisible(false);
   }
 
-  function declineMission() {
-    setHasDeclinedMission(true);
-    setIsMissionPopupVisible(false);
-  }
-
-  function addQuickPlanItem() {
-    setPlanItems((items) => [
-      ...items,
+  function addQuickSavedPlan() {
+    setSavedWorkoutPlans((plans) => [
+      ...plans,
       {
-        id: `plan-${items.length}-${Date.now()}`,
-        title: "새 운동 계획",
-        subtitle: "30분",
-        isMission: false,
-        isDone: false,
+        ...createMockWorkoutPlan(`saved-plan-${Date.now()}`, "새 운동 계획"),
+        selectedGoalTypes: ["time"],
+        goalValues: {
+          time: 30,
+          distance: 1.4,
+          reps: 10,
+          sets: 3,
+        },
+        memo: "",
       },
     ]);
   }
 
-  function togglePlanItemDone(id: string) {
-    setPlanItems((items) =>
-      items.map((item) =>
-        item.id === id ? { ...item, isDone: !item.isDone } : item,
+  // 오늘의 미션 체크와 동일한 패턴: 빈 체크를 탭하면 즉시 낙관적으로 완료
+  // 처리하는 동시에 같은 이벤트에서 기록 방식 선택 모달을 연다. 이미 완료된
+  // 항목을 다시 누르면(완료 취소) 모달 없이 즉시 되돌린다.
+  function toggleTodayWorkoutDone(instanceId: string) {
+    const workout = todayWorkouts.find((item) => item.id === instanceId);
+    if (!workout) return;
+
+    if (workout.isDone) {
+      setTodayWorkouts((workouts) =>
+        workouts.map((item) =>
+          item.id === instanceId ? { ...item, isDone: false } : item,
+        ),
+      );
+      return;
+    }
+
+    setTodayWorkouts((workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId ? { ...item, isDone: true } : item,
       ),
+    );
+    openRecordMethodModal(instanceId, workout.title);
+  }
+
+  function updateSavedPlan(updatedPlan: WorkoutPlanDraft) {
+    setSavedWorkoutPlans((plans) =>
+      plans.map((plan) => (plan.id === updatedPlan.id ? updatedPlan : plan)),
     );
   }
 
-  // 완료 처리는 인증 사진 촬영을 거쳐야 하므로 카메라 화면으로 이동한다.
-  // 완료 취소는 사진 없이 바로 되돌릴 수 있다.
-  function handleTogglePress(item: WorkoutPlanItem) {
-    if (item.isDone) {
-      togglePlanItemDone(item.id);
+  function deleteSavedPlan(planId: string) {
+    setSavedWorkoutPlans((plans) => plans.filter((plan) => plan.id !== planId));
+    setSelectedPlanId(null);
+  }
+
+  // 빈 체크를 탭하면 즉시(optimistic) 체크 UI를 켜는 동시에 같은 이벤트에서
+  // 기록 방식 선택 모달을 연다 — 모달 결과를 기다렸다가 그때 체크하지 않는다.
+  // 이미 체크된 상태를 다시 누르면(완료 취소) 기존처럼 즉시 되돌린다.
+  function openRecordMethodModal(planItemId: string, title: string) {
+    setPendingRecordPlanItemId(planItemId);
+    setRecordModalTitle(title);
+    setIsRecordMethodModalVisible(true);
+  }
+
+  function handleMissionCompletePress() {
+    if (missionStatus === "completed") {
+      setMissionStatus("accepted");
       return;
     }
+    setMissionStatus("completed");
+    openRecordMethodModal(MISSION_PLAN_ITEM_ID, MISSION_TITLE);
+  }
+
+  // 기록 방식 모달을 고르지 않고 닫으면(백드롭 탭) 낙관적으로 켰던 체크를
+  // 되돌린다 — 카메라로 넘어가거나 "사진 없이 기록하기"를 고르는 경우는
+  // 각자 별도 핸들러가 모달을 닫으므로 여기로 오지 않는다.
+  function dismissRecordMethodModal() {
+    setIsRecordMethodModalVisible(false);
+    if (!pendingRecordPlanItemId) return;
+    if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
+      setMissionStatus("accepted");
+    } else {
+      setTodayWorkouts((workouts) =>
+        workouts.map((workout) =>
+          workout.id === pendingRecordPlanItemId
+            ? { ...workout, isDone: false }
+            : workout,
+        ),
+      );
+    }
+    setPendingRecordPlanItemId(null);
+  }
+
+  function completeRecordWithoutPhoto() {
+    setIsRecordMethodModalVisible(false);
+    setPendingRecordPlanItemId(null);
+  }
+
+  function startRecordPhotoCapture() {
+    setIsRecordMethodModalVisible(false);
     router.push({
       pathname: "/camera",
-      params: { title: item.title, planItemId: item.id },
+      params: {
+        title: recordModalTitle,
+        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
+      },
+    });
+  }
+
+  function startRecordLibraryPick() {
+    setIsRecordMethodModalVisible(false);
+    router.push({
+      pathname: "/camera",
+      params: {
+        title: recordModalTitle,
+        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
+        source: "library",
+      },
     });
   }
 
@@ -312,241 +474,43 @@ export default function HomeScreen() {
             ))}
           </View>
 
-          {cardVariant !== "mission" && (
-            <View className="flex-row items-center gap-3.5 rounded-2xl bg-fill-subtle px-[18px] py-4">
-              <Ionicons name="camera-outline" size={26} color={theme.text} />
-              <View className="flex-1 gap-0.5">
-                <ThemedText typography="body-3-bold">
-                  운동한 날을 사진으로 남겨보세요
-                </ThemedText>
-                <ThemedText
-                  typography="caption-1-regular"
-                  style={{ color: semanticColors["label-disabled"] }}
-                >
-                  기록한 사진이 이 달력에 쌓여요
-                </ThemedText>
-              </View>
-            </View>
-          )}
+          <MissionCard
+            canDismiss={hasCompletedTodayWorkout}
+            onAccept={() => setMissionStatus("accepted")}
+            onDismiss={() => setMissionStatus("dismissed")}
+            onReveal={() => setMissionStatus("revealed")}
+            onToggleComplete={handleMissionCompletePress}
+            status={missionStatus}
+          />
 
-          <View
-            className={
-              cardVariant === "mission"
-                ? "rounded-[20px] border-[1.5px] border-label-normal"
-                : "rounded-[20px] border border-line-normal"
+          <TodayWorkoutCard
+            dateLabel={todayLabel}
+            expanded={isTodayCardExpanded}
+            onAddNewPlan={addQuickSavedPlan}
+            onAddSavedPlan={addSavedPlanToToday}
+            onOpenSavedPlan={setSelectedPlanId}
+            onRecordWorkout={() => console.log("운동 기록하기 pressed")}
+            onToggleExpanded={() =>
+              setIsTodayCardExpanded((expanded) => !expanded)
             }
-          >
-            {cardVariant === "mission" ? (
-              <View>
-                <View className="h-[54px] flex-row items-center justify-between px-5 pt-[18px]">
-                  <ThemedText typography="body-2-bold">오늘의 미션</ThemedText>
-                  <View className="rounded-full bg-label-normal px-[9px] py-1">
-                    <ThemedText
-                      typography="caption-1-bold"
-                      style={{ color: "#ffffff", letterSpacing: 0.6 }}
-                    >
-                      NEW
-                    </ThemedText>
-                  </View>
-                </View>
+            onToggleTodayWorkout={toggleTodayWorkoutDone}
+            savedWorkoutPlans={savedWorkoutPlans}
+            todayWorkouts={todayWorkouts}
+          />
 
-                <View className="gap-2 px-5 pb-4">
-                  <ThemedText typography="title-3-bold">
-                    {SUGGESTED_MISSION.title}
-                  </ThemedText>
-                  <View className="flex-row items-center gap-2">
-                    {SUGGESTED_MISSION.tags.map((tag) => (
-                      <View
-                        key={tag}
-                        className="rounded-lg bg-fill-subtle px-2.5 py-[5px]"
-                      >
-                        <ThemedText
-                          typography="caption-1-bold"
-                          themeColor="textSecondary"
-                        >
-                          {tag}
-                        </ThemedText>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-
-                <View className="h-px bg-line-subtle" />
-
-                <View className="gap-1 px-5 py-4">
-                  <Pressable
-                    className="items-center justify-center rounded-2xl bg-label-normal py-4"
-                    accessibilityRole="button"
-                    onPress={acceptMission}
-                  >
-                    <ThemedText
-                      typography="body-2-bold"
-                      style={{ color: "#ffffff" }}
-                    >
-                      이걸로 할게요
-                    </ThemedText>
-                  </Pressable>
-                  <Pressable
-                    className="items-center justify-center py-3"
-                    accessibilityRole="button"
-                    onPress={declineMission}
-                  >
-                    <ThemedText
-                      typography="body-3-bold"
-                      style={{ color: semanticColors["label-disabled"] }}
-                    >
-                      오늘은 안 할래요
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            ) : (
-              <View>
-                <Pressable
-                  className="h-[55px] flex-row items-center justify-between px-5"
-                  accessibilityRole="button"
-                  onPress={() =>
-                    setIsTodayCardExpanded((expanded) => !expanded)
-                  }
-                >
-                  <ThemedText typography="body-2-bold">오늘의 운동</ThemedText>
-                  <View className="flex-row items-center gap-3">
-                    {cardVariant === "planned" && (
-                      <ThemedText
-                        typography="caption-1-bold"
-                        themeColor="textSecondary"
-                      >
-                        {doneCount} / {planItems.length}
-                      </ThemedText>
-                    )}
-                    <Ionicons
-                      name={isTodayCardExpanded ? "chevron-up" : "chevron-down"}
-                      size={14}
-                      color={theme.textSecondary}
-                    />
-                  </View>
-                </Pressable>
-
-                {isTodayCardExpanded && (
-                  <View className="px-5 pb-2">
-                    {cardVariant === "empty" && (
-                      <View className="items-center gap-2 pb-3 pt-2">
-                        <ThemedText
-                          typography="body-3-medium"
-                          themeColor="textSecondary"
-                        >
-                          오늘 계획된 운동이 없어요
-                        </ThemedText>
-                        <ThemedText
-                          typography="caption-1-regular"
-                          style={{ color: semanticColors["label-disabled"] }}
-                        >
-                          아래에서 계획을 세워보세요
-                        </ThemedText>
-                      </View>
-                    )}
-
-                    {cardVariant === "planned" &&
-                      planItems.map((item) => (
-                        <View key={item.id}>
-                          <View className="flex-row items-center gap-5 py-3">
-                            <View className="size-10 rounded-[10px] bg-fill-normal" />
-                            <View className="flex-1 gap-0.5">
-                              <ThemedText
-                                typography="body-3-bold"
-                                themeColor={
-                                  item.isDone ? "textSecondary" : "text"
-                                }
-                                style={
-                                  item.isDone
-                                    ? { textDecorationLine: "line-through" }
-                                    : undefined
-                                }
-                              >
-                                {item.title}
-                              </ThemedText>
-                              <ThemedText
-                                typography="caption-1-regular"
-                                style={{
-                                  color: semanticColors["label-disabled"],
-                                }}
-                              >
-                                {item.subtitle}
-                              </ThemedText>
-                            </View>
-                            {item.isMission && (
-                              <View className="rounded-md bg-fill-subtle px-2 py-1">
-                                <ThemedText
-                                  typography="caption-1-bold"
-                                  themeColor="textSecondary"
-                                >
-                                  미션
-                                </ThemedText>
-                              </View>
-                            )}
-                            <Pressable
-                              accessibilityRole="button"
-                              accessibilityLabel={
-                                item.isDone ? "완료 취소" : "완료로 표시"
-                              }
-                              onPress={() => handleTogglePress(item)}
-                              className={
-                                item.isDone
-                                  ? "size-6 items-center justify-center rounded-full bg-label-normal"
-                                  : "size-6 items-center justify-center rounded-full border border-line-strong"
-                              }
-                            >
-                              {item.isDone && (
-                                <Ionicons
-                                  name="checkmark"
-                                  size={14}
-                                  color="#ffffff"
-                                />
-                              )}
-                            </Pressable>
-                          </View>
-                          <View className="h-px bg-line-subtle" />
-                        </View>
-                      ))}
-
-                    <Pressable
-                      className="flex-row items-center gap-5 py-3"
-                      accessibilityRole="button"
-                      onPress={addQuickPlanItem}
-                    >
-                      <View className="size-10 items-center justify-center rounded-[10px] border border-dashed border-line-strong">
-                        <Ionicons
-                          name="add"
-                          size={18}
-                          color={theme.textSecondary}
-                        />
-                      </View>
-                      <ThemedText
-                        typography="body-3-bold"
-                        themeColor="textSecondary"
-                      >
-                        운동 계획 추가
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                )}
-
-                <View className="px-5 pb-5 pt-1">
-                  <Pressable
-                    className="items-center justify-center rounded-2xl bg-label-normal py-[15px]"
-                    accessibilityRole="button"
-                    onPress={() => console.log("운동 기록하기 pressed")}
-                  >
-                    <ThemedText
-                      typography="body-3-bold"
-                      style={{ color: "#ffffff" }}
-                    >
-                      운동 기록하기
-                    </ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            )}
+          <View className="flex-row items-center gap-3.5 rounded-2xl bg-fill-subtle px-[18px] py-4">
+            <Ionicons name="camera-outline" size={26} color={theme.text} />
+            <View className="flex-1 gap-0.5">
+              <ThemedText typography="body-3-bold">
+                운동한 날을 사진으로 남겨보세요
+              </ThemedText>
+              <ThemedText
+                typography="caption-1-regular"
+                style={{ color: semanticColors["label-disabled"] }}
+              >
+                기록한 사진이 이 달력에 쌓여요
+              </ThemedText>
+            </View>
           </View>
 
           {Platform.OS === "ios" && (
@@ -568,57 +532,24 @@ export default function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      <Modal
-        visible={
-          isFocused && isMissionPopupVisible && cardVariant === "mission"
-        }
-        transparent
-        animationType="fade"
-        onRequestClose={() => setIsMissionPopupVisible(false)}
-      >
-        <View className="flex-1 items-center justify-center bg-black/50 px-5">
-          <View className="w-full max-w-[303px] rounded-3xl bg-background-normal p-6">
-            <View className="items-center">
-              <View className="h-[150px] w-[180px] items-center justify-center rounded-2xl bg-fill-subtle">
-                <View className="absolute -bottom-3 rounded-full border-[3px] border-background-normal bg-label-normal px-3.5 py-1.5">
-                  <ThemedText
-                    typography="caption-1-bold"
-                    style={{ color: "#ffffff", letterSpacing: 0.4 }}
-                  >
-                    오늘의 미션
-                  </ThemedText>
-                </View>
-              </View>
-            </View>
+      {selectedPlan && isFocused && (
+        <WorkoutPlanDetailBottomSheet
+          key={selectedPlan.id}
+          onClose={() => setSelectedPlanId(null)}
+          onDelete={deleteSavedPlan}
+          onUpdate={updateSavedPlan}
+          plan={selectedPlan}
+        />
+      )}
 
-            <View className="gap-2 pt-6" style={{ alignItems: "center" }}>
-              <ThemedText
-                typography="title-3-bold"
-                style={{ textAlign: "center" }}
-              >
-                {SUGGESTED_MISSION.title}
-              </ThemedText>
-              <ThemedText
-                typography="body-3-regular"
-                themeColor="textSecondary"
-                style={{ textAlign: "center" }}
-              >
-                {SUGGESTED_MISSION.subtitle}
-              </ThemedText>
-            </View>
-
-            <Pressable
-              className="mt-6 items-center justify-center rounded-2xl bg-label-normal py-4"
-              accessibilityRole="button"
-              onPress={() => setIsMissionPopupVisible(false)}
-            >
-              <ThemedText typography="body-2-bold" style={{ color: "#ffffff" }}>
-                확인했어요
-              </ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+      <RecordMethodModal
+        onClose={dismissRecordMethodModal}
+        onPickFromLibrary={startRecordLibraryPick}
+        onSkipPhoto={completeRecordWithoutPhoto}
+        onTakePhoto={startRecordPhotoCapture}
+        title={recordModalTitle}
+        visible={isRecordMethodModalVisible && isFocused}
+      />
     </ThemedView>
   );
 }

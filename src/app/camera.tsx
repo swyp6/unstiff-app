@@ -7,11 +7,13 @@ import { Image, Pressable, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { semanticColors } from "@/constants/tokens";
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { uploadPickedImage } from "@/features/upload/upload-image";
 
-const CAMERA_BG = "#191f28";
+// Figma 1917:24863/1917:24879 배경색과 동일한 값 — 하드코딩 대신 토큰을 쓴다.
+const CAMERA_BG = semanticColors["label-normal"];
 
 type CapturedPhoto = {
   uri: string;
@@ -51,14 +53,18 @@ function ViewfinderCorner({
 // Cloudinary 업로드를 수행하고, 결과는 daily-photo-store를 통해 홈 화면으로
 // 전달한다(저장 API가 아직 없어 로컬 상태로만 반영됨).
 export default function CameraScreen() {
-  const { title, planItemId } = useLocalSearchParams<{
+  const { title, planItemId, source } = useLocalSearchParams<{
     title?: string;
     planItemId?: string;
+    // "library"면 기록 방식 선택 모달에서 "앨범에서 선택"으로 진입한 것 —
+    // 마운트 즉시 앨범 picker를 띄운다.
+    source?: string;
   }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
   const [isCameraReady, setIsCameraReady] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
@@ -90,9 +96,11 @@ export default function CameraScreen() {
 
       // expo-camera는 onCameraReady 콜백 전에 takePictureAsync를 호출하지
       // 말라고 명시한다 — 셔터 버튼이 비활성화돼 있어도 혹시 모를 호출을
-      // 한 번 더 막는다.
-      if (!isCameraReady) return;
+      // 한 번 더 막는다. isCapturing은 촬영 중 연타로 takePictureAsync가
+      // 중복 실행되는 것을 막는다.
+      if (!isCameraReady || isCapturing) return;
 
+      setIsCapturing(true);
       const result = await cameraRef.current?.takePictureAsync();
       if (result) {
         setError(null);
@@ -105,6 +113,8 @@ export default function CameraScreen() {
     } catch (captureError) {
       logImageUploadError("camera capture failed", captureError);
       setError("사진 촬영에 실패했어요. 다시 시도해 주세요.");
+    } finally {
+      setIsCapturing(false);
     }
   }
 
@@ -131,8 +141,20 @@ export default function CameraScreen() {
     }
   }
 
+  // "앨범에서 선택"으로 진입한 경우 라이브 카메라를 보여주지 않고 바로 앨범
+  // picker를 띄운다 — 취소하면 그냥 이 화면(라이브 카메라 프리뷰)에 남는다.
+  // handlePickFromLibrary는 네이티브 picker가 닫힌 뒤(사용자 액션 이후)에만
+  // setState하므로 마운트 시 동기적으로 캐스케이딩 렌더를 유발하지 않는다.
+  useEffect(() => {
+    if (source === "library") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      void handlePickFromLibrary();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleUsePhoto() {
-    if (!photo || !planItemId) return;
+    if (!photo || !planItemId || isUploading) return;
 
     setIsUploading(true);
     setError(null);
@@ -231,9 +253,9 @@ export default function CameraScreen() {
           )}
 
           {photo ? (
-            <View className="flex-row gap-2.5">
+            <View className="flex-row gap-3.5">
               <Pressable
-                className="flex-1 items-center justify-center rounded-[14px] bg-white/[0.16] py-4"
+                className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white/[0.16]"
                 accessibilityRole="button"
                 disabled={isUploading}
                 onPress={() => {
@@ -249,12 +271,15 @@ export default function CameraScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable
-                className="flex-1 items-center justify-center rounded-[14px] bg-white py-4"
+                className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white"
                 accessibilityRole="button"
                 disabled={isUploading}
                 onPress={handleUsePhoto}
               >
-                <ThemedText typography="body-3-bold">
+                <ThemedText
+                  typography="body-3-bold"
+                  style={{ color: semanticColors["label-normal"] }}
+                >
                   {isUploading ? "업로드 중..." : "이 사진 사용"}
                 </ThemedText>
               </Pressable>
@@ -271,10 +296,10 @@ export default function CameraScreen() {
               </Pressable>
 
               <Pressable
-                className="items-center justify-center rounded-full border-2 border-white/60 p-[7px]"
+                className="items-center justify-center rounded-full border-2 border-white/60 p-[5px]"
                 accessibilityRole="button"
                 accessibilityLabel="촬영"
-                disabled={!isCameraReady}
+                disabled={!isCameraReady || isCapturing}
                 onPress={handleCapture}
               >
                 <View
