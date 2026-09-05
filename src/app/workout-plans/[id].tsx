@@ -171,6 +171,7 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
             <SectionLabel>예상 시작 시간</SectionLabel>
             <SelectionRow
               onPress={() => setIsTimeSheetVisible(true)}
+              placeholder="선택해주세요"
               value={formatStartTime(plan.startTime)}
             />
           </View>
@@ -179,6 +180,7 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
             <SectionLabel>강도</SectionLabel>
             <SelectionRow
               onPress={() => setIsIntensitySheetVisible(true)}
+              placeholder="선택해주세요"
               value={getIntensityLabel(plan.intensity)}
             />
           </View>

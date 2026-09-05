@@ -337,6 +337,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>예상 시작 시간</SectionLabel>
                       <SelectionRow
                         onPress={() => setIsTimeSheetVisible(true)}
+                        placeholder="선택해주세요"
                         value={formatStartTime(draft.startTime)}
                       />
                     </View>
@@ -345,6 +346,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>강도</SectionLabel>
                       <SelectionRow
                         onPress={() => setIsIntensitySheetVisible(true)}
+                        placeholder="선택해주세요"
                         value={getIntensityLabel(draft.intensity)}
                       />
                     </View>

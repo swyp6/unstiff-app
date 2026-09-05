@@ -294,6 +294,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SelectionRow
             accessibilityLabel="예상 시작 시간 선택"
             onPress={openTimePicker}
+            placeholder="선택해주세요"
             value={formatStartTime(detailDraft.startTime)}
           />
         </View>
@@ -303,6 +304,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SelectionRow
             accessibilityLabel="강도 선택"
             onPress={openIntensityPicker}
+            placeholder="선택해주세요"
             value={getIntensityLabel(detailDraft.intensity)}
           />
         </View>

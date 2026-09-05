@@ -1,6 +1,6 @@
 export type GoalType = "time" | "distance" | "reps" | "sets";
 
-export type Intensity = "light" | "moderate" | "hard";
+export type Intensity = "light" | "moderate" | "hard" | null;
 
 export type StartTime = {
   period: "AM" | "PM";
@@ -89,11 +89,8 @@ export function createMockWorkoutPlan(
   };
 }
 
-// "신규 운동 계획 추가" 시트가 시작할 빈 상태. Intensity/exerciseType은 "선택 안
-// 됨"을 표현할 타입이 없어(둘 다 항상 값이 있는 union/string) light/빈 문자열로
-// 채워둔다 — Figma의 "선택하세요" placeholder까지 완전히 재현하려면 모델 타입을
-// 바꿔야 해서, 지금은 폼 필드 구성 자체를 Figma(node 2929-5701)에 맞추는 데
-// 집중한다.
+// "신규 운동 계획 추가" 시트가 시작할 빈 상태(Figma node 2929-5701) —
+// 운동명·운동 종류·기록할 항목·예상 시작 시간·강도 전부 미선택으로 시작한다.
 export function createBlankWorkoutPlanDraft(id: string): WorkoutPlanDraft {
   return {
     id,
@@ -107,7 +104,7 @@ export function createBlankWorkoutPlanDraft(id: string): WorkoutPlanDraft {
       sets: GOAL_CONFIG.sets.minimum,
     },
     startTime: null,
-    intensity: "light",
+    intensity: null,
     memo: "",
   };
 }
@@ -117,17 +114,20 @@ export function formatGoalValue(type: GoalType, value: number) {
   return `${displayValue}${GOAL_CONFIG[type].unit}`;
 }
 
+// null이면 빈 문자열을 돌려줘서 SelectionRow의 placeholder("선택해주세요",
+// 호출하는 쪽에서 지정)가 뜨게 한다.
 export function formatStartTime(value: StartTime) {
-  if (!value) return "설정 안 함";
+  if (!value) return "";
 
   const period = value.period === "AM" ? "오전" : "오후";
   return `${period} ${value.hour}시 ${String(value.minute).padStart(2, "0")}분`;
 }
 
+// null이면 빈 문자열을 돌려줘서 SelectionRow의 기본 placeholder("선택하세요")가
+// 뜨게 한다.
 export function getIntensityLabel(value: Intensity) {
   return (
-    INTENSITY_OPTIONS.find((option) => option.value === value)?.label ??
-    "가볍게"
+    INTENSITY_OPTIONS.find((option) => option.value === value)?.label ?? ""
   );
 }
 
