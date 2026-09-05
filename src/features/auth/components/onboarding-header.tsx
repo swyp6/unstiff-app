@@ -6,27 +6,34 @@ import { semanticColors } from "@/constants/tokens";
 
 type OnboardingHeaderProps = {
   title: string;
-  onBack: () => void;
+  // Omit for a screen with no back path (e.g. signup-complete, which Figma
+  // gives no back button — it's the end of the flow).
+  onBack?: () => void;
 };
 
 // Shared TopNav for the SNS-signup screen stack (terms → nickname →
-// profile photo) — WF/Signup/TopNav in Figma, identical on all three.
+// profile photo → photo-adjust → signup-complete) — WF/Signup/TopNav in
+// Figma, identical across all of them.
 export function OnboardingHeader({ title, onBack }: OnboardingHeaderProps) {
   return (
     <View style={styles.header}>
-      <Pressable
-        accessibilityLabel="뒤로가기"
-        accessibilityRole="button"
-        hitSlop={8}
-        onPress={onBack}
-        style={styles.backButton}
-      >
-        <Ionicons
-          color={semanticColors["label-normal"]}
-          name="chevron-back"
-          size={20}
-        />
-      </Pressable>
+      {onBack ? (
+        <Pressable
+          accessibilityLabel="뒤로가기"
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={onBack}
+          style={styles.backButton}
+        >
+          <Ionicons
+            color={semanticColors["label-normal"]}
+            name="chevron-back"
+            size={20}
+          />
+        </Pressable>
+      ) : (
+        <View style={styles.backButton} />
+      )}
       <ThemedText style={styles.headerTitle} typography="body-1-medium">
         {title}
       </ThemedText>

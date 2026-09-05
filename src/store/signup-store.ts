@@ -8,23 +8,28 @@ import { create } from "zustand";
 type SignupState = {
   isNewUser: boolean;
   nickname: string;
-  profileImageUrl: string | null;
+  // A local file URI the user has confirmed (via photo-adjust's "완료") as
+  // their profile photo for this onboarding session — NOT a server-saved
+  // profile URL. There is no backend endpoint yet to persist a profile
+  // image, so this only ever feeds local preview UI (profile-photo,
+  // signup-complete) until that endpoint exists.
+  confirmedPhotoUri: string | null;
   setIsNewUser: (value: boolean) => void;
   setNickname: (value: string) => void;
-  setProfileImageUrl: (value: string | null) => void;
+  setConfirmedPhotoUri: (value: string | null) => void;
   reset: () => void;
 };
 
 const initialState = {
   isNewUser: false,
   nickname: "",
-  profileImageUrl: null,
+  confirmedPhotoUri: null,
 };
 
 export const useSignupStore = create<SignupState>((set) => ({
   ...initialState,
   setIsNewUser: (isNewUser) => set({ isNewUser }),
   setNickname: (nickname) => set({ nickname }),
-  setProfileImageUrl: (profileImageUrl) => set({ profileImageUrl }),
+  setConfirmedPhotoUri: (confirmedPhotoUri) => set({ confirmedPhotoUri }),
   reset: () => set(initialState),
 }));

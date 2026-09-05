@@ -12,7 +12,12 @@ type UploadState =
   | { status: "uploading" }
   | { status: "error"; message: string };
 
-async function pickImage(source: ImagePickSource) {
+// Exported so callers that need the bare picker (permission + native
+// picker UI + cancel handling) without the resize/signature/Cloudinary
+// upload steps — e.g. profile-photo.tsx, which defers any upload until a
+// backend endpoint exists to actually save the result — can reuse it
+// instead of duplicating this permission/cancel logic.
+export async function pickImage(source: ImagePickSource) {
   const permission =
     source === "library"
       ? await ImagePicker.requestMediaLibraryPermissionsAsync()
