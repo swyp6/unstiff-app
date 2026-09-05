@@ -13,8 +13,10 @@ type RecordMethodModalProps = {
   onSkipPhoto: () => void;
 };
 
-// Figma "1.9 기록 방식 모달" (node 2697:22772) — same centered-dialog Modal
-// pattern as DeletePlanModal (transparent + fade, dim backdrop dismiss).
+// DeletePlanModal(features/workout-plan/components/delete-plan-modal.tsx)과
+// 같은 dialog 프레임(디밍/배경/버튼 구조)을 그대로 따른다 — Pressable이 직접
+// 스타일을 갖는 대신 pointerEvents="none" View를 감싸는 패턴까지 동일하게
+// 맞춰서 두 모달의 스타일이 갈라지지 않게 한다.
 export function RecordMethodModal({
   visible,
   title,
@@ -34,65 +36,67 @@ export function RecordMethodModal({
           onPress={onClose}
           style={styles.backdrop}
         />
-        <View style={styles.card}>
+        <View style={styles.dialog}>
           <View style={styles.copy}>
-            <ThemedText style={styles.title} typography="title-3-bold">
+            <ThemedText style={styles.center} typography="title-3-bold">
               {title}
             </ThemedText>
-            <ThemedText style={styles.subtitle} typography="body-3-regular">
+            <ThemedText
+              style={[styles.center, styles.description]}
+              typography="body-3-regular"
+            >
               오늘 운동을 어떻게 남길까요?
             </ThemedText>
           </View>
 
-          <View style={styles.actions}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onTakePhoto}
-              style={({ pressed }) => [
-                styles.primaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText
-                style={styles.primaryButtonText}
-                typography="body-2-bold"
+          <Pressable
+            accessibilityRole="button"
+            onPress={onTakePhoto}
+            style={styles.buttonPressable}
+          >
+            {({ pressed }) => (
+              <View
+                pointerEvents="none"
+                style={[styles.primaryButton, pressed && styles.pressed]}
               >
-                사진 촬영
-              </ThemedText>
-            </Pressable>
+                <ThemedText style={styles.primaryText} typography="body-2-bold">
+                  사진 촬영
+                </ThemedText>
+              </View>
+            )}
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={onPickFromLibrary}
-              style={({ pressed }) => [
-                styles.secondaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText
-                style={styles.secondaryButtonText}
-                typography="body-3-bold"
+          <Pressable
+            accessibilityRole="button"
+            onPress={onPickFromLibrary}
+            style={[styles.buttonPressable, styles.secondaryPressable]}
+          >
+            {({ pressed }) => (
+              <View
+                pointerEvents="none"
+                style={[styles.secondaryButton, pressed && styles.pressed]}
               >
-                앨범에서 선택
-              </ThemedText>
-            </Pressable>
+                <ThemedText typography="body-3-bold">앨범에서 선택</ThemedText>
+              </View>
+            )}
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              onPress={onSkipPhoto}
-              style={({ pressed }) => [
-                styles.tertiaryButton,
-                pressed && styles.pressed,
-              ]}
-            >
-              <ThemedText
-                style={styles.tertiaryButtonText}
-                typography="caption-1-bold"
-              >
-                사진 없이 기록하기
-              </ThemedText>
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={onSkipPhoto}
+            style={styles.tertiaryPressable}
+          >
+            {({ pressed }) => (
+              <View pointerEvents="none" style={pressed && styles.pressed}>
+                <ThemedText
+                  style={[styles.center, styles.skipText]}
+                  typography="caption-1-bold"
+                >
+                  사진 없이 기록하기
+                </ThemedText>
+              </View>
+            )}
+          </Pressable>
         </View>
       </SafeAreaView>
     </Modal>
@@ -102,8 +106,7 @@ export function RecordMethodModal({
 const styles = StyleSheet.create({
   dim: {
     alignItems: "center",
-    // Figma "Dim" layer: primitiveColors.charcoal["12"] (#171719) at 45% opacity.
-    backgroundColor: "rgba(23, 23, 25, 0.45)",
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
@@ -111,66 +114,58 @@ const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFill,
   },
-  card: {
-    alignItems: "center",
+  dialog: {
     backgroundColor: semanticColors["background-normal"],
-    borderRadius: 20,
-    gap: 20,
-    paddingBottom: 18,
-    paddingHorizontal: 20,
-    paddingTop: 26,
-    width: 300,
+    borderRadius: 24,
+    maxWidth: 340,
+    padding: 24,
+    width: "100%",
     zIndex: 1,
   },
   copy: {
     alignItems: "center",
     gap: 8,
-    width: "100%",
+    marginBottom: 24,
   },
-  title: {
-    color: semanticColors["label-normal"],
+  center: {
     textAlign: "center",
   },
-  subtitle: {
+  description: {
     color: semanticColors["label-subtle"],
-    textAlign: "center",
   },
-  actions: {
-    alignItems: "center",
-    gap: 10,
+  buttonPressable: {
+    height: 50,
     width: "100%",
+  },
+  secondaryPressable: {
+    marginTop: 8,
   },
   primaryButton: {
     alignItems: "center",
     backgroundColor: semanticColors["label-normal"],
-    borderRadius: 12,
+    borderRadius: 16,
     height: 50,
     justifyContent: "center",
-    width: "100%",
   },
-  primaryButtonText: {
+  primaryText: {
     color: semanticColors["label-inverse"],
   },
   secondaryButton: {
     alignItems: "center",
-    borderColor: semanticColors["line-strong"],
-    borderRadius: 12,
+    borderColor: semanticColors["line-normal"],
+    borderRadius: 16,
     borderWidth: 1,
     height: 50,
     justifyContent: "center",
-    width: "100%",
   },
-  secondaryButtonText: {
-    color: semanticColors["label-normal"],
-  },
-  tertiaryButton: {
+  tertiaryPressable: {
     alignItems: "center",
-    height: 30,
     justifyContent: "center",
-    paddingTop: 4,
+    marginTop: 8,
+    paddingVertical: 4,
     width: "100%",
   },
-  tertiaryButtonText: {
+  skipText: {
     color: semanticColors["label-subtle"],
   },
   pressed: {

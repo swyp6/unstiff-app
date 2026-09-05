@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { router, useIsFocused } from "expo-router";
+import { router, useFocusEffect, useIsFocused } from "expo-router";
 import {
   useCallback,
   useEffect,
@@ -285,6 +285,13 @@ export default function HomeScreen() {
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
     null,
   );
+  const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  // 캘린더에서 탭한 날짜. 오늘이면 실제 미션/오늘의 운동(상호작용 가능)을 보여주고,
+  // 다른 날이면 그날의 미션·운동 목데이터를 읽기 전용으로 보여준다 — 미션 "받기"는
+  // 오늘 날짜에만 가능하므로 다른 날엔 그 UI 자체를 노출하지 않는다.
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(
+    () => new Date(),
+  );
   const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
     useState(false);
   // 체크 탭 즉시 완료 상태를 낙관적으로 바꾸지만, 기록 방식(사진 촬영/앨범/
@@ -295,13 +302,6 @@ export default function HomeScreen() {
     string | null
   >(null);
   const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
-  const [viewedMonth, setViewedMonth] = useState(() => new Date());
-  // 캘린더에서 탭한 날짜. 오늘이면 실제 미션/오늘의 운동(상호작용 가능)을 보여주고,
-  // 다른 날이면 그날의 미션·운동 목데이터를 읽기 전용으로 보여준다 — 미션 "받기"는
-  // 오늘 날짜에만 가능하므로 다른 날엔 그 UI 자체를 노출하지 않는다.
-  const [selectedCalendarDate, setSelectedCalendarDate] = useState(
-    () => new Date(),
-  );
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
   // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
@@ -359,6 +359,18 @@ export default function HomeScreen() {
       setPendingRecordPlanItemId(null);
     }
   }, [isFocused, pendingRecordPlanItemId]);
+
+  // 다른 탭으로 이동해 포커스를 잃으면 모달을 닫는다. isFocused를 visible
+  // prop에서 직접 && 하면, 모달을 여는 탭(체크박스 탭)이 화면이 막 포커스를
+  // 되찾은 직후 일어날 때 isFocused가 아직 stale한 false라서 visible이
+  // false→true로 한 프레임 튀고, 그 사이 네이티브 Modal 표시 애니메이션이
+  // 끊겨 버튼 일부가 깨져 보이는 문제가 있었다. useFocusEffect의 cleanup은
+  // blur 시점에만 실행되므로 마운트 시 stale 값 문제가 없다.
+  useFocusEffect(
+    useCallback(() => {
+      return () => setIsRecordMethodModalVisible(false);
+    }, []),
+  );
 
   const today = new Date();
   const todayWorkouts = getWorkoutsForDate(today);
@@ -890,7 +902,7 @@ export default function HomeScreen() {
         onSkipPhoto={completeRecordWithoutPhoto}
         onTakePhoto={startRecordPhotoCapture}
         title={recordModalTitle}
-        visible={isRecordMethodModalVisible && isFocused}
+        visible={isRecordMethodModalVisible}
       />
 
       {newPlanDraft && isFocused && (
