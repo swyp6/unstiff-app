@@ -448,48 +448,52 @@ export default function HomeScreen() {
                   new Date(monthDate.getFullYear(), monthDate.getMonth(), day),
                 )
               }
-              className={
-                isToday
-                  ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
-                      isTodayRecorded
-                        ? "border-solid border-label-normal bg-fill-normal"
-                        : "border-dashed border-label-normal"
-                    }`
-                  : hasPhoto
-                    ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
-                    : "h-[60px] w-[43px] items-start p-1.5"
-              }
+              className="h-[60px] w-[43px]"
             >
-              {isToday && todayPhotoUrl && (
-                <>
-                  <Image
-                    source={{
-                      uri: getOptimizedImageUrl(todayPhotoUrl, {
-                        ...CALENDAR_DAY_THUMBNAIL_SIZE,
-                        crop: "fill",
-                      }),
-                    }}
-                    style={{ position: "absolute", inset: 0 }}
-                    contentFit="cover"
-                  />
-                  <View
-                    className="absolute inset-0"
-                    style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
-                  />
-                </>
-              )}
+              {/* 메인 카드보다 먼저 그려야 "뒤에 깔린" 것처럼 보인다 — 형제로
+                  두지 않고 메인 카드 안에 넣으면 zIndex를 아무리 낮춰도 부모(=
+                  메인 카드) 자신의 배경보다 뒤로는 못 가서 오히려 위에 덮인다. */}
               {hasMultiplePhotos && !isToday && (
-                <View
-                  className="absolute -top-1 left-2 h-[52px] w-[35px] rounded-lg border-[1.5px] border-background-normal bg-fill-subtle"
-                  style={{ zIndex: -1 }}
-                />
+                <View className="absolute -top-1 left-2 h-[52px] w-[35px] rounded-lg border-[1.5px] border-background-normal bg-fill-subtle" />
               )}
-              <ThemedText
-                typography={isToday ? "caption-1-bold" : "caption-1-regular"}
-                style={{ color: textColor }}
+              <View
+                className={
+                  isToday
+                    ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
+                        isTodayRecorded
+                          ? "border-solid border-label-normal bg-fill-normal"
+                          : "border-dashed border-label-normal"
+                      }`
+                    : hasPhoto
+                      ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
+                      : "h-[60px] w-[43px] items-start p-1.5"
+                }
               >
-                {day}
-              </ThemedText>
+                {isToday && todayPhotoUrl && (
+                  <>
+                    <Image
+                      source={{
+                        uri: getOptimizedImageUrl(todayPhotoUrl, {
+                          ...CALENDAR_DAY_THUMBNAIL_SIZE,
+                          crop: "fill",
+                        }),
+                      }}
+                      style={{ position: "absolute", inset: 0 }}
+                      contentFit="cover"
+                    />
+                    <View
+                      className="absolute inset-0"
+                      style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
+                    />
+                  </>
+                )}
+                <ThemedText
+                  typography={isToday ? "caption-1-bold" : "caption-1-regular"}
+                  style={{ color: textColor }}
+                >
+                  {day}
+                </ThemedText>
+              </View>
             </Pressable>
           );
         })}
@@ -713,7 +717,11 @@ export default function HomeScreen() {
                 >
                   <Animated.View
                     style={[
-                      { flexDirection: "row", width: calendarWidth * 3 },
+                      {
+                        flexDirection: "row",
+                        alignItems: "flex-start",
+                        width: calendarWidth * 3,
+                      },
                       pagerAnimatedStyle,
                     ]}
                   >
