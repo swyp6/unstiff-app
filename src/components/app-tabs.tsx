@@ -11,6 +11,8 @@ export default function AppTabs() {
     <NativeTabs
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
+      // shadowColor is iOS-only (react-native-screens has no Android tab bar
+      // border prop) — the top divider only renders there.
       shadowColor={colors.border}
       iconColor={{
         default: colors.textDisabled,

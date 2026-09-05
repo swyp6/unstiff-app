@@ -83,7 +83,13 @@ export function CustomTabList(props: TabListProps) {
 
   return (
     <View {...props} style={styles.tabListContainer}>
-      <ThemedView type="backgroundElement" style={styles.innerContainer}>
+      <ThemedView
+        type="backgroundElement"
+        style={[
+          styles.innerContainer,
+          { borderWidth: StyleSheet.hairlineWidth, borderColor: colors.border },
+        ]}
+      >
         <ThemedText type="smallBold" style={styles.brandText}>
           Expo Starter
         </ThemedText>
