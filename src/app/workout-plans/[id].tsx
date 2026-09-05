@@ -11,6 +11,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -31,6 +36,7 @@ import {
   getIntensityLabel,
   type GoalType,
   parseWorkoutPlan,
+  toggleGoalTypeSelection,
 } from "@/features/workout-plan/model";
 
 export default function WorkoutPlanDetailScreen() {
@@ -77,17 +83,13 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
   };
 
   const toggleGoalType = (goalType: GoalType) => {
-    setPlan((current) => {
-      const selected = current.selectedGoalTypes.includes(goalType);
-      if (selected && current.selectedGoalTypes.length === 1) return current;
-
-      return {
-        ...current,
-        selectedGoalTypes: selected
-          ? current.selectedGoalTypes.filter((type) => type !== goalType)
-          : [...current.selectedGoalTypes, goalType],
-      };
-    });
+    setPlan((current) => ({
+      ...current,
+      selectedGoalTypes: toggleGoalTypeSelection(
+        current.selectedGoalTypes,
+        goalType,
+      ),
+    }));
   };
 
   return (
@@ -145,17 +147,23 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
 
           <View style={styles.steppers}>
             {plan.selectedGoalTypes.map((type) => (
-              <GoalStepper
+              <Animated.View
+                entering={FadeIn}
+                exiting={FadeOut}
                 key={type}
-                onChange={(value) =>
-                  setPlan((current) => ({
-                    ...current,
-                    goalValues: { ...current.goalValues, [type]: value },
-                  }))
-                }
-                type={type}
-                value={plan.goalValues[type]}
-              />
+                layout={LinearTransition}
+              >
+                <GoalStepper
+                  onChange={(value) =>
+                    setPlan((current) => ({
+                      ...current,
+                      goalValues: { ...current.goalValues, [type]: value },
+                    }))
+                  }
+                  type={type}
+                  value={plan.goalValues[type]}
+                />
+              </Animated.View>
             ))}
           </View>
 

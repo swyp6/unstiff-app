@@ -18,13 +18,22 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+// 이 파일은 시트 드래그 애니메이션에 이미 RN 기본 Animated를 쓰고 있어서,
+// 스테퍼 추가/삭제용 reanimated는 이름 충돌 피하려고 별칭으로 가져온다.
+import ReanimatedAnimated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { NotificationToggle } from "@/features/settings/components/notification-toggle";
 import {
   formatStartTime,
   getIntensityLabel,
   type GoalType,
+  toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 
@@ -44,7 +53,18 @@ type WorkoutPlanEditSheetProps = {
   value: WorkoutPlanDraft;
   onClose: () => void;
   onDelete: () => void;
-  onSave: (value: WorkoutPlanDraft) => void;
+  // 신규 추가 흐름에서만 saveAsRoutine이 의미 있다(아래 토글) — 편집 흐름은
+  // 이미 저장된 계획을 고치는 것뿐이라 두 번째 인자를 그냥 무시하면 된다.
+  onSave: (value: WorkoutPlanDraft, saveAsRoutine: boolean) => void;
+  // 기존 계획 편집("운동 계획 편집"/"변경 저장"/삭제 링크 있음)과 신규 계획
+  // 추가("루틴 추가"/"오늘 운동으로 담기"/삭제 링크 없음, Figma node
+  // 2929-5701)가 필드 구성이 완전히 같아서 하나의 시트를 재사용한다.
+  title?: string;
+  saveLabel?: string;
+  showDelete?: boolean;
+  // 신규 추가 흐름에서만 "루틴에 추가하기" on/off 토글을 보여준다 — 편집
+  // 흐름의 계획은 이미 루틴이므로 토글이 필요 없다.
+  showSaveAsRoutineToggle?: boolean;
 };
 
 export function WorkoutPlanEditSheet({
@@ -53,10 +73,15 @@ export function WorkoutPlanEditSheet({
   onClose,
   onDelete,
   onSave,
+  title = "운동 계획 편집",
+  saveLabel = "변경 저장",
+  showDelete = true,
+  showSaveAsRoutineToggle = false,
 }: WorkoutPlanEditSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<WorkoutPlanDraft>(value);
+  const [saveAsRoutine, setSaveAsRoutine] = useState(true);
   const [isWorkoutTypeSheetVisible, setIsWorkoutTypeSheetVisible] =
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
@@ -188,17 +213,13 @@ export function WorkoutPlanEditSheet({
   );
 
   const toggleGoalType = (goalType: GoalType) => {
-    setDraft((current) => {
-      const selected = current.selectedGoalTypes.includes(goalType);
-      if (selected && current.selectedGoalTypes.length === 1) return current;
-
-      return {
-        ...current,
-        selectedGoalTypes: selected
-          ? current.selectedGoalTypes.filter((type) => type !== goalType)
-          : [...current.selectedGoalTypes, goalType],
-      };
-    });
+    setDraft((current) => ({
+      ...current,
+      selectedGoalTypes: toggleGoalTypeSelection(
+        current.selectedGoalTypes,
+        goalType,
+      ),
+    }));
   };
 
   return (
@@ -229,7 +250,7 @@ export function WorkoutPlanEditSheet({
                 </View>
                 <View style={styles.header}>
                   <ThemedText style={styles.title} typography="title-3-bold">
-                    운동 계획 편집
+                    {title}
                   </ThemedText>
                 </View>
 
@@ -278,20 +299,26 @@ export function WorkoutPlanEditSheet({
 
                     <View style={styles.steppers}>
                       {draft.selectedGoalTypes.map((type) => (
-                        <GoalStepper
+                        <ReanimatedAnimated.View
+                          entering={FadeIn}
+                          exiting={FadeOut}
                           key={type}
-                          onChange={(goalValue) =>
-                            setDraft((current) => ({
-                              ...current,
-                              goalValues: {
-                                ...current.goalValues,
-                                [type]: goalValue,
-                              },
-                            }))
-                          }
-                          type={type}
-                          value={draft.goalValues[type]}
-                        />
+                          layout={LinearTransition}
+                        >
+                          <GoalStepper
+                            onChange={(goalValue) =>
+                              setDraft((current) => ({
+                                ...current,
+                                goalValues: {
+                                  ...current.goalValues,
+                                  [type]: goalValue,
+                                },
+                              }))
+                            }
+                            type={type}
+                            value={draft.goalValues[type]}
+                          />
+                        </ReanimatedAnimated.View>
                       ))}
                     </View>
 
@@ -326,34 +353,52 @@ export function WorkoutPlanEditSheet({
                         value={draft.memo}
                       />
                     </View>
+
+                    {showSaveAsRoutineToggle && (
+                      <View style={styles.toggleRow}>
+                        <ThemedText typography="body-2-bold">
+                          루틴에 추가하기
+                        </ThemedText>
+                        <NotificationToggle
+                          accessibilityLabel="루틴에 추가하기"
+                          onValueChange={setSaveAsRoutine}
+                          value={saveAsRoutine}
+                        />
+                      </View>
+                    )}
+
                     <View style={styles.actions}>
                       <PrimaryActionButton
-                        label="변경 저장"
-                        onPress={() => closeSheet(() => onSave(draft))}
+                        label={saveLabel}
+                        onPress={() =>
+                          closeSheet(() => onSave(draft, saveAsRoutine))
+                        }
                       />
-                      <Pressable
-                        accessibilityRole="button"
-                        hitSlop={{ bottom: 13, left: 20, right: 20, top: 13 }}
-                        onPress={() => closeSheet(onDelete)}
-                        style={styles.deleteLinkPressable}
-                      >
-                        {({ pressed }) => (
-                          <View
-                            pointerEvents="none"
-                            style={[
-                              styles.deleteLink,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <ThemedText
-                              style={styles.deleteLinkText}
-                              typography="body-3-bold"
+                      {showDelete && (
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={{ bottom: 13, left: 20, right: 20, top: 13 }}
+                          onPress={() => closeSheet(onDelete)}
+                          style={styles.deleteLinkPressable}
+                        >
+                          {({ pressed }) => (
+                            <View
+                              pointerEvents="none"
+                              style={[
+                                styles.deleteLink,
+                                pressed && styles.pressed,
+                              ]}
                             >
-                              계획 삭제하기
-                            </ThemedText>
-                          </View>
-                        )}
-                      </Pressable>
+                              <ThemedText
+                                style={styles.deleteLinkText}
+                                typography="body-3-bold"
+                              >
+                                계획 삭제하기
+                              </ThemedText>
+                            </View>
+                          )}
+                        </Pressable>
+                      )}
                     </View>
                   </ScrollView>
                 </View>
@@ -474,6 +519,11 @@ const styles = StyleSheet.create({
   },
   steppers: {
     gap: 8,
+  },
+  toggleRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   actions: {
     gap: 16,

@@ -56,15 +56,23 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 export function SelectionRow({
   value,
   onPress,
+  placeholder = "선택하세요",
   accessibilityLabel,
 }: {
   value: string;
   onPress?: () => void;
+  placeholder?: string;
   accessibilityLabel?: string;
 }) {
+  const hasValue = value.length > 0;
   const content = (
     <>
-      <ThemedText typography="body-2-bold">{value}</ThemedText>
+      <ThemedText
+        style={!hasValue && { color: semanticColors["label-disabled"] }}
+        typography="body-2-bold"
+      >
+        {hasValue ? value : placeholder}
+      </ThemedText>
       <View style={styles.selectionValue}>
         {onPress && (
           <Ionicons

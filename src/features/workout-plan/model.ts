@@ -21,6 +21,23 @@ export type WorkoutPlanDraft = {
 
 export const GOAL_TYPES: GoalType[] = ["time", "distance", "reps", "sets"];
 
+// 칩을 누른 순서가 아니라 항상 GOAL_TYPES 순서(시간/거리/횟수/세트)로 보이도록
+// 정렬해서 반환한다 — 세 군데(계획 편집/상세/새 루틴 추가)에서 토글 로직이
+// 똑같이 중복돼 있어서 여기 하나로 모았다.
+export function toggleGoalTypeSelection(
+  selectedGoalTypes: GoalType[],
+  goalType: GoalType,
+): GoalType[] {
+  const isSelected = selectedGoalTypes.includes(goalType);
+  if (isSelected && selectedGoalTypes.length === 1) return selectedGoalTypes;
+
+  const next = isSelected
+    ? selectedGoalTypes.filter((type) => type !== goalType)
+    : [...selectedGoalTypes, goalType];
+
+  return GOAL_TYPES.filter((type) => next.includes(type));
+}
+
 export const GOAL_CONFIG: Record<
   GoalType,
   { label: string; step: number; minimum: number; unit: string }
@@ -69,6 +86,29 @@ export function createMockWorkoutPlan(
     startTime: { period: "PM", hour: 7, minute: 0 },
     intensity: "light",
     memo: "오늘은 천천히",
+  };
+}
+
+// "신규 운동 계획 추가" 시트가 시작할 빈 상태. Intensity/exerciseType은 "선택 안
+// 됨"을 표현할 타입이 없어(둘 다 항상 값이 있는 union/string) light/빈 문자열로
+// 채워둔다 — Figma의 "선택하세요" placeholder까지 완전히 재현하려면 모델 타입을
+// 바꿔야 해서, 지금은 폼 필드 구성 자체를 Figma(node 2929-5701)에 맞추는 데
+// 집중한다.
+export function createBlankWorkoutPlanDraft(id: string): WorkoutPlanDraft {
+  return {
+    id,
+    title: "",
+    exerciseType: "",
+    selectedGoalTypes: [],
+    goalValues: {
+      time: GOAL_CONFIG.time.minimum,
+      distance: GOAL_CONFIG.distance.minimum,
+      reps: GOAL_CONFIG.reps.minimum,
+      sets: GOAL_CONFIG.sets.minimum,
+    },
+    startTime: null,
+    intensity: "light",
+    memo: "",
   };
 }
 

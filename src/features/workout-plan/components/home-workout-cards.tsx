@@ -187,7 +187,6 @@ type TodayWorkoutCardProps = {
   onAddSavedPlan: (plan: WorkoutPlanDraft) => void;
   onOpenSavedPlan: (planId: string) => void;
   onAddNewPlan: () => void;
-  onRecordWorkout: () => void;
 };
 
 export function TodayWorkoutCard({
@@ -200,7 +199,6 @@ export function TodayWorkoutCard({
   onAddSavedPlan,
   onOpenSavedPlan,
   onAddNewPlan,
-  onRecordWorkout,
 }: TodayWorkoutCardProps) {
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
 
@@ -231,79 +229,68 @@ export function TodayWorkoutCard({
         </View>
       </Pressable>
 
-      {expanded && (
-        <View className="px-5 pb-5">
-          <View className="h-px bg-line-subtle" />
+      <View className="px-5 pb-5">
+        <View className="h-px bg-line-subtle" />
 
-          <View className="py-2">
-            {todayWorkouts.length === 0 ? (
-              <View className="items-center py-6">
-                <ThemedText
-                  typography="body-3-medium"
-                  themeColor="textSecondary"
-                >
-                  오늘 담은 운동이 없어요
-                </ThemedText>
-              </View>
-            ) : (
-              todayWorkouts.map((workout) => (
-                <TodayWorkoutRow
-                  key={workout.id}
-                  workout={workout}
-                  onToggle={() => onToggleTodayWorkout(workout.id)}
-                />
-              ))
-            )}
-          </View>
-
-          <ThemedText
-            className="pb-1 pt-3"
-            typography="caption-1-bold"
-            themeColor="textSecondary"
-          >
-            저장된 운동 계획
-          </ThemedText>
-
-          {savedWorkoutPlans.map((plan) => (
-            <SavedWorkoutPlanRow
-              key={plan.id}
-              plan={plan}
-              onAdd={() => onAddSavedPlan(plan)}
-              onOpenDetail={() => onOpenSavedPlan(plan.id)}
-            />
-          ))}
-
-          <Pressable
-            accessibilityRole="button"
-            className="flex-row items-center gap-3 py-3"
-            onPress={onAddNewPlan}
-          >
-            <View className="h-[34px] w-[34px] items-center justify-center rounded-full border border-dashed border-line-strong bg-fill-subtle">
-              <Ionicons
-                color={semanticColors["label-subtle"]}
-                name="add"
-                size={16}
-              />
+        <View className="py-2">
+          {todayWorkouts.length === 0 ? (
+            <View className="items-center py-6">
+              <ThemedText typography="body-3-medium" themeColor="textSecondary">
+                오늘 담은 운동이 없어요
+              </ThemedText>
             </View>
-            <ThemedText typography="body-3-bold" themeColor="textSecondary">
-              신규 운동 계획 추가
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            accessibilityRole="button"
-            className="mt-3 h-[50px] items-center justify-center rounded-2xl bg-label-normal"
-            onPress={onRecordWorkout}
-          >
-            <ThemedText
-              typography="body-3-bold"
-              style={{ color: semanticColors["label-inverse"] }}
-            >
-              운동 기록하기
-            </ThemedText>
-          </Pressable>
+          ) : (
+            todayWorkouts.map((workout) => (
+              <TodayWorkoutRow
+                key={workout.id}
+                onOpenDetail={() => onOpenSavedPlan(workout.sourcePlanId)}
+                onToggle={() => onToggleTodayWorkout(workout.id)}
+                workout={workout}
+              />
+            ))
+          )}
         </View>
-      )}
+
+        {/* 드롭다운(펼치기/접기)은 이 "저장된 운동 계획" 부분만 담당한다 —
+            위의 오늘 담은 운동 목록은 항상 보인다. */}
+        {expanded && (
+          <>
+            <ThemedText
+              className="pb-1 pt-3"
+              typography="caption-1-bold"
+              themeColor="textSecondary"
+            >
+              저장된 운동 계획
+            </ThemedText>
+
+            {savedWorkoutPlans.map((plan) => (
+              <SavedWorkoutPlanRow
+                key={plan.id}
+                plan={plan}
+                onAdd={() => onAddSavedPlan(plan)}
+                onOpenDetail={() => onOpenSavedPlan(plan.id)}
+              />
+            ))}
+
+            <Pressable
+              accessibilityRole="button"
+              className="flex-row items-center gap-3 py-3"
+              onPress={onAddNewPlan}
+            >
+              <View className="h-[34px] w-[34px] items-center justify-center rounded-full border border-dashed border-line-strong bg-fill-subtle">
+                <Ionicons
+                  color={semanticColors["label-subtle"]}
+                  name="add"
+                  size={16}
+                />
+              </View>
+              <ThemedText typography="body-3-bold" themeColor="textSecondary">
+                신규 운동 계획 추가
+              </ThemedText>
+            </Pressable>
+          </>
+        )}
+      </View>
     </View>
   );
 }
@@ -311,9 +298,11 @@ export function TodayWorkoutCard({
 function TodayWorkoutRow({
   workout,
   onToggle,
+  onOpenDetail,
 }: {
   workout: TodayWorkoutInstance;
   onToggle: () => void;
+  onOpenDetail: () => void;
 }) {
   return (
     <View className="flex-row items-center gap-3 border-b border-line-subtle py-3">
@@ -356,6 +345,19 @@ function TodayWorkoutRow({
           {workout.subtitle}
         </ThemedText>
       </View>
+      <Pressable
+        accessibilityLabel={`${workout.title} 상세 보기`}
+        accessibilityRole="button"
+        className="h-[34px] w-[34px] items-center justify-center"
+        hitSlop={4}
+        onPress={onOpenDetail}
+      >
+        <Ionicons
+          color={semanticColors["label-subtle"]}
+          name="ellipsis-vertical"
+          size={20}
+        />
+      </Pressable>
     </View>
   );
 }

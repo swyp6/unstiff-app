@@ -8,6 +8,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -15,6 +20,7 @@ import {
   formatStartTime,
   getIntensityLabel,
   type GoalType,
+  toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 
@@ -96,17 +102,13 @@ export function WorkoutPlanDetailBottomSheet({
   }, []);
 
   const toggleGoalType = (goalType: GoalType) => {
-    setDetailDraft((current) => {
-      const selected = current.selectedGoalTypes.includes(goalType);
-      if (selected && current.selectedGoalTypes.length === 1) return current;
-
-      return {
-        ...current,
-        selectedGoalTypes: selected
-          ? current.selectedGoalTypes.filter((type) => type !== goalType)
-          : [...current.selectedGoalTypes, goalType],
-      };
-    });
+    setDetailDraft((current) => ({
+      ...current,
+      selectedGoalTypes: toggleGoalTypeSelection(
+        current.selectedGoalTypes,
+        goalType,
+      ),
+    }));
   };
 
   const savePlan = () => {
@@ -262,20 +264,26 @@ export function WorkoutPlanDetailBottomSheet({
           {detailDraft.selectedGoalTypes.length > 0 && (
             <View style={styles.goals}>
               {detailDraft.selectedGoalTypes.map((type) => (
-                <GoalStepper
+                <Animated.View
+                  entering={FadeIn}
+                  exiting={FadeOut}
                   key={type}
-                  onChange={(goalValue) =>
-                    setDetailDraft((current) => ({
-                      ...current,
-                      goalValues: {
-                        ...current.goalValues,
-                        [type]: goalValue,
-                      },
-                    }))
-                  }
-                  type={type}
-                  value={detailDraft.goalValues[type]}
-                />
+                  layout={LinearTransition}
+                >
+                  <GoalStepper
+                    onChange={(goalValue) =>
+                      setDetailDraft((current) => ({
+                        ...current,
+                        goalValues: {
+                          ...current.goalValues,
+                          [type]: goalValue,
+                        },
+                      }))
+                    }
+                    type={type}
+                    value={detailDraft.goalValues[type]}
+                  />
+                </Animated.View>
               ))}
             </View>
           )}

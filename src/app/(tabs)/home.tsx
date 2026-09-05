@@ -32,7 +32,9 @@ import {
   type TodayWorkoutInstance,
 } from "@/features/workout-plan/components/home-workout-cards";
 import { WorkoutPlanDetailBottomSheet } from "@/features/workout-plan/components/workout-plan-detail-bottom-sheet";
+import { WorkoutPlanEditSheet } from "@/features/workout-plan/components/workout-plan-edit-sheet";
 import {
+  createBlankWorkoutPlanDraft,
   createMockWorkoutPlan,
   getWorkoutPlanSummary,
   type WorkoutPlanDraft,
@@ -156,53 +158,90 @@ function WeekdayHeaderRow() {
 }
 
 // 오늘이 아닌 날을 탭했을 때 보여주는 읽기 전용 카드. 미션 "받기"/운동 체크 같은
-// 상호작용은 없다 — 그 날의 미션·운동 기록을 보여주기만 한다.
+// 상호작용은 없다 — 그 날 완료된 미션·운동을 "지난 운동" 하나의 체크 목록으로
+// 보여주기만 한다 (Figma node 2910-4400: 미션/운동을 따로 나누지 않고 완료
+// 표시가 된 항목을 한 리스트로 합쳐서 보여준다).
 function DayRecordCard({
   dateLabel,
   record,
+  expanded,
+  onToggleExpanded,
 }: {
   dateLabel: string;
   record: DayRecord | null;
+  expanded: boolean;
+  onToggleExpanded: () => void;
 }) {
-  return (
-    <View className="gap-4 rounded-[20px] border border-line-normal bg-background-normal px-5 py-[18px]">
-      <ThemedText typography="caption-1-bold" themeColor="textSecondary">
-        {dateLabel}
-      </ThemedText>
+  const entries = record
+    ? [{ title: record.missionTitle, subtitle: "미션" }, ...record.workouts]
+    : [];
 
-      {record ? (
-        <>
-          <View className="flex-row items-center gap-2">
-            <Ionicons
-              name="checkmark-circle"
-              size={18}
-              color={semanticColors["label-normal"]}
-            />
-            <ThemedText typography="body-3-bold">
-              {record.missionTitle}
-            </ThemedText>
-          </View>
-          <View className="gap-3">
-            {record.workouts.map((workout, index) => (
-              <View key={index} className="gap-0.5">
-                <ThemedText typography="body-3-bold">
-                  {workout.title}
-                </ThemedText>
+  return (
+    <View className="rounded-[20px] border border-line-normal bg-background-normal">
+      <Pressable
+        accessibilityRole="button"
+        className="h-[60px] flex-row items-center justify-between px-5"
+        onPress={onToggleExpanded}
+      >
+        <View className="gap-0.5">
+          <ThemedText typography="body-2-bold">지난 운동</ThemedText>
+          <ThemedText typography="caption-1-medium" themeColor="textSecondary">
+            {dateLabel}
+          </ThemedText>
+        </View>
+        <Ionicons
+          color={semanticColors["label-subtle"]}
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={14}
+        />
+      </Pressable>
+
+      {expanded && (
+        <View className="px-5 pb-5">
+          <View className="h-px bg-line-subtle" />
+
+          <View className="py-2">
+            {entries.length === 0 ? (
+              <View className="items-center py-6">
                 <ThemedText
-                  typography="caption-1-regular"
+                  typography="body-3-medium"
                   themeColor="textSecondary"
                 >
-                  {workout.subtitle}
+                  이 날의 기록이 없어요
                 </ThemedText>
               </View>
-            ))}
+            ) : (
+              entries.map((entry, index) => (
+                <View
+                  key={index}
+                  className="flex-row items-center gap-3 border-b border-line-subtle py-3"
+                >
+                  <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal">
+                    <Ionicons
+                      color={semanticColors["label-inverse"]}
+                      name="checkmark"
+                      size={16}
+                    />
+                  </View>
+                  <View className="flex-1 gap-0.5">
+                    <ThemedText
+                      typography="body-3-bold"
+                      themeColor="textSecondary"
+                      style={{ textDecorationLine: "line-through" }}
+                    >
+                      {entry.title}
+                    </ThemedText>
+                    <ThemedText
+                      typography="caption-1-regular"
+                      style={{ color: semanticColors["label-disabled"] }}
+                    >
+                      {entry.subtitle}
+                    </ThemedText>
+                  </View>
+                </View>
+              ))
+            )}
           </View>
-        </>
-      ) : (
-        <View className="items-center py-6">
-          <ThemedText typography="body-3-medium" themeColor="textSecondary">
-            이 날의 기록이 없어요
-          </ThemedText>
         </View>
       )}
     </View>
@@ -225,6 +264,10 @@ export default function HomeScreen() {
     [],
   );
   const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  // "신규 운동 계획 추가"로 연 빈 계획 초안. null이면 시트가 안 보인다.
+  const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
+    null,
+  );
   const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
     useState(false);
   // 체크 탭 즉시 완료 상태를 낙관적으로 바꾸지만, 기록 방식(사진 촬영/앨범/
@@ -535,21 +578,17 @@ export default function HomeScreen() {
     ]);
   }
 
-  function addQuickSavedPlan() {
-    setSavedWorkoutPlans((plans) => [
-      ...plans,
-      {
-        ...createMockWorkoutPlan(`saved-plan-${Date.now()}`, "새 운동 계획"),
-        selectedGoalTypes: ["time"],
-        goalValues: {
-          time: 30,
-          distance: 1.4,
-          reps: 10,
-          sets: 3,
-        },
-        memo: "",
-      },
-    ]);
+  function openNewPlanSheet() {
+    setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
+  }
+
+  function saveNewPlan(plan: WorkoutPlanDraft, saveAsRoutine: boolean) {
+    // 오늘의 운동에는 추가하지 않는다 — 새 루틴은 저장된 운동 계획에만 나타나고,
+    // 오늘 할지는 그 목록의 "+" 버튼으로 따로 고른다.
+    if (saveAsRoutine) {
+      setSavedWorkoutPlans((plans) => [...plans, plan]);
+    }
+    setNewPlanDraft(null);
   }
 
   // 오늘의 미션 체크와 동일한 패턴: 빈 체크를 탭하면 즉시 낙관적으로 완료
@@ -768,10 +807,9 @@ export default function HomeScreen() {
             <TodayWorkoutCard
               dateLabel={isSelectedDateToday ? todayLabel : selectedDateLabel}
               expanded={isTodayCardExpanded}
-              onAddNewPlan={addQuickSavedPlan}
+              onAddNewPlan={openNewPlanSheet}
               onAddSavedPlan={addSavedPlanToToday}
               onOpenSavedPlan={setSelectedPlanId}
-              onRecordWorkout={() => console.log("운동 기록하기 pressed")}
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
               }
@@ -783,6 +821,10 @@ export default function HomeScreen() {
             <DayRecordCard
               dateLabel={selectedDateLabel}
               record={selectedDayRecord}
+              expanded={isTodayCardExpanded}
+              onToggleExpanded={() =>
+                setIsTodayCardExpanded((expanded) => !expanded)
+              }
             />
           )}
 
@@ -838,6 +880,20 @@ export default function HomeScreen() {
         title={recordModalTitle}
         visible={isRecordMethodModalVisible && isFocused}
       />
+
+      {newPlanDraft && isFocused && (
+        <WorkoutPlanEditSheet
+          onClose={() => setNewPlanDraft(null)}
+          onDelete={() => setNewPlanDraft(null)}
+          onSave={saveNewPlan}
+          saveLabel="루틴 추가하기"
+          showDelete={false}
+          showSaveAsRoutineToggle
+          title="루틴 추가"
+          value={newPlanDraft}
+          visible
+        />
+      )}
     </ThemedView>
   );
 }
