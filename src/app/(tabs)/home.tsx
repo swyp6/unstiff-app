@@ -114,12 +114,16 @@ function createTodayWorkoutInstance(
   plan: WorkoutPlanDraft,
 ): TodayWorkoutInstance {
   nextTodayWorkoutInstanceId += 1;
+  const instanceId = `today-${Date.now()}-${nextTodayWorkoutInstanceId}`;
+  // 저장된 계획을 그대로 복사해 완전히 독립적인 사본을 만든다 — 이후 원본을
+  // 수정하거나 삭제해도 이 인스턴스는 영향받지 않는다(실제 백엔드 연동
+  // 시에도 별도 레코드로 저장될 예정). plan.id도 이 인스턴스 id로 새로
+  // 부여해서, 점세개로 이 사본을 수정/삭제할 때 원본 저장 목록과 완전히
+  // 분리된다.
   return {
-    id: `today-${Date.now()}-${nextTodayWorkoutInstanceId}`,
-    sourcePlanId: plan.id,
-    title: plan.title,
-    subtitle: getWorkoutPlanSummary(plan),
+    id: instanceId,
     isDone: false,
+    plan: { ...plan, id: instanceId },
   };
 }
 
@@ -282,7 +286,15 @@ export default function HomeScreen() {
       [key]: updater(current[key] ?? []),
     }));
   }
-  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  // 상세/수정 시트가 지금 "저장된 운동 계획" 하나를 편집 중인지, 아니면
+  // 어떤 날짜의 독립적인 운동 인스턴스(workout.plan)를 편집 중인지 구분한다
+  // — 시트 자체(WorkoutPlanDetailBottomSheet)는 그대로 재사용하고, 저장만
+  // savedWorkoutPlans 쪽으로 갈지 workoutsByDate 쪽으로 갈지만 갈린다.
+  const [planDetailTarget, setPlanDetailTarget] = useState<
+    | { kind: "saved"; planId: string }
+    | { kind: "instance"; instanceId: string }
+    | null
+  >(null);
   // "신규 운동 계획 추가"로 연 빈 계획 초안. null이면 시트가 안 보인다.
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
     null,
@@ -616,8 +628,16 @@ export default function HomeScreen() {
     ));
   }
 
-  const selectedPlan =
-    savedWorkoutPlans.find((plan) => plan.id === selectedPlanId) ?? null;
+  const detailPlan =
+    planDetailTarget?.kind === "saved"
+      ? (savedWorkoutPlans.find(
+          (plan) => plan.id === planDetailTarget.planId,
+        ) ?? null)
+      : planDetailTarget?.kind === "instance"
+        ? (selectedDateWorkouts.find(
+            (workout) => workout.id === planDetailTarget.instanceId,
+          )?.plan ?? null)
+        : null;
 
   function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
     updateWorkoutsForDate(date, (workouts) => [
@@ -664,7 +684,7 @@ export default function HomeScreen() {
         item.id === instanceId ? { ...item, isDone: true } : item,
       ),
     );
-    openRecordMethodModal(instanceId, workout.title);
+    openRecordMethodModal(instanceId, workout.plan.title);
   }
 
   function updateSavedPlan(updatedPlan: WorkoutPlanDraft) {
@@ -675,7 +695,38 @@ export default function HomeScreen() {
 
   function deleteSavedPlan(planId: string) {
     setSavedWorkoutPlans((plans) => plans.filter((plan) => plan.id !== planId));
-    setSelectedPlanId(null);
+  }
+
+  // WorkoutPlanDetailBottomSheet는 "저장된 계획"과 "오늘의 운동 인스턴스"
+  // 둘 다에 재사용된다 — planDetailTarget의 종류에 따라 저장/삭제를 올바른
+  // 쪽(savedWorkoutPlans 또는 그 날짜의 workoutsByDate)으로 돌려준다.
+  function updateDetailPlan(updatedPlan: WorkoutPlanDraft) {
+    if (!planDetailTarget) return;
+    if (planDetailTarget.kind === "saved") {
+      updateSavedPlan(updatedPlan);
+      return;
+    }
+    updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
+      workouts.map((workout) =>
+        workout.id === planDetailTarget.instanceId
+          ? { ...workout, plan: updatedPlan }
+          : workout,
+      ),
+    );
+  }
+
+  function deleteDetailPlan() {
+    if (!planDetailTarget) return;
+    if (planDetailTarget.kind === "saved") {
+      deleteSavedPlan(planDetailTarget.planId);
+    } else {
+      updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
+        workouts.filter(
+          (workout) => workout.id !== planDetailTarget.instanceId,
+        ),
+      );
+    }
+    setPlanDetailTarget(null);
   }
 
   // 빈 체크를 탭하면 즉시(optimistic) 체크 UI를 켜는 동시에 같은 이벤트에서
@@ -902,7 +953,12 @@ export default function HomeScreen() {
               onAddSavedPlan={(plan) =>
                 addSavedPlanToDate(plan, selectedCalendarDate)
               }
-              onOpenSavedPlan={setSelectedPlanId}
+              onOpenSavedPlan={(planId) =>
+                setPlanDetailTarget({ kind: "saved", planId })
+              }
+              onOpenWorkoutDetail={(instanceId) =>
+                setPlanDetailTarget({ kind: "instance", instanceId })
+              }
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
               }
@@ -925,13 +981,13 @@ export default function HomeScreen() {
         </ScrollView>
       </SafeAreaView>
 
-      {selectedPlan && isFocused && (
+      {detailPlan && isFocused && (
         <WorkoutPlanDetailBottomSheet
-          key={selectedPlan.id}
-          onClose={() => setSelectedPlanId(null)}
-          onDelete={deleteSavedPlan}
-          onUpdate={updateSavedPlan}
-          plan={selectedPlan}
+          key={detailPlan.id}
+          onClose={() => setPlanDetailTarget(null)}
+          onDelete={deleteDetailPlan}
+          onUpdate={updateDetailPlan}
+          plan={detailPlan}
         />
       )}
 

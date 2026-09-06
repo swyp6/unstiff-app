@@ -13,9 +13,10 @@ export type MissionStatus =
 
 export type TodayWorkoutInstance = {
   id: string;
-  sourcePlanId: string;
-  title: string;
-  subtitle: string;
+  // 저장된 계획에서 복사해온 완전히 독립적인 사본 — 원본이 나중에
+  // 수정/삭제돼도 영향받지 않는다. 상세/수정 화면도 이 사본을 직접
+  // 편집한다.
+  plan: WorkoutPlanDraft;
   isDone: boolean;
   photoUrl?: string;
 };
@@ -186,6 +187,10 @@ type TodayWorkoutCardProps = {
   onToggleTodayWorkout: (instanceId: string) => void;
   onAddSavedPlan: (plan: WorkoutPlanDraft) => void;
   onOpenSavedPlan: (planId: string) => void;
+  // 오늘의 운동 항목은 저장된 계획과 독립된 자기 사본(workout.plan)을 갖고
+  // 있어서, 상세/수정도 그 사본을 직접 연다 — onOpenSavedPlan과 달리
+  // savedWorkoutPlans 목록을 조회하지 않는다.
+  onOpenWorkoutDetail: (instanceId: string) => void;
   onAddNewPlan: () => void;
   // 오늘이 아닌 미래 날짜를 보고 있을 때(Figma node 2910-4774/2918-4983):
   // 제목·빈 상태 문구가 바뀌고, 아직 안 지난 날이라 완료 체크는 없앤다 —
@@ -204,6 +209,7 @@ export function TodayWorkoutCard({
   onToggleTodayWorkout,
   onAddSavedPlan,
   onOpenSavedPlan,
+  onOpenWorkoutDetail,
   onAddNewPlan,
   title = "오늘의 운동",
   emptyStateLabel = "오늘 담은 운동이 없어요",
@@ -252,7 +258,7 @@ export function TodayWorkoutCard({
             todayWorkouts.map((workout) => (
               <TodayWorkoutRow
                 key={workout.id}
-                onOpenDetail={() => onOpenSavedPlan(workout.sourcePlanId)}
+                onOpenDetail={() => onOpenWorkoutDetail(workout.id)}
                 onToggle={
                   readOnly ? undefined : () => onToggleTodayWorkout(workout.id)
                 }
@@ -345,7 +351,7 @@ function TodayWorkoutRow({
           themeColor={workout.isDone ? "textSecondary" : "text"}
           style={workout.isDone ? { textDecorationLine: "line-through" } : null}
         >
-          {workout.title}
+          {workout.plan.title}
         </ThemedText>
         <ThemedText
           typography="caption-1-regular"
@@ -355,12 +361,12 @@ function TodayWorkoutRow({
               : semanticColors["label-subtle"],
           }}
         >
-          {workout.subtitle}
+          {getWorkoutPlanSummary(workout.plan)}
         </ThemedText>
       </View>
       {onOpenDetail && (
         <Pressable
-          accessibilityLabel={`${workout.title} 상세 보기`}
+          accessibilityLabel={`${workout.plan.title} 상세 보기`}
           accessibilityRole="button"
           className="h-[34px] w-[34px] items-center justify-center"
           hitSlop={4}
