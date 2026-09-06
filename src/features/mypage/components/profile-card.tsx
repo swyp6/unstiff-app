@@ -3,16 +3,23 @@ import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
+import type { AvatarSelection } from "@/features/mypage/avatar-presets";
 
 type ProfileCardProps = {
   nickname: string;
+  avatar: AvatarSelection;
   onEditPress?: () => void;
 };
 
 const AVATAR_SIZE = 56;
 const COVER_HEIGHT = 64;
 
-export function ProfileCard({ nickname, onEditPress }: ProfileCardProps) {
+export function ProfileCard({
+  nickname,
+  avatar,
+  onEditPress,
+}: ProfileCardProps) {
   return (
     <View className="overflow-hidden rounded-default border border-line-subtle bg-background-normal">
       <View className="bg-fill-normal" style={{ height: COVER_HEIGHT }} />
@@ -22,10 +29,10 @@ export function ProfileCard({ nickname, onEditPress }: ProfileCardProps) {
       >
         <View>
           <View
-            className="items-center justify-center rounded-full border-2 border-background-normal bg-fill-strong"
+            className="overflow-hidden rounded-full border-2 border-background-normal"
             style={{ height: AVATAR_SIZE, width: AVATAR_SIZE }}
           >
-            <View className="size-7 rounded-full bg-line-strong" />
+            <AvatarCircle avatar={avatar} size={AVATAR_SIZE} />
           </View>
           <Pressable
             accessibilityLabel="프로필 사진 수정"

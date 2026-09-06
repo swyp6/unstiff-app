@@ -15,10 +15,12 @@ import {
 } from "@/features/mypage/components/mypage-tabs";
 import { ProfileCard } from "@/features/mypage/components/profile-card";
 import { StreakTab } from "@/features/mypage/components/streak-tab";
-import { MOCK_NICKNAME } from "@/features/mypage/mock-data";
+import { useMyProfileStore } from "@/features/mypage/profile-store";
 
 export default function MyPageScreen() {
   const [tab, setTab] = useState<MyPageTab>("streak");
+  const nickname = useMyProfileStore((state) => state.nickname);
+  const avatar = useMyProfileStore((state) => state.avatar);
 
   return (
     <ThemedView style={{ flex: 1 }}>
@@ -46,7 +48,11 @@ export default function MyPageScreen() {
           className="flex-1 bg-fill-subtle"
           contentContainerClassName="gap-4 p-5"
         >
-          <ProfileCard nickname={MOCK_NICKNAME} />
+          <ProfileCard
+            avatar={avatar}
+            nickname={nickname}
+            onEditPress={() => router.push("/mypage/edit-profile")}
+          />
           <MyPageTabs onChange={setTab} value={tab} />
 
           {tab === "streak" && <StreakTab />}
