@@ -69,8 +69,11 @@ const DEVICE_PERMISSION_ROWS = [
   },
 ];
 
+// "error" is local to this screen (not a value either native API returns)
+// — it marks that the last status check itself failed, so the screen can
+// treat it as retry-able instead of a resolved authorization state.
 type HealthStatus =
-  HealthKitStepCountRequestStatus | HealthConnectStepCountStatus;
+  HealthKitStepCountRequestStatus | HealthConnectStepCountStatus | "error";
 
 export default function PermissionsScreen() {
   const [pendingKeys, setPendingKeys] = useState<Set<PermissionRowKey>>(
@@ -81,16 +84,24 @@ export default function PermissionsScreen() {
 
   // Dedupes concurrent callers (mount, AppState foreground, and a tap that
   // lands before the first check resolves) onto a single in-flight request
-  // instead of firing a fresh one each time.
+  // instead of firing a fresh one each time. Never rejects — a failed
+  // native check resolves to "error" instead, since this also runs outside
+  // runRowAction's try/catch (on mount and on AppState foreground) where a
+  // rejection would otherwise surface as an unhandled promise rejection.
   const refreshHealthStatus = useCallback((): Promise<HealthStatus> => {
     if (!healthStatusRequestRef.current) {
       healthStatusRequestRef.current = (async () => {
-        const next: HealthStatus =
-          Platform.OS === "ios"
-            ? await getStepCountAuthorizationRequestStatus()
-            : Platform.OS === "android"
-              ? await getAndroidStepCountAuthorizationStatus()
-              : "unavailable";
+        let next: HealthStatus;
+        try {
+          next =
+            Platform.OS === "ios"
+              ? await getStepCountAuthorizationRequestStatus()
+              : Platform.OS === "android"
+                ? await getAndroidStepCountAuthorizationStatus()
+                : "unavailable";
+        } catch {
+          next = "error";
+        }
         setHealthStatus(next);
         return next;
       })().finally(() => {
@@ -104,16 +115,23 @@ export default function PermissionsScreen() {
   // Health app on iOS, Health Connect's settings on Android), so refreshing
   // on foreground return — the same AppState pattern used for the FCM token
   // in use-register-push-token.ts — is what picks up a change made there.
+  // `refreshHealthStatus` never rejects (see above), so these fire-and-
+  // forget calls are safe without their own catch.
   useEffect(() => {
-    refreshHealthStatus();
+    void refreshHealthStatus();
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "active") refreshHealthStatus();
+      if (nextState === "active") void refreshHealthStatus();
     });
     return () => subscription.remove();
   }, [refreshHealthStatus]);
 
   const handleHealthPress = useCallback(async () => {
-    const status = healthStatus ?? (await refreshHealthStatus());
+    // A cached "error" is a failed check, not a resolved status — retry it
+    // live instead of replaying the same failure.
+    const status =
+      healthStatus && healthStatus !== "error"
+        ? healthStatus
+        : await refreshHealthStatus();
 
     if (status === "unavailable") {
       Alert.alert(
@@ -125,11 +143,13 @@ export default function PermissionsScreen() {
       return;
     }
 
-    // HealthKit can report that it genuinely doesn't know yet (distinct
-    // from "unnecessary" because it's already been decided) — treat that
-    // as a failed check rather than silently assuming access is settled.
-    if (status === "unknown") {
-      throw new Error("HealthKit authorization status could not be determined");
+    // "unknown" (HealthKit genuinely doesn't know yet, distinct from
+    // "unnecessary" which means already decided) and "error" (the retry
+    // above also failed) both mean we couldn't determine a usable status
+    // — surface it as a failure via runRowAction's common catch rather
+    // than silently assuming access is settled.
+    if (status === "unknown" || status === "error") {
+      throw new Error("Health authorization status could not be determined");
     }
 
     if (status === "shouldRequest") {
