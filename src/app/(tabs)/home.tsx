@@ -25,6 +25,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
+import { getCalendarMonth } from "@/features/calendar/api";
+import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   MissionCard,
   type MissionStatus,
@@ -52,9 +54,11 @@ const MONTH_SWIPE_THRESHOLD = 60;
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
 const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
-// Mock history for the current month — no records API exists yet, so this
-// stands in for "days with a photo" and "days with more than one photo"
-// until real data is wired up. Matches the Figma "계획됨"/"완료" examples.
+// Mock content for the tapped-day detail card (DayRecordCard) only — the
+// calendar API returns just a per-day summary (count/photo/plan flag), not
+// per-record titles, so the detail list still stands in with mock content
+// until a records-detail API exists. The calendar grid's own photo/multi-photo
+// highlighting below is wired to the real API response.
 const MOCK_PHOTO_DAYS = new Set([4, 5, 6, 8, 10, 11, 12, 13, 14, 17, 18]);
 const MOCK_MULTI_PHOTO_DAYS = new Set([6, 11]);
 
@@ -144,6 +148,14 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
     weeks.push(days.slice(i, i + 7));
   }
   return weeks;
+}
+
+// 서버 CalendarDay.date가 "YYYY-MM-DD" 로컬 날짜 문자열이므로, UTC 변환이
+// 섞이는 toISOString() 대신 로컬 필드로 같은 포맷의 키를 만들어 그대로 비교한다.
+function toDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 // 요일 라벨 행. 달 전환 시 날짜 그리드와 같이 슬라이드되도록 각 달 패널
@@ -300,6 +312,56 @@ export default function HomeScreen() {
     null,
   );
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  // 조회 중인 달의 캘린더 API 응답. year/month를 응답과 함께 묶어 보관해서,
+  // 달을 빠르게 연속으로 넘길 때 아직 도착 안 한 이전 요청의 응답이 섞이지
+  // 않게 하고(cancelled 플래그) daysByDate도 지금 보고 있는 달의 응답일 때만
+  // 쓰도록 한다. 로딩 중이거나 실패했을 때는 null로 남아 캘린더가 빈 상태처럼
+  // 보이되 깨지지 않는다.
+  const [calendarMonthData, setCalendarMonthData] = useState<{
+    year: number;
+    month: number;
+    response: CalendarResponse;
+  } | null>(null);
+  const viewedYear = viewedMonth.getFullYear();
+  const viewedMonthNumber = viewedMonth.getMonth() + 1;
+
+  useEffect(() => {
+    let cancelled = false;
+    getCalendarMonth(viewedYear, viewedMonthNumber)
+      .then((response) => {
+        if (!cancelled) {
+          setCalendarMonthData({
+            year: viewedYear,
+            month: viewedMonthNumber,
+            response,
+          });
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load calendar", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedYear, viewedMonthNumber]);
+
+  // date(YYYY-MM-DD) 기준 lookup — days는 기록/예정 운동이 있는 날짜만 내려오는
+  // sparse 배열이라 index로 캘린더 셀과 매칭하면 안 되고 반드시 date로 찾아야
+  // 한다. 보관된 응답이 지금 보고 있는 달의 것이 아니면(= 새 달 요청이 아직
+  // pending) 빈 Map을 써서 이전 달 데이터가 새 달 셀에 노출되지 않게 한다.
+  const daysByDate = useMemo(() => {
+    const map = new Map<string, CalendarDay>();
+    const isForViewedMonth =
+      calendarMonthData?.year === viewedYear &&
+      calendarMonthData?.month === viewedMonthNumber;
+    if (!isForViewedMonth) return map;
+
+    for (const day of calendarMonthData.response.days) {
+      map.set(day.date, day);
+    }
+    return map;
+  }, [calendarMonthData, viewedYear, viewedMonthNumber]);
+
   // 캘린더에서 탭한 날짜. 오늘이면 실제 미션/오늘의 운동(상호작용 가능)을 보여주고,
   // 다른 날이면 그날의 미션·운동 목데이터를 읽기 전용으로 보여준다 — 미션 "받기"는
   // 오늘 날짜에만 가능하므로 다른 날엔 그 UI 자체를 노출하지 않는다.
@@ -540,24 +602,34 @@ export default function HomeScreen() {
           }
 
           const isToday = isThisMonth && day === today.getDate();
-          const hasPhoto =
-            (isThisMonth && MOCK_PHOTO_DAYS.has(day)) ||
-            (isToday && isTodayRecorded);
-          const hasMultiplePhotos =
-            isThisMonth && MOCK_MULTI_PHOTO_DAYS.has(day);
           const cellDate = new Date(
             monthDate.getFullYear(),
             monthDate.getMonth(),
             day,
           );
+          // daysByDate는 현재 조회된 달(viewedMonth)의 응답만 담고 있으므로,
+          // 스와이프 중인 옆 달 패널의 날짜는 자연히 매칭되지 않아 하이라이트가
+          // 없는 상태로 보인다 — 그 달로 넘어가 API가 다시 조회되면 채워진다.
+          const dayEntry = daysByDate.get(toDateKey(cellDate));
+          const hasPhoto =
+            dayEntry?.imageUrl != null || (isToday && isTodayRecorded);
+          // recordCount는 "그 날 남긴 기록 수"이지 사진 수가 아니다 — API에
+          // 사진 개수 필드가 없어서 이 값으로 "여러 장 사진" 스택 UI를 채우면
+          // 사진이 하나도 없는 날에도 스택이 보이는 등 의미가 달라진다. 정확한
+          // 사진 개수를 내려주는 필드가 생기기 전까지는 끄둔다.
+          const hasMultiplePhotos = false;
           const isFutureDay =
             cellDate >
             new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          // 미래 날짜에 이미 담아둔 운동이 있으면 점으로 표시한다(Figma node
-          // 2918-4983의 31일 셀). 사진 배경(hasPhoto)은 지난 날짜 전용이라
-          // 미래 날짜와 겹칠 일이 없다.
+          // 오늘 이후 날짜에 예정 운동이 있으면 점으로 표시한다(Figma node
+          // 2918-4983의 31일 셀). workout-plan 기능은 아직 백엔드에 저장하는
+          // API가 없어(운동 계획 추가는 로컬 상태만 갱신) 서버 hasPlan만으로는
+          // 방금 이 세션에서 추가한 예정 운동이 반영되지 않는다 — 두 신호를
+          // OR로 합쳐서 기존 로컬-상태 기반 표시를 유지한다.
           const hasScheduledWorkout =
-            isFutureDay && getWorkoutsForDate(cellDate).length > 0;
+            isFutureDay &&
+            (dayEntry?.hasPlan === true ||
+              getWorkoutsForDate(cellDate).length > 0);
 
           const textColor =
             isToday && todayPhotoUrl
