@@ -18,8 +18,8 @@ import {
 } from "@/features/auth/nickname-validation";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import { ProfileImagePickerSheet } from "@/features/mypage/components/profile-image-picker-sheet";
-import { SettingsHeader } from "@/features/settings/components/settings-header";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
+import { SettingsHeader } from "@/features/settings/components/settings-header";
 
 const AVATAR_SIZE = 88;
 
@@ -97,7 +97,7 @@ export default function EditProfileScreen() {
             </ThemedText>
           </View>
           <ThemedText themeColor="textSecondary" typography="caption-1-regular">
-            프로필 이미지 · 닉네임 수정
+            영어·숫자 및 특수기호(.,-,_)만 사용하여 3~20자로 입력해주세요.
           </ThemedText>
         </View>
 
