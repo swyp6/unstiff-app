@@ -218,7 +218,7 @@ export function TodayWorkoutCard({
         className="h-[60px] flex-row items-center justify-between px-5"
         onPress={onToggleExpanded}
       >
-        <View className="flex-row items-center gap-2">
+        <View className="items-start gap-0.5">
           <ThemedText typography="body-2-bold">{title}</ThemedText>
           <ThemedText typography="caption-1-medium" themeColor="textSecondary">
             {dateLabel}
