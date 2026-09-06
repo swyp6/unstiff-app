@@ -51,6 +51,35 @@ async function assertHealthKitAvailable() {
   }
 }
 
+// HealthKit deliberately never reveals whether a *read* permission was
+// denied (only whether it was ever asked about at all) — Apple hides this
+// for privacy. `getRequestStatusForAuthorization` is the closest thing to a
+// status check: "shouldRequest" means tapping should prompt, "unnecessary"
+// means it's already been decided one way or another and the only way to
+// let the user review/change it is the Health app itself, not this app's
+// OS settings page.
+export type HealthKitStepCountRequestStatus =
+  "unavailable" | "shouldRequest" | "unnecessary" | "unknown";
+
+export async function getStepCountAuthorizationRequestStatus(): Promise<HealthKitStepCountRequestStatus> {
+  if (!(await isHealthKitAvailable())) return "unavailable";
+
+  const { AuthorizationRequestStatus, getRequestStatusForAuthorization } =
+    await import("@kingstinct/react-native-healthkit");
+  const status = await getRequestStatusForAuthorization({
+    toRead: [STEP_COUNT_IDENTIFIER],
+  });
+
+  switch (status) {
+    case AuthorizationRequestStatus.shouldRequest:
+      return "shouldRequest";
+    case AuthorizationRequestStatus.unnecessary:
+      return "unnecessary";
+    default:
+      return "unknown";
+  }
+}
+
 export async function requestStepCountAuthorization(): Promise<void> {
   await assertHealthKitAvailable();
 
