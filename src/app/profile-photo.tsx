@@ -32,22 +32,27 @@ function goToSignupComplete() {
 }
 
 export default function ProfilePhotoScreen() {
-  const isNewUser = useSignupStore((state) => state.isNewUser);
-  const nickname = useSignupStore((state) => state.nickname);
   const confirmedPhotoUri = useSignupStore((state) => state.confirmedPhotoUri);
   const [isPicking, setIsPicking] = useState(false);
 
   // Minimal guard against reaching this screen out of order (direct/deep
   // link, or skipping the nickname step) — mirrors nickname.tsx's guard.
+  // Checked once at mount via getState() rather than reactive isNewUser/
+  // nickname dependencies — this screen stays mounted underneath
+  // signup-complete in the push-based stack, so subscribing reactively
+  // meant signup-complete's own reset() (on "시작하기") flipped these back
+  // to their initial values while this screen was still alive, firing this
+  // redirect and racing the intended router.replace("/home").
   useEffect(() => {
-    if (!isNewUser) {
+    const state = useSignupStore.getState();
+    if (!state.isNewUser) {
       router.replace("/login");
       return;
     }
-    if (!nickname) {
+    if (!state.nickname) {
       router.replace("/nickname");
     }
-  }, [isNewUser, nickname]);
+  }, []);
 
   async function handlePickImage() {
     if (isPicking) return;

@@ -20,22 +20,32 @@ function handleStart() {
 }
 
 export default function SignupCompleteScreen() {
-  const isNewUser = useSignupStore((state) => state.isNewUser);
-  const nickname = useSignupStore((state) => state.nickname);
   const confirmedPhotoUri = useSignupStore((state) => state.confirmedPhotoUri);
 
   // Minimal guard against reaching this screen out of order (direct/deep
   // link) — mirrors nickname.tsx/profile-photo.tsx's guard. Photo is
   // optional so it isn't part of this check.
+  //
+  // Checked once at mount via getState() rather than reactive isNewUser/
+  // nickname dependencies. This screen's own "시작하기" calls
+  // useSignupStore.getState().reset(), which flips isNewUser/nickname back
+  // to their initial (falsy) values — with a reactive dependency, that
+  // reset triggered this same effect to re-run *while still mounted* (the
+  // replace("/home") navigation hadn't unmounted it yet) and fire
+  // router.replace("/login"), racing the intended navigation and
+  // occasionally winning it. This was the actual cause of a real-device
+  // report where completing signup landed on /login instead of /home —
+  // accessToken/auth-store were never involved.
   useEffect(() => {
-    if (!isNewUser) {
+    const state = useSignupStore.getState();
+    if (!state.isNewUser) {
       router.replace("/login");
       return;
     }
-    if (!nickname) {
+    if (!state.nickname) {
       router.replace("/nickname");
     }
-  }, [isNewUser, nickname]);
+  }, []);
 
   // This is the final confirmation screen — Android's hardware back button
   // must not pop it back to profile-photo any more than the (already

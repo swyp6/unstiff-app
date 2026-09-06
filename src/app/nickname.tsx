@@ -49,19 +49,24 @@ function handleBack() {
 }
 
 export default function NicknameScreen() {
-  const isNewUser = useSignupStore((state) => state.isNewUser);
   const storedNickname = useSignupStore((state) => state.nickname);
   const setStoredNickname = useSignupStore((state) => state.setNickname);
   const [nickname, setNickname] = useState(storedNickname);
 
   // Minimal guard against reaching this screen by direct/deep-link
   // navigation outside the SNS-login → terms flow (the in-memory signup
-  // store is only ever set to newUser there).
+  // store is only ever set to newUser there). Checked once at mount via
+  // getState() rather than a reactive `isNewUser` dependency — this screen
+  // stays mounted (not unmounted) underneath nickname/profile-photo/
+  // signup-complete in the push-based stack, so subscribing reactively
+  // meant signup-complete's own reset() (on "시작하기") flipped isNewUser
+  // back to false while this screen was still alive, firing this redirect
+  // and racing the intended router.replace("/home").
   useEffect(() => {
-    if (!isNewUser) {
+    if (!useSignupStore.getState().isNewUser) {
       router.replace("/login");
     }
-  }, [isNewUser]);
+  }, []);
 
   const hasInput = nickname.length > 0;
   const formatValid = NICKNAME_FORMAT_PATTERN.test(nickname);
@@ -69,9 +74,17 @@ export default function NicknameScreen() {
   // No nickname duplicate-check endpoint exists anywhere in the current API
   // surface (confirmed by searching the whole codebase) — until the backend
   // adds one, real availability can never be confirmed, so this stays
-  // hard-coded false and the CTA below stays disabled even for an
-  // otherwise-valid nickname. Do not derive this from format validation.
-  const nicknameAvailabilityConfirmed = false;
+  // hard-coded false in production and the CTA below stays disabled even
+  // for an otherwise-valid nickname. Do not derive this from format
+  // validation.
+  //
+  // TODO(backend): remove this __DEV__ bypass once the duplicate-check API
+  // exists and is wired up here — it exists solely so the rest of the
+  // signup UI flow (profile-photo, signup-complete) can be exercised in
+  // development builds without a real availability check to pass.
+  // formatValid is unaffected and still rejects the same invalid input
+  // (jamo-only, too short, whitespace/special characters) in dev builds.
+  const nicknameAvailabilityConfirmed = __DEV__ ? formatValid : false;
   const canSubmit = formatValid && nicknameAvailabilityConfirmed;
 
   function handleChangeText(text: string) {
