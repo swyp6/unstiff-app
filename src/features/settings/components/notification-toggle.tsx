@@ -6,6 +6,7 @@ type NotificationToggleProps = {
   value: boolean;
   onValueChange: (value: boolean) => void;
   accessibilityLabel?: string;
+  disabled?: boolean;
 };
 
 const TRACK_ON_COLOR = "#3E3E43";
@@ -14,11 +15,13 @@ export function NotificationToggle({
   value,
   onValueChange,
   accessibilityLabel,
+  disabled = false,
 }: NotificationToggleProps) {
   return (
-    <View style={styles.toggleContainer}>
+    <View style={[styles.toggleContainer, disabled && styles.disabled]}>
       <Switch
         accessibilityLabel={accessibilityLabel}
+        disabled={disabled}
         ios_backgroundColor={semanticColors["fill-strong"]}
         onValueChange={onValueChange}
         style={styles.toggle}
@@ -42,5 +45,8 @@ const styles = StyleSheet.create({
   },
   toggle: {
     transform: [{ scaleX: 44 / 51 }, { scaleY: 26 / 31 }],
+  },
+  disabled: {
+    opacity: 0.4,
   },
 });

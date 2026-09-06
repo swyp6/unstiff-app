@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 
-export const SETTINGS_DIVIDER_COLOR = "#E2E6EC";
+export const SETTINGS_DIVIDER_COLOR = semanticColors["line-subtle"];
 
 type SettingsRowProps = {
   title: string;
@@ -15,6 +15,13 @@ type SettingsRowProps = {
 type SettingsInfoRowProps = {
   label: string;
   value: string;
+};
+
+type SettingsValueRowProps = {
+  title: string;
+  value?: string;
+  disabled?: boolean;
+  onPress?: () => void;
 };
 
 export function SettingsSectionLabel({ label }: { label: string }) {
@@ -75,6 +82,46 @@ export function SettingsInfoRow({ label, value }: SettingsInfoRowProps) {
   );
 }
 
+// A row with an optional trailing value plus a chevron — used where a row
+// navigates somewhere but also needs to preview a current setting (mission
+// receive time, permission status labels). `disabled` mutes the whole row
+// (text/value/chevron) and blocks the press, matching the Figma spec for
+// the daily-mission-off state of the mission time row.
+export function SettingsValueRow({
+  title,
+  value,
+  disabled = false,
+  onPress,
+}: SettingsValueRowProps) {
+  return (
+    <Pressable
+      accessibilityLabel={title}
+      accessibilityRole={onPress ? "button" : undefined}
+      accessibilityState={disabled ? { disabled: true } : undefined}
+      disabled={disabled || !onPress}
+      style={[styles.row, disabled && styles.rowDisabled]}
+      onPress={onPress}
+    >
+      <View style={styles.rowText}>
+        <ThemedText style={styles.normalText} typography="body-2-medium">
+          {title}
+        </ThemedText>
+      </View>
+      {value !== undefined && (
+        <ThemedText style={styles.valueText} typography="body-3-regular">
+          {value}
+        </ThemedText>
+      )}
+      <Ionicons
+        color={semanticColors["label-disabled"]}
+        name="chevron-forward"
+        size={20}
+      />
+      <View style={styles.divider} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   sectionLabel: {
     lineHeight: 18,
@@ -92,6 +139,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     minWidth: 0,
+  },
+  rowDisabled: {
+    opacity: 0.4,
+  },
+  valueText: {
+    color: semanticColors["label-subtle"],
   },
   infoRow: {
     backgroundColor: semanticColors["background-normal"],

@@ -83,6 +83,36 @@ function hasStepCountPermission(
   );
 }
 
+// Unlike HealthKit, Health Connect's grant list is directly queryable, so
+// we can report a real granted/not-granted state instead of just "have we
+// asked before".
+export type HealthConnectStepCountStatus =
+  "unavailable" | "granted" | "notGranted";
+
+export async function getStepCountAuthorizationStatus(): Promise<HealthConnectStepCountStatus> {
+  if (Platform.OS !== "android") return "unavailable";
+
+  try {
+    await ensureHealthConnectInitialized();
+  } catch {
+    return "unavailable";
+  }
+
+  const { getGrantedPermissions } = await import("react-native-health-connect");
+  const grantedPermissions = await getGrantedPermissions();
+  return hasStepCountPermission(grantedPermissions) ? "granted" : "notGranted";
+}
+
+// Opens the Health Connect app's own permission management screen — there
+// is no per-permission Android system settings page for Health Connect
+// grants the way there is for camera/location/etc.
+export async function openHealthConnectSettings(): Promise<void> {
+  assertAndroid();
+  const { openHealthConnectSettings: openSettings } =
+    await import("react-native-health-connect");
+  openSettings();
+}
+
 export async function requestStepCountAuthorization(): Promise<void> {
   await ensureHealthConnectInitialized();
 
