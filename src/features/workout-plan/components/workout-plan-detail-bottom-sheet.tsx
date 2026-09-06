@@ -192,7 +192,11 @@ export function WorkoutPlanDetailBottomSheet({
     <WorkoutPlanBottomSheet
       expanded={isParentExpanded}
       fullHeight
-      initialHeightRatio={713 / 814}
+      // 713/814는 이 시트의 원래(축소 상태) 콘텐츠 높이 비율이다. 그 아래
+      // "계획 삭제하기" 링크(paddingTop 16 + gap 16 + 높이 18 = 50)가 나중에
+      // 추가됐는데 이 비율을 안 늘려서, 축소 상태에서 그 링크가 화면 아래로
+      // 밀려나 안 보였다 — 시트를 펼쳐야만(translateY 0) 보이던 상태.
+      initialHeightRatio={(713 + 50) / 814}
       onClose={onClose}
       onExpanded={handleParentExpanded}
       onExpandedChange={setIsParentExpanded}
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   deleteText: {
-    color: semanticColors["label-disabled"],
+    color: semanticColors["label-subtle"],
   },
   pressed: {
     opacity: 0.7,
