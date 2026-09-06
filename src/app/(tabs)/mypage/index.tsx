@@ -22,7 +22,7 @@ export default function MyPageScreen() {
 
   return (
     <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView edges={["top", "left", "right"]} style={{ flex: 1 }}>
+      <SafeAreaView style={{ flex: 1 }}>
         <View className="flex-row items-center justify-between px-4 py-3">
           <View style={{ width: 20 }} />
           <ThemedText themeColor="textSecondary" typography="body-1-medium">
