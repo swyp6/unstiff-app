@@ -1,11 +1,12 @@
 import { View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import type { WeekDots } from "@/features/mypage/mock-data";
+import type { DayCell, WeekDots } from "@/features/mypage/mock-data";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 
-function Dot({ recorded }: { recorded: boolean }) {
+function Dot({ recorded }: { recorded: DayCell }) {
+  if (recorded === null) return <View className="size-3" />;
   return (
     <View
       className={`size-3 rounded-full ${recorded ? "bg-primary-strong" : "bg-fill-normal"}`}

@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import {
+  NICKNAME_FORMAT_PATTERN,
   NICKNAME_MAX_LENGTH,
   sanitizeNickname,
 } from "@/features/auth/nickname-validation";
@@ -32,7 +33,10 @@ export default function EditProfileScreen() {
   const [draftAvatar, setDraftAvatar] = useState(storedAvatar);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
 
+  const isNicknameValid = NICKNAME_FORMAT_PATTERN.test(draftNickname);
+
   function handleSave() {
+    if (!isNicknameValid) return;
     setNickname(draftNickname);
     setAvatar(draftAvatar);
     router.back();
@@ -102,7 +106,11 @@ export default function EditProfileScreen() {
         <Pressable
           accessibilityLabel="저장"
           accessibilityRole="button"
-          className="mb-6 h-[52px] items-center justify-center rounded-[20px] border border-line-subtle bg-background-normal"
+          accessibilityState={{ disabled: !isNicknameValid }}
+          className={`mb-6 h-[52px] items-center justify-center rounded-[20px] border border-line-subtle bg-background-normal ${
+            isNicknameValid ? "" : "opacity-40"
+          }`}
+          disabled={!isNicknameValid}
           onPress={handleSave}
         >
           <ThemedText typography="body-2-bold">저장</ThemedText>

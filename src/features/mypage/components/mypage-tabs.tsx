@@ -22,7 +22,7 @@ export function MyPageTabs({ value, onChange }: MyPageTabsProps) {
         const selected = tab.key === value;
         return (
           <Pressable
-            accessibilityRole="button"
+            accessibilityRole="tab"
             accessibilityState={{ selected }}
             className={`flex-1 items-center justify-center border-b ${
               selected

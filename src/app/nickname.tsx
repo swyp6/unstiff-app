@@ -71,7 +71,7 @@ export default function NicknameScreen() {
   // signup UI flow (profile-photo, signup-complete) can be exercised in
   // development builds without a real availability check to pass.
   // formatValid is unaffected and still rejects the same invalid input
-  // (jamo-only, too short, whitespace/special characters) in dev builds.
+  // (too short/long, Korean/whitespace/disallowed characters) in dev builds.
   const nicknameAvailabilityConfirmed = __DEV__ ? formatValid : false;
   const canSubmit = formatValid && nicknameAvailabilityConfirmed;
 
@@ -88,11 +88,11 @@ export default function NicknameScreen() {
   // Figma only designed two helper-text states: this initial guidance copy
   // and "사용 가능한 닉네임이에요." (shown only once a real duplicate-check
   // succeeds — see nicknameAvailabilityConfirmed above). There's no
-  // designed error copy for an invalid format (too short, jamo-only,
-  // etc.), so rather than inventing one, this stays the single guidance
-  // string regardless of validity — formatValid still gates canSubmit
-  // above, this text just isn't used to communicate that.
-  const helperText = "한글, 영어, 숫자 포함 2~10자까지 가능해요.";
+  // designed error copy for an invalid format (too short/long, disallowed
+  // character, etc.), so rather than inventing one, this stays the single
+  // guidance string regardless of validity — formatValid still gates
+  // canSubmit above, this text just isn't used to communicate that.
+  const helperText = "영문, 숫자, 특수기호(. _ -) 포함 3~20자까지 가능해요.";
 
   return (
     <SafeAreaView

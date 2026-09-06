@@ -2,9 +2,15 @@
 // (UserProfile only has id/authType/createdAt/updatedAt) — this file stands
 // in for that data until the real endpoints land.
 
-export const MOCK_NICKNAME = "사용자 닉네임";
+// Must satisfy NICKNAME_FORMAT_PATTERN (features/auth/nickname-validation.ts)
+// — English/digits/`. _ -` only, no space — since this doubles as a valid
+// starting value on the edit screen.
+export const MOCK_NICKNAME = "user_nickname";
 
-export type WeekDots = boolean[]; // 7 entries, Sun–Sat, true = recorded
+// true/false = recorded/unrecorded day; null = outside the selected month
+// (a leading/trailing calendar cell), rendered blank rather than as a dot.
+export type DayCell = boolean | null;
+export type WeekDots = DayCell[]; // 7 entries, Sun–Sat
 
 export type StreakMonthData = {
   currentStreakDays: number;
@@ -24,11 +30,16 @@ export function getStreakDataForMonth(
   month: number, // 1-12
 ): StreakMonthData {
   const seed = year * 12 + month;
-  const weeks: WeekDots[] = Array.from({ length: 4 }, (_, weekIndex) =>
-    Array.from(
-      { length: 7 },
-      (_, dayIndex) => seededPercent(seed + weekIndex * 7 + dayIndex) > 40,
-    ),
+  const firstWeekday = new Date(year, month - 1, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const rowCount = Math.ceil((firstWeekday + daysInMonth) / 7);
+
+  const weeks: WeekDots[] = Array.from({ length: rowCount }, (_, weekIndex) =>
+    Array.from({ length: 7 }, (_, dayIndex) => {
+      const dayOfMonth = weekIndex * 7 + dayIndex - firstWeekday + 1;
+      if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return null;
+      return seededPercent(seed + dayOfMonth) > 40;
+    }),
   );
   const thisMonthPercent = seededPercent(seed);
   const lastMonthPercent = seededPercent(seed - 1);
