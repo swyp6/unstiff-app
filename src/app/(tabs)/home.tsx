@@ -336,6 +336,13 @@ export default function HomeScreen() {
             response,
           });
           setStreakDays(response.streakDays);
+          // 같은 달을 재조회해 이번엔 성공했다면, 그 달에 대해 남아 있던
+          // 실패 기록만 지운다 — 다른 달의 실패 상태는 건드리지 않는다.
+          setCalendarErrorMonth((prev) =>
+            prev?.year === viewedYear && prev?.month === viewedMonthNumber
+              ? null
+              : prev,
+          );
         }
       })
       .catch((error) => {
