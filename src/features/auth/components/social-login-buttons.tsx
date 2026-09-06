@@ -11,7 +11,9 @@ import { router } from "expo-router";
 import { Alert, Platform, View } from "react-native";
 
 import { hasUnagreedRequiredTerms, signIn } from "@/features/auth/api";
+import type { OAuth2SignInResponse } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
+import { useSignupStore } from "@/store/signup-store";
 
 import { SocialLoginButton } from "./social-login-button";
 
@@ -19,6 +21,32 @@ GoogleSignin.configure({
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
 });
+
+// `newUser` is the OAuth response's own signal for "this account was just
+// created" — the authoritative branch point per the sign-in contract, not
+// a guess based on whether the backend happens to have a nickname on file
+// (it never does yet; see nickname.tsx). A brand-new account always still
+// has its required terms unagreed, so routing it straight to
+// terms-agreement without the extra hasUnagreedRequiredTerms() round trip
+// is safe. An existing user may still have newly-added required terms to
+// accept, so that check is kept for them.
+async function routeAfterSignIn({
+  accessToken,
+  newUser,
+}: OAuth2SignInResponse) {
+  useAuthStore.getState().setAccessToken(accessToken);
+  useSignupStore.getState().reset();
+  useSignupStore.getState().setIsNewUser(newUser);
+
+  if (newUser) {
+    router.replace("/terms-agreement");
+    return;
+  }
+
+  router.replace(
+    (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
+  );
+}
 
 async function handleGoogleLogin() {
   console.log("구글 로그인 클릭");
@@ -35,12 +63,9 @@ async function handleGoogleLogin() {
       throw new Error("Google sign-in did not return an idToken");
     }
 
-    const { accessToken } = await signIn("google", googleIdToken);
-    useAuthStore.getState().setAccessToken(accessToken);
+    const signInResponse = await signIn("google", googleIdToken);
     console.log("google login success!");
-    router.replace(
-      (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
-    );
+    await routeAfterSignIn(signInResponse);
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return;
@@ -73,12 +98,9 @@ async function handleAppleLogin() {
       throw new Error("Apple sign-in did not return an identityToken");
     }
 
-    const { accessToken } = await signIn("apple", credential.identityToken);
-    useAuthStore.getState().setAccessToken(accessToken);
+    const signInResponse = await signIn("apple", credential.identityToken);
     console.log("apple login success! ");
-    router.replace(
-      (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
-    );
+    await routeAfterSignIn(signInResponse);
   } catch (error) {
     if (
       error &&
@@ -110,12 +132,9 @@ async function handleKakaoLogin() {
     // confirmed with the backend team, requires OpenID Connect enabled on
     // the Kakao app, which it is).
     const { idToken: kakaoIdToken } = await kakaoLogin();
-    const { accessToken } = await signIn("kakao", kakaoIdToken);
-    useAuthStore.getState().setAccessToken(accessToken);
+    const signInResponse = await signIn("kakao", kakaoIdToken);
     console.log("kakao login success!");
-    router.replace(
-      (await hasUnagreedRequiredTerms()) ? "/terms-agreement" : "/home",
-    );
+    await routeAfterSignIn(signInResponse);
   } catch (error) {
     if (axios.isAxiosError(error)) {
       console.error("kakao login failed", {

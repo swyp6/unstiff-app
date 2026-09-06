@@ -14,48 +14,139 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
+import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
+import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import type { Term } from "@/features/auth/types";
-import { NotificationToggle } from "@/features/settings/components/notification-toggle";
-import { SETTINGS_DIVIDER_COLOR } from "@/features/settings/components/settings-list";
+import { useSignupStore } from "@/store/signup-store";
 
-type TermsRowProps = {
-  term: Term;
-  value: boolean;
-  onValueChange: (value: boolean) => void;
+function isValidHttpUrl(value: string | null | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+async function openTermContent(
+  title: string,
+  contentUrl: string | null | undefined,
+) {
+  if (!isValidHttpUrl(contentUrl)) {
+    console.warn(
+      `[terms-agreement] invalid contentUrl for term "${title}":`,
+      contentUrl,
+    );
+    Alert.alert("오류", "약관 내용을 불러올 수 없습니다.");
+    return;
+  }
+  try {
+    await WebBrowser.openBrowserAsync(contentUrl);
+  } catch {
+    Alert.alert("오류", "페이지를 열지 못했습니다. 잠시 후 다시 시도해주세요.");
+  }
+}
+
+function handleBack() {
+  if (router.canGoBack()) {
+    router.back();
+    return;
+  }
+  router.replace("/login");
+}
+
+type CheckboxProps = {
+  checked: boolean;
 };
 
-function TermsRow({ term, value, onValueChange }: TermsRowProps) {
+function Checkbox({ checked }: CheckboxProps) {
   return (
-    <View style={styles.row}>
-      <Pressable
-        accessibilityLabel={`${term.title} 보기`}
-        accessibilityRole="button"
-        onPress={() => WebBrowser.openBrowserAsync(term.contentUrl)}
-        style={styles.rowTitle}
-      >
-        <ThemedText style={styles.rowText} typography="body-2-medium">
-          {term.required ? "[필수] " : "[선택] "}
-          {term.title}
-        </ThemedText>
+    <View
+      style={[
+        styles.checkbox,
+        checked ? styles.checkboxChecked : styles.checkboxUnchecked,
+      ]}
+    >
+      {checked && (
         <Ionicons
-          color={semanticColors["label-disabled"]}
-          name="chevron-forward"
+          color={semanticColors["primary-on"]}
+          name="checkmark"
           size={16}
         />
-      </Pressable>
-      <NotificationToggle
-        accessibilityLabel={term.title}
-        onValueChange={onValueChange}
-        value={value}
-      />
-      <View style={styles.divider} />
+      )}
     </View>
   );
 }
 
+type TermRowProps = {
+  title: string;
+  required: boolean;
+  checked: boolean;
+  onToggle: () => void;
+  onPressDetail?: () => void;
+};
+
+function TermRow({
+  title,
+  required,
+  checked,
+  onToggle,
+  onPressDetail,
+}: TermRowProps) {
+  return (
+    <View style={styles.termRow}>
+      <Pressable
+        accessibilityLabel={title}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked }}
+        onPress={onToggle}
+        style={styles.termCheckArea}
+      >
+        <Checkbox checked={checked} />
+        <ThemedText style={styles.termText} typography="body-2-regular">
+          {required ? "[필수] " : "[선택] "}
+          {title}
+        </ThemedText>
+      </Pressable>
+      {onPressDetail ? (
+        <Pressable
+          accessibilityLabel={`${title} 상세 보기`}
+          accessibilityRole="button"
+          hitSlop={10}
+          onPress={onPressDetail}
+          style={styles.chevronButton}
+        >
+          <Ionicons
+            color={semanticColors["label-subtle"]}
+            name="chevron-forward"
+            size={18}
+          />
+        </Pressable>
+      ) : (
+        // No server Term/contentUrl backs this row, so the chevron is
+        // shown for visual parity with Figma but isn't interactive.
+        <View style={styles.chevronButton}>
+          <Ionicons
+            color={semanticColors["label-subtle"]}
+            name="chevron-forward"
+            size={18}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
+// The server's Term list has no "만 14세 이상" entry — it's a signup
+// eligibility check, not a legal document, so it's tracked as local-only
+// state and excluded from the agreeToTerms payload.
+const AGE_REQUIREMENT_TITLE = "만 14세 이상 가입 동의";
+
 export default function TermsAgreementScreen() {
   const [terms, setTerms] = useState<Term[] | null>(null);
   const [agreements, setAgreements] = useState<Record<number, boolean>>({});
+  const [ageRequirementAgreed, setAgeRequirementAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -86,21 +177,26 @@ export default function TermsAgreementScreen() {
   }
 
   const allAgreed = useMemo(
-    () => terms !== null && terms.every((term) => agreements[term.id]),
-    [terms, agreements],
+    () =>
+      terms !== null &&
+      ageRequirementAgreed &&
+      terms.every((term) => agreements[term.id]),
+    [terms, agreements, ageRequirementAgreed],
   );
 
   const requiredAgreed = useMemo(
     () =>
       terms !== null &&
+      ageRequirementAgreed &&
       terms
         .filter((term) => term.required)
         .every((term) => agreements[term.id]),
-    [terms, agreements],
+    [terms, agreements, ageRequirementAgreed],
   );
 
   function toggleAll(value: boolean) {
     if (!terms) return;
+    setAgeRequirementAgreed(value);
     setAgreements(Object.fromEntries(terms.map((term) => [term.id, value])));
   }
 
@@ -112,7 +208,19 @@ export default function TermsAgreementScreen() {
         .filter((term) => agreements[term.id])
         .map((term) => term.id);
       await agreeToTerms(agreedIds);
-      router.replace("/home");
+      // Only flips true once the server call above actually succeeded —
+      // nickname/profile-photo/signup-complete's guards gate on this to
+      // block a new user from jumping straight past terms, so it must
+      // never be set on a click alone or a failed request.
+      useSignupStore.getState().setHasAgreedToRequiredTerms(true);
+      if (useSignupStore.getState().isNewUser) {
+        // Keep terms-agreement in the stack so nickname/profile-photo can
+        // `router.back()` here — unlike the final /home hop, this isn't a
+        // dead end for an existing user re-agreeing to updated terms.
+        router.push("/nickname");
+      } else {
+        router.replace("/home");
+      }
     } catch {
       Alert.alert("오류", "약관 동의 처리 중 문제가 발생했습니다.");
     } finally {
@@ -122,35 +230,47 @@ export default function TermsAgreementScreen() {
 
   if (loadError) {
     return (
-      <SafeAreaView style={[styles.screen, styles.loadingScreen]}>
-        <ThemedText
-          style={styles.errorText}
-          themeColor="textSecondary"
-          typography="body-2-medium"
-        >
-          약관 정보를 불러오지 못했습니다.
-        </ThemedText>
-        <Pressable
-          accessibilityLabel="다시 시도"
-          accessibilityRole="button"
-          onPress={retry}
-          style={styles.retryButton}
-        >
+      <SafeAreaView
+        edges={["top", "left", "right", "bottom"]}
+        style={styles.screen}
+      >
+        <OnboardingHeader onBack={handleBack} title="회원가입" />
+        <View style={styles.loadingScreen}>
           <ThemedText
-            style={styles.continueButtonText}
-            typography="body-1-medium"
+            style={styles.errorText}
+            themeColor="textSecondary"
+            typography="body-2-medium"
           >
-            다시 시도
+            약관 정보를 불러오지 못했습니다.
           </ThemedText>
-        </Pressable>
+          <Pressable
+            accessibilityLabel="다시 시도"
+            accessibilityRole="button"
+            onPress={retry}
+            style={styles.retryButton}
+          >
+            <ThemedText
+              style={styles.retryButtonText}
+              typography="body-1-medium"
+            >
+              다시 시도
+            </ThemedText>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (!terms) {
     return (
-      <SafeAreaView style={[styles.screen, styles.loadingScreen]}>
-        <ActivityIndicator color={semanticColors["label-normal"]} />
+      <SafeAreaView
+        edges={["top", "left", "right", "bottom"]}
+        style={styles.screen}
+      >
+        <OnboardingHeader onBack={handleBack} title="회원가입" />
+        <View style={styles.loadingScreen}>
+          <ActivityIndicator color={semanticColors["label-normal"]} />
+        </View>
       </SafeAreaView>
     );
   }
@@ -162,60 +282,57 @@ export default function TermsAgreementScreen() {
       edges={["top", "left", "right", "bottom"]}
       style={styles.screen}
     >
+      <OnboardingHeader onBack={handleBack} title="회원가입" />
+
       <View style={styles.content}>
-        <View style={styles.intro}>
-          <ThemedText typography="title-3-bold">
-            서비스 이용을 위해{"\n"}약관에 동의해 주세요
+        <ThemedText style={styles.title} typography="title-3-bold">
+          이용약관 동의
+        </ThemedText>
+
+        <Pressable
+          accessibilityLabel="약관 전체 동의"
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: allAgreed }}
+          onPress={() => toggleAll(!allAgreed)}
+          style={styles.allAgreeCard}
+        >
+          <Checkbox checked={allAgreed} />
+          <ThemedText style={styles.allAgreeText} typography="body-2-bold">
+            약관 전체 동의
           </ThemedText>
-        </View>
+        </Pressable>
 
-        <View style={styles.section}>
-          <View style={styles.row}>
-            <View style={styles.rowTitle}>
-              <ThemedText style={styles.allRowText} typography="body-1-bold">
-                전체 동의
-              </ThemedText>
-            </View>
-            <NotificationToggle
-              accessibilityLabel="전체 동의"
-              onValueChange={toggleAll}
-              value={allAgreed}
-            />
-            <View style={styles.divider} />
-          </View>
+        <ThemedText style={styles.sectionLabel} typography="caption-1-regular">
+          찌뿌둥 이용약관
+        </ThemedText>
 
+        <View style={styles.termsList}>
+          <TermRow
+            checked={ageRequirementAgreed}
+            onToggle={() => setAgeRequirementAgreed((value) => !value)}
+            required
+            title={AGE_REQUIREMENT_TITLE}
+          />
           {terms.map((term) => (
-            <TermsRow
+            <TermRow
+              checked={agreements[term.id] ?? false}
               key={term.id}
-              onValueChange={(value) =>
-                setAgreements((current) => ({ ...current, [term.id]: value }))
+              onPressDetail={() => openTermContent(term.title, term.contentUrl)}
+              onToggle={() =>
+                setAgreements((current) => ({
+                  ...current,
+                  [term.id]: !current[term.id],
+                }))
               }
-              term={term}
-              value={agreements[term.id] ?? false}
+              required={term.required}
+              title={term.title}
             />
           ))}
         </View>
       </View>
 
       <View style={styles.footer}>
-        <Pressable
-          accessibilityLabel="동의하고 시작하기"
-          accessibilityRole="button"
-          accessibilityState={{ disabled: !canSubmit }}
-          disabled={!canSubmit}
-          onPress={handleSubmit}
-          style={[
-            styles.continueButton,
-            !canSubmit && styles.continueButtonDisabled,
-          ]}
-        >
-          <ThemedText
-            style={styles.continueButtonText}
-            typography="body-1-medium"
-          >
-            동의하고 시작하기
-          </ThemedText>
-        </Pressable>
+        <OnboardingCtaButton disabled={!canSubmit} onPress={handleSubmit} />
       </View>
     </SafeAreaView>
   );
@@ -223,7 +340,7 @@ export default function TermsAgreementScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["background-normal"],
+    backgroundColor: semanticColors["fill-subtle"],
     flex: 1,
   },
   loadingScreen: {
@@ -243,64 +360,79 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 24,
   },
+  retryButtonText: {
+    color: semanticColors["primary-on"],
+  },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: 24,
+    paddingHorizontal: 20,
+    paddingTop: 18,
   },
-  intro: {
-    marginBottom: 32,
+  title: {
+    color: semanticColors["label-normal"],
+    marginBottom: 18,
   },
-  section: {
-    gap: 8,
-  },
-  row: {
+  allAgreeCard: {
     alignItems: "center",
+    backgroundColor: semanticColors["background-normal"],
+    borderColor: semanticColors["line-normal"],
+    borderRadius: radius.default,
+    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
-    height: 56,
+    height: 52,
+    marginBottom: 14,
     paddingHorizontal: 16,
-    position: "relative",
-    width: "100%",
   },
-  rowTitle: {
+  allAgreeText: {
+    color: semanticColors["label-normal"],
+  },
+  sectionLabel: {
+    color: semanticColors["label-subtle"],
+    marginBottom: 18,
+  },
+  termsList: {
+    gap: 14,
+  },
+  termRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    height: 44,
+  },
+  termCheckArea: {
     alignItems: "center",
     flex: 1,
     flexDirection: "row",
-    gap: 4,
-    minWidth: 0,
+    gap: 12,
   },
-  rowText: {
+  termText: {
     color: semanticColors["label-normal"],
+    flexShrink: 1,
   },
-  allRowText: {
-    color: semanticColors["label-normal"],
+  chevronButton: {
+    alignItems: "center",
+    height: 44,
+    justifyContent: "center",
+    width: 24,
   },
-  divider: {
-    backgroundColor: SETTINGS_DIVIDER_COLOR,
-    bottom: 0,
-    height: 1,
-    left: 0,
-    position: "absolute",
-    right: 0,
+  checkbox: {
+    alignItems: "center",
+    borderRadius: 6,
+    height: 24,
+    justifyContent: "center",
+    width: 24,
+  },
+  checkboxChecked: {
+    backgroundColor: semanticColors["primary-normal"],
+  },
+  checkboxUnchecked: {
+    backgroundColor: semanticColors["background-normal"],
+    borderColor: semanticColors["line-strong"],
+    borderWidth: 1,
   },
   footer: {
     paddingBottom: 24,
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     paddingTop: 8,
-  },
-  continueButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: radius.default,
-    height: 52,
-    justifyContent: "center",
-    width: "100%",
-  },
-  continueButtonDisabled: {
-    opacity: 0.35,
-  },
-  continueButtonText: {
-    color: semanticColors["primary-on"],
   },
 });
