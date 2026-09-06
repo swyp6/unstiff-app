@@ -631,11 +631,14 @@ export default function HomeScreen() {
   }
 
   function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
-    // 새 루틴은 항상 저장된 운동 계획에 들어간다. "오늘만 할래요"가 켜져
-    // 있을 때만 오늘의 운동에도 같이 추가한다(기본값은 꺼짐).
-    setSavedWorkoutPlans((plans) => [...plans, plan]);
+    // "오늘만 할래요"(addToToday)가 켜져 있으면 1회성 운동이므로 저장된
+    // 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시 실제
+    // 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
+    // 꺼져 있으면 재사용할 루틴이므로 저장된 운동 계획에만 넣는다.
     if (addToToday) {
-      addSavedPlanToDate(plan, today);
+      addSavedPlanToDate(plan, selectedCalendarDate);
+    } else {
+      setSavedWorkoutPlans((plans) => [...plans, plan]);
     }
     setNewPlanDraft(null);
   }
