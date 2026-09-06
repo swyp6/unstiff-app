@@ -25,6 +25,8 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { semanticColors } from "@/constants/tokens";
+import { getCalendarMonth } from "@/features/calendar/api";
+import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   MissionCard,
   type MissionStatus,
@@ -52,12 +54,6 @@ const MONTH_SWIPE_THRESHOLD = 60;
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
 const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
-// Mock history for the current month — no records API exists yet, so this
-// stands in for "days with a photo" and "days with more than one photo"
-// until real data is wired up. Matches the Figma "계획됨"/"완료" examples.
-const MOCK_PHOTO_DAYS = new Set([4, 5, 6, 8, 10, 11, 12, 13, 14, 17, 18]);
-const MOCK_MULTI_PHOTO_DAYS = new Set([6, 11]);
-
 // Matches the mission title MissionCard renders for its "revealed"/"accepted"
 // states — no missions API exists yet, so both are the same mock literal.
 const MISSION_TITLE = "15분 걷기";
@@ -82,31 +78,13 @@ const INITIAL_SAVED_WORKOUT_PLANS: WorkoutPlanDraft[] = [
   },
 ];
 
+// calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
+// 상세 정보가 없다 — 그래서 미션 항목은 아예 만들 수 없고, "지난 운동"
+// 목록은 이 세션에서 사용자가 실제로 완료 처리한 로컬 운동(workoutsByDate)만
+// 보여준다. 상세 기록 조회 API가 생기면 이 타입을 확장한다.
 type DayRecord = {
-  missionTitle: string;
   workouts: { title: string; subtitle: string }[];
 };
-
-// 오늘이 아닌 날을 탭했을 때 보여줄 목데이터. MOCK_PHOTO_DAYS/MOCK_MULTI_PHOTO_DAYS
-// (이번 달 캘린더에 사진 배경으로 이미 표시 중인 날짜)와 신호를 맞춰서, 캘린더에서
-// 사진이 있는 것처럼 보이는 날을 탭하면 실제로 미션·운동 기록이 나오게 한다.
-function getMockDayRecord(date: Date, today: Date): DayRecord | null {
-  const isSameMonthAsToday =
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth();
-  if (!isSameMonthAsToday || !MOCK_PHOTO_DAYS.has(date.getDate())) return null;
-
-  const workoutCount = MOCK_MULTI_PHOTO_DAYS.has(date.getDate()) ? 2 : 1;
-  return {
-    missionTitle: MISSION_TITLE,
-    workouts: INITIAL_SAVED_WORKOUT_PLANS.slice(0, workoutCount).map(
-      (plan) => ({
-        title: plan.title,
-        subtitle: getWorkoutPlanSummary(plan),
-      }),
-    ),
-  };
-}
 
 let nextTodayWorkoutInstanceId = 0;
 
@@ -146,6 +124,14 @@ function buildCalendarWeeks(reference: Date): (number | null)[][] {
   return weeks;
 }
 
+// 서버 CalendarDay.date가 "YYYY-MM-DD" 로컬 날짜 문자열이므로, UTC 변환이
+// 섞이는 toISOString() 대신 로컬 필드로 같은 포맷의 키를 만들어 그대로 비교한다.
+function toDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 // 요일 라벨 행. 달 전환 시 날짜 그리드와 같이 슬라이드되도록 각 달 패널
 // 안쪽에 렌더링한다 — 셋 다 내용은 같지만 패널마다 하나씩 필요하다.
 function WeekdayHeaderRow() {
@@ -169,17 +155,19 @@ function WeekdayHeaderRow() {
 function DayRecordCard({
   dateLabel,
   record,
+  serverRecordCount,
   expanded,
   onToggleExpanded,
 }: {
   dateLabel: string;
   record: DayRecord | null;
+  // 로컬에 상세 항목이 없을 때(entries.length === 0) "기록이 없다"와 "서버에는
+  // 기록이 있지만 상세를 보여줄 수 없다"를 구분하는 데만 쓰인다.
+  serverRecordCount: number;
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
-  const entries = record
-    ? [{ title: record.missionTitle, subtitle: "미션" }, ...record.workouts]
-    : [];
+  const entries = record ? record.workouts : [];
 
   return (
     <View className="rounded-[20px] border border-line-normal bg-background-normal">
@@ -212,7 +200,9 @@ function DayRecordCard({
                   typography="body-3-medium"
                   themeColor="textSecondary"
                 >
-                  이 날의 기록이 없어요
+                  {serverRecordCount > 0
+                    ? `기록 ${serverRecordCount}개가 있어요`
+                    : "이 날의 기록이 없어요"}
                 </ThemedText>
               </View>
             ) : (
@@ -300,6 +290,89 @@ export default function HomeScreen() {
     null,
   );
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  // 조회 중인 달의 캘린더 API 응답. year/month를 응답과 함께 묶어 보관해서,
+  // 달을 빠르게 연속으로 넘길 때 아직 도착 안 한 이전 요청의 응답이 섞이지
+  // 않게 하고(cancelled 플래그) daysByDate도 지금 보고 있는 달의 응답일 때만
+  // 쓰도록 한다. 로딩 중이거나 실패했을 때는 null로 남아 캘린더가 빈 상태처럼
+  // 보이되 깨지지 않는다.
+  const [calendarMonthData, setCalendarMonthData] = useState<{
+    year: number;
+    month: number;
+    response: CalendarResponse;
+  } | null>(null);
+  const viewedYear = viewedMonth.getFullYear();
+  const viewedMonthNumber = viewedMonth.getMonth() + 1;
+  // streakDays는 조회한 달과 무관하게 "요청 시점 서버 날짜" 기준으로 계산된
+  // 값이라, days(달별로만 유효)와 달리 달이 바뀌어 새 요청이 pending인
+  // 동안에도 리셋하지 않고 마지막으로 받아온 값을 그대로 보여준다 — 초기
+  // 로딩 전에만 0으로 안전하게 fallback한다.
+  const [streakDays, setStreakDays] = useState(0);
+  // "정상 응답 + days가 빈 배열"과 "요청 자체가 실패"를 구분하기 위한 상태.
+  // calendarMonthData와 같은 방식으로 실패한 year/month를 같이 저장해두고,
+  // 지금 보고 있는 달과 비교해서 렌더링한다 — 달을 바꾸면 그 비교가 자연히
+  // 어긋나서 이전 달의 실패 상태가 다음 달로 남지 않는다.
+  const [calendarErrorMonth, setCalendarErrorMonth] = useState<{
+    year: number;
+    month: number;
+  } | null>(null);
+  const calendarError =
+    calendarErrorMonth?.year === viewedYear &&
+    calendarErrorMonth?.month === viewedMonthNumber;
+  // 로딩 중인지도 별도 setState 없이 파생한다 — 지금 보고 있는 달의 응답도
+  // 에러도 아직 없으면(=요청이 진행 중이면) loading이다.
+  const isCalendarDataForViewedMonth =
+    calendarMonthData?.year === viewedYear &&
+    calendarMonthData?.month === viewedMonthNumber;
+  const isCalendarLoading = !isCalendarDataForViewedMonth && !calendarError;
+
+  useEffect(() => {
+    let cancelled = false;
+    getCalendarMonth(viewedYear, viewedMonthNumber)
+      .then((response) => {
+        if (!cancelled) {
+          setCalendarMonthData({
+            year: viewedYear,
+            month: viewedMonthNumber,
+            response,
+          });
+          setStreakDays(response.streakDays);
+          // 같은 달을 재조회해 이번엔 성공했다면, 그 달에 대해 남아 있던
+          // 실패 기록만 지운다 — 다른 달의 실패 상태는 건드리지 않는다.
+          setCalendarErrorMonth((prev) =>
+            prev?.year === viewedYear && prev?.month === viewedMonthNumber
+              ? null
+              : prev,
+          );
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load calendar", error);
+        if (!cancelled) {
+          setCalendarErrorMonth({ year: viewedYear, month: viewedMonthNumber });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [viewedYear, viewedMonthNumber]);
+
+  // date(YYYY-MM-DD) 기준 lookup — days는 기록/예정 운동이 있는 날짜만 내려오는
+  // sparse 배열이라 index로 캘린더 셀과 매칭하면 안 되고 반드시 date로 찾아야
+  // 한다. 보관된 응답이 지금 보고 있는 달의 것이 아니면(= 새 달 요청이 아직
+  // pending) 빈 Map을 써서 이전 달 데이터가 새 달 셀에 노출되지 않게 한다.
+  const daysByDate = useMemo(() => {
+    const map = new Map<string, CalendarDay>();
+    const isForViewedMonth =
+      calendarMonthData?.year === viewedYear &&
+      calendarMonthData?.month === viewedMonthNumber;
+    if (!isForViewedMonth) return map;
+
+    for (const day of calendarMonthData.response.days) {
+      map.set(day.date, day);
+    }
+    return map;
+  }, [calendarMonthData, viewedYear, viewedMonthNumber]);
+
   // 캘린더에서 탭한 날짜. 오늘이면 실제 미션/오늘의 운동(상호작용 가능)을 보여주고,
   // 다른 날이면 그날의 미션·운동 목데이터를 읽기 전용으로 보여준다 — 미션 "받기"는
   // 오늘 날짜에만 가능하므로 다른 날엔 그 UI 자체를 노출하지 않는다.
@@ -413,7 +486,12 @@ export default function HomeScreen() {
   const hasCompletedTodayWorkout = todayWorkouts.some(
     (workout) => workout.isDone,
   );
-  const isTodayRecorded = doneCount > 0;
+  // 로컬에서 아직 오늘 운동을 체크하지 않았어도, 서버 recordCount가 이미
+  // 0보다 크면(다른 기기에서 기록했거나 앱을 재실행한 경우) 오늘을 이미
+  // 기록된 날로 표시해야 한다 — recordCount는 그 날의 실제 기록 수이므로
+  // "오늘이 기록됐는지" 판정에 직접 연결한다.
+  const isTodayRecorded =
+    doneCount > 0 || (daysByDate.get(toDateKey(today))?.recordCount ?? 0) > 0;
   const todayPhotoUrl = todayWorkouts.find(
     (workout) => workout.photoUrl,
   )?.photoUrl;
@@ -425,10 +503,30 @@ export default function HomeScreen() {
   const isSelectedDateFuture =
     !isSelectedDateToday && selectedCalendarDate > today;
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
-  const selectedDayRecord =
-    isSelectedDateToday || isSelectedDateFuture
+  // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
+  // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
+  // 완료 처리한 로컬 기록(workoutsByDate)만 "지난 운동" 목록으로 보여준다.
+  const completedSelectedDateWorkouts = selectedDateWorkouts.filter(
+    (workout) => workout.isDone,
+  );
+  const selectedDayRecord: DayRecord | null =
+    isSelectedDateToday ||
+    isSelectedDateFuture ||
+    completedSelectedDateWorkouts.length === 0
       ? null
-      : getMockDayRecord(selectedCalendarDate, today);
+      : {
+          workouts: completedSelectedDateWorkouts.map((workout) => ({
+            title: workout.plan.title,
+            subtitle: getWorkoutPlanSummary(workout.plan),
+          })),
+        };
+  // 로컬에 상세가 없어도 서버 recordCount가 0보다 크면 "기록이 없다"고 하면
+  // 안 된다 — 서버 사실과 모순된다. DayRecordCard가 이 값을 받아 로컬 상세가
+  // 없을 때만 "이 날의 기록이 없어요" 대신 recordCount 기반 문구로 구분한다.
+  const selectedDayServerRecordCount =
+    isSelectedDateToday || isSelectedDateFuture
+      ? 0
+      : (daysByDate.get(toDateKey(selectedCalendarDate))?.recordCount ?? 0);
 
   // 드래그 중엔 캘린더가 손가락을 그대로 따라가다가(dragX), 손을 떼면 임계값을
   // 넘었는지에 따라 다음/이전 달 패널 쪽으로 마저 넘어가거나(withTiming) 제자리로
@@ -540,24 +638,37 @@ export default function HomeScreen() {
           }
 
           const isToday = isThisMonth && day === today.getDate();
-          const hasPhoto =
-            (isThisMonth && MOCK_PHOTO_DAYS.has(day)) ||
-            (isToday && isTodayRecorded);
-          const hasMultiplePhotos =
-            isThisMonth && MOCK_MULTI_PHOTO_DAYS.has(day);
           const cellDate = new Date(
             monthDate.getFullYear(),
             monthDate.getMonth(),
             day,
           );
+          // daysByDate는 현재 조회된 달(viewedMonth)의 응답만 담고 있으므로,
+          // 스와이프 중인 옆 달 패널의 날짜는 자연히 매칭되지 않아 하이라이트가
+          // 없는 상태로 보인다 — 그 달로 넘어가 API가 다시 조회되면 채워진다.
+          const dayEntry = daysByDate.get(toDateKey(cellDate));
+          // hasPhoto는 "사진이 있다"는 뜻이지 "기록이 있다"는 뜻이 아니다 — 이
+          // 값은 오늘이 아닌 셀에만 실제로 쓰이므로(아래 className/textColor는
+          // isToday를 먼저 분기해 오늘 셀에서는 이 값을 보지 않는다) imageUrl만
+          // 본다. 오늘 실제로 업로드된 사진은 todayPhotoUrl로 별도 렌더링된다.
+          const hasPhoto = dayEntry?.imageUrl != null;
+          // recordCount는 "그 날 남긴 기록 수"이지 사진 수가 아니다 — API에
+          // 사진 개수 필드가 없어서 이 값으로 "여러 장 사진" 스택 UI를 채우면
+          // 사진이 하나도 없는 날에도 스택이 보이는 등 의미가 달라진다. 정확한
+          // 사진 개수를 내려주는 필드가 생기기 전까지는 끄둔다.
+          const hasMultiplePhotos = false;
           const isFutureDay =
             cellDate >
             new Date(today.getFullYear(), today.getMonth(), today.getDate());
-          // 미래 날짜에 이미 담아둔 운동이 있으면 점으로 표시한다(Figma node
-          // 2918-4983의 31일 셀). 사진 배경(hasPhoto)은 지난 날짜 전용이라
-          // 미래 날짜와 겹칠 일이 없다.
+          // 오늘 이후 날짜에 예정 운동이 있으면 점으로 표시한다(Figma node
+          // 2918-4983의 31일 셀). workout-plan 기능은 아직 백엔드에 저장하는
+          // API가 없어(운동 계획 추가는 로컬 상태만 갱신) 서버 hasPlan만으로는
+          // 방금 이 세션에서 추가한 예정 운동이 반영되지 않는다 — 두 신호를
+          // OR로 합쳐서 기존 로컬-상태 기반 표시를 유지한다.
           const hasScheduledWorkout =
-            isFutureDay && getWorkoutsForDate(cellDate).length > 0;
+            isFutureDay &&
+            (dayEntry?.hasPlan === true ||
+              getWorkoutsForDate(cellDate).length > 0);
 
           const textColor =
             isToday && todayPhotoUrl
@@ -888,9 +999,29 @@ export default function HomeScreen() {
               onPress={() => console.log("streak badge pressed")}
             >
               <Ionicons name="flame" size={16} color={theme.text} />
-              <ThemedText typography="caption-1-medium">연속 스트릭</ThemedText>
+              <ThemedText typography="caption-1-medium">
+                {streakDays}일
+              </ThemedText>
             </Pressable>
           </View>
+
+          {calendarError ? (
+            <ThemedText
+              typography="caption-1-medium"
+              themeColor="textSecondary"
+            >
+              캘린더 정보를 불러오지 못했어요
+            </ThemedText>
+          ) : (
+            isCalendarLoading && (
+              <ThemedText
+                typography="caption-1-medium"
+                themeColor="textSecondary"
+              >
+                캘린더 정보를 불러오는 중이에요
+              </ThemedText>
+            )
+          )}
 
           <GestureDetector gesture={monthSwipeGesture}>
             <View
@@ -976,6 +1107,7 @@ export default function HomeScreen() {
             <DayRecordCard
               dateLabel={selectedDateLabel}
               record={selectedDayRecord}
+              serverRecordCount={selectedDayServerRecordCount}
               expanded={isTodayCardExpanded}
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
