@@ -436,10 +436,33 @@ export default function HomeScreen() {
   const dragX = useSharedValue(0);
   const [calendarWidth, setCalendarWidth] = useState(0);
 
+  // 화살표든 스와이프든 월이 바뀌는 모든 경로가 이 함수 하나를 거친다.
+  // selectedCalendarDate를 그대로 두면, 캘린더는 새 달을 보여주는데 그
+  // 아래 미션/운동 패널은 화면에 안 보이는 이전 달의 날짜 기준으로 뜨는
+  // 불일치가 생긴다 — 이미 새 달의 날짜를 보고 있으면 그대로 두고, 아니면
+  // 그 달에 오늘이 있으면 오늘로, 없으면 1일로 같이 맞춘다.
   const commitMonthChange = useCallback((delta: 1 | -1) => {
-    setViewedMonth(
-      (month) => new Date(month.getFullYear(), month.getMonth() + delta, 1),
-    );
+    setViewedMonth((month) => {
+      const nextMonth = new Date(
+        month.getFullYear(),
+        month.getMonth() + delta,
+        1,
+      );
+      setSelectedCalendarDate((current) => {
+        if (
+          current.getFullYear() === nextMonth.getFullYear() &&
+          current.getMonth() === nextMonth.getMonth()
+        ) {
+          return current;
+        }
+        const now = new Date();
+        const isNextMonthCurrent =
+          now.getFullYear() === nextMonth.getFullYear() &&
+          now.getMonth() === nextMonth.getMonth();
+        return isNextMonthCurrent ? now : nextMonth;
+      });
+      return nextMonth;
+    });
   }, []);
 
   // dragX를 여기서 바로 0으로 되돌리면 패널 내용(previousMonthWeeks 등)이 새
