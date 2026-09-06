@@ -324,6 +324,11 @@ export default function HomeScreen() {
   } | null>(null);
   const viewedYear = viewedMonth.getFullYear();
   const viewedMonthNumber = viewedMonth.getMonth() + 1;
+  // streakDays는 조회한 달과 무관하게 "요청 시점 서버 날짜" 기준으로 계산된
+  // 값이라, days(달별로만 유효)와 달리 달이 바뀌어 새 요청이 pending인
+  // 동안에도 리셋하지 않고 마지막으로 받아온 값을 그대로 보여준다 — 초기
+  // 로딩 전에만 0으로 안전하게 fallback한다.
+  const [streakDays, setStreakDays] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -335,6 +340,7 @@ export default function HomeScreen() {
             month: viewedMonthNumber,
             response,
           });
+          setStreakDays(response.streakDays);
         }
       })
       .catch((error) => {
@@ -960,7 +966,9 @@ export default function HomeScreen() {
               onPress={() => console.log("streak badge pressed")}
             >
               <Ionicons name="flame" size={16} color={theme.text} />
-              <ThemedText typography="caption-1-medium">연속 스트릭</ThemedText>
+              <ThemedText typography="caption-1-medium">
+                {streakDays}일
+              </ThemedText>
             </Pressable>
           </View>
 
