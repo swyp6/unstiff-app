@@ -1,5 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
+import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import {
   useCallback,
@@ -9,7 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Alert, Pressable, ScrollView, View } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Animated, {
@@ -39,6 +40,7 @@ import {
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
+import { logImageUploadError } from "@/features/upload/cloudinary";
 import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
@@ -691,11 +693,10 @@ export default function HomeScreen() {
     openRecordMethodModal(MISSION_PLAN_ITEM_ID, MISSION_TITLE);
   }
 
-  // 기록 방식 모달을 고르지 않고 닫으면(백드롭 탭) 낙관적으로 켰던 체크를
-  // 되돌린다 — 카메라로 넘어가거나 "사진 없이 기록하기"를 고르는 경우는
-  // 각자 별도 핸들러가 모달을 닫으므로 여기로 오지 않는다.
-  function dismissRecordMethodModal() {
-    setIsRecordMethodModalVisible(false);
+  // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 그리고
+  // 앨범에서 선택하다 취소/거부됐을 때 공통으로 쓴다. 카메라로 넘어가거나
+  // "사진 없이 기록하기"를 고르는 경우는 기록이 확정되므로 여기로 오지 않는다.
+  function revertPendingRecord() {
     if (!pendingRecordPlanItemId) return;
     if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
       setMissionStatus("accepted");
@@ -709,6 +710,11 @@ export default function HomeScreen() {
       );
     }
     setPendingRecordPlanItemId(null);
+  }
+
+  function dismissRecordMethodModal() {
+    setIsRecordMethodModalVisible(false);
+    revertPendingRecord();
   }
 
   function completeRecordWithoutPhoto() {
@@ -727,16 +733,46 @@ export default function HomeScreen() {
     });
   }
 
-  function startRecordLibraryPick() {
+  // 앨범 picker는 여기(홈 화면)에서 바로 연다 — /camera 화면이 fullScreenModal로
+  // 올라오는 present 전환이 채 끝나기 전에 그 안에서 두 번째 네이티브 모달(사진
+  // picker)을 띄우면 iOS가 그 두 번째 present를 조용히 무시해버려서 피커가 아예
+  // 뜨지 않는 문제가 있었다. 홈 화면은 이미 완전히 떠 있는 상태라 그 충돌이 없다.
+  // 사진을 고르면 그때 /camera를 그 사진 미리보기(확인) 화면으로 바로 띄운다.
+  async function startRecordLibraryPick() {
     setIsRecordMethodModalVisible(false);
-    router.push({
-      pathname: "/camera",
-      params: {
-        title: recordModalTitle,
-        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
-        source: "library",
-      },
-    });
+    try {
+      const libraryPermission =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!libraryPermission.granted) {
+        Alert.alert("사진 보관함 접근 권한이 필요합니다.");
+        revertPendingRecord();
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+      });
+      if (result.canceled) {
+        revertPendingRecord();
+        return;
+      }
+
+      const asset = result.assets[0];
+      router.push({
+        pathname: "/camera",
+        params: {
+          title: recordModalTitle,
+          planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
+          pickedUri: asset.uri,
+          pickedWidth: String(asset.width),
+          pickedHeight: String(asset.height),
+        },
+      });
+    } catch (pickError) {
+      logImageUploadError("photo library pick failed", pickError);
+      Alert.alert("사진을 불러오지 못했어요. 다시 시도해 주세요.");
+      revertPendingRecord();
+    }
   }
 
   return (

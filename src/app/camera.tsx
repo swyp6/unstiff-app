@@ -2,9 +2,10 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -53,22 +54,38 @@ function ViewfinderCorner({
 // Cloudinary 업로드를 수행하고, 결과는 daily-photo-store를 통해 홈 화면으로
 // 전달한다(저장 API가 아직 없어 로컬 상태로만 반영됨).
 export default function CameraScreen() {
-  const { title, planItemId, source } = useLocalSearchParams<{
-    title?: string;
-    planItemId?: string;
-    // "library"면 기록 방식 선택 모달에서 "앨범에서 선택"으로 진입한 것 —
-    // 마운트 즉시 앨범 picker를 띄운다.
-    source?: string;
-  }>();
+  const { title, planItemId, pickedUri, pickedWidth, pickedHeight } =
+    useLocalSearchParams<{
+      title?: string;
+      planItemId?: string;
+      // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
+      // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
+      // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
+      pickedUri?: string;
+      pickedWidth?: string;
+      pickedHeight?: string;
+    }>();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<"front" | "back">("back");
-  const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
+  const [photo, setPhoto] = useState<CapturedPhoto | null>(() =>
+    pickedUri && pickedWidth && pickedHeight
+      ? {
+          uri: pickedUri,
+          width: Number(pickedWidth),
+          height: Number(pickedHeight),
+        }
+      : null,
+  );
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const cameraRef = useRef<CameraView>(null);
   const navigation = useNavigation();
+  // fullScreenModal로 뜨는 화면이라 <SafeAreaView>의 네이티브 인셋 측정이
+  // 상단(상태바 영역)을 0으로 잡는 경우가 있어 — 명시적으로 훅에서 읽은
+  // 값을 padding으로 적용한다.
+  const insets = useSafeAreaInsets();
 
   // 업로드 도중 사용자가 닫기/뒤로가기로 이 화면을 벗어날 수 있다. 업로드
   // 자체(및 setResult)는 화면을 나가도 계속 끝까지 진행되어야 하지만,
@@ -118,6 +135,10 @@ export default function CameraScreen() {
     }
   }
 
+  // 라이브 카메라 화면 하단의 갤러리 아이콘 전용 — 이 화면이 이미 완전히
+  // 떠 있는 상태에서 사용자가 직접 누르는 경우라 present 충돌이 없다("앨범
+  // 에서 선택"으로 처음 들어올 때 쓰는 picker는 home.tsx의
+  // startRecordLibraryPick이 화면 전환 전에 따로 연다).
   async function handlePickFromLibrary() {
     try {
       const libraryPermission =
@@ -140,18 +161,6 @@ export default function CameraScreen() {
       setError("사진을 불러오지 못했어요. 다시 시도해 주세요.");
     }
   }
-
-  // "앨범에서 선택"으로 진입한 경우 라이브 카메라를 보여주지 않고 바로 앨범
-  // picker를 띄운다 — 취소하면 그냥 이 화면(라이브 카메라 프리뷰)에 남는다.
-  // handlePickFromLibrary는 네이티브 picker가 닫힌 뒤(사용자 액션 이후)에만
-  // setState하므로 마운트 시 동기적으로 캐스케이딩 렌더를 유발하지 않는다.
-  useEffect(() => {
-    if (source === "library") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      void handlePickFromLibrary();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function handleUsePhoto() {
     if (!photo || !planItemId || isUploading) return;
@@ -179,10 +188,17 @@ export default function CameraScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: CAMERA_BG }}>
-      <SafeAreaView className="flex-1">
+      <StatusBar style="light" />
+      <View
+        style={{
+          flex: 1,
+          paddingTop: insets.top,
+          paddingBottom: insets.bottom,
+        }}
+      >
         <View className="h-[54px] flex-row items-center justify-center px-[14px]">
           <Pressable
-            className="absolute left-[14px] size-11 items-center justify-center"
+            className="absolute left-[18px] size-12 items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="닫기"
             onPress={() => router.back()}
@@ -328,7 +344,7 @@ export default function CameraScreen() {
             </View>
           )}
         </View>
-      </SafeAreaView>
+      </View>
     </View>
   );
 }
