@@ -13,26 +13,12 @@ import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors, typography } from "@/constants/tokens";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
+import {
+  NICKNAME_FORMAT_PATTERN,
+  NICKNAME_MAX_LENGTH,
+  sanitizeNickname,
+} from "@/features/auth/nickname-validation";
 import { useSignupStore } from "@/store/signup-store";
-
-const NICKNAME_MIN_LENGTH = 3;
-const NICKNAME_MAX_LENGTH = 20;
-
-// Only A-Z, a-z, 0-9, and the three allowed special characters may ever sit
-// in state — everything else (whitespace, Hangul, other punctuation, emoji)
-// is stripped as it's typed. Case is never transformed; "abc" and "ABC" stay
-// distinct.
-const NICKNAME_INPUT_DISALLOWED_CHARS = /[^A-Za-z0-9._-]/g;
-
-const NICKNAME_FORMAT_PATTERN = new RegExp(
-  `^[A-Za-z0-9._-]{${NICKNAME_MIN_LENGTH},${NICKNAME_MAX_LENGTH}}$`,
-);
-
-function sanitizeNickname(value: string) {
-  return value
-    .replace(NICKNAME_INPUT_DISALLOWED_CHARS, "")
-    .slice(0, NICKNAME_MAX_LENGTH);
-}
 
 function handleBack() {
   if (router.canGoBack()) {
@@ -85,8 +71,7 @@ export default function NicknameScreen() {
   // signup UI flow (profile-photo, signup-complete) can be exercised in
   // development builds without a real availability check to pass.
   // formatValid is unaffected and still rejects the same invalid input
-  // (too short/long, whitespace, disallowed special characters) in dev
-  // builds.
+  // (too short/long, Korean/whitespace/disallowed characters) in dev builds.
   const nicknameAvailabilityConfirmed = __DEV__ ? formatValid : false;
   const canSubmit = formatValid && nicknameAvailabilityConfirmed;
 
@@ -104,11 +89,10 @@ export default function NicknameScreen() {
   // and "사용 가능한 닉네임이에요." (shown only once a real duplicate-check
   // succeeds — see nicknameAvailabilityConfirmed above). There's no
   // designed error copy for an invalid format (too short/long, disallowed
-  // characters, etc.), so rather than inventing one, this stays the single
+  // character, etc.), so rather than inventing one, this stays the single
   // guidance string regardless of validity — formatValid still gates
   // canSubmit above, this text just isn't used to communicate that.
-  const helperText =
-    "영어·숫자 및 특수기호(.,-,_)만 사용하여 3~20자로 입력해주세요.";
+  const helperText = "영문, 숫자, 특수기호(. _ -) 포함 3~20자까지 가능해요.";
 
   return (
     <SafeAreaView
