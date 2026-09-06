@@ -15,23 +15,17 @@ import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-b
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import { useSignupStore } from "@/store/signup-store";
 
-const NICKNAME_MIN_LENGTH = 2;
-const NICKNAME_MAX_LENGTH = 10;
+const NICKNAME_MIN_LENGTH = 3;
+const NICKNAME_MAX_LENGTH = 20;
 
-// Input-stage filter only — keeps whitespace/punctuation/emoji out of state
-// as the user types, but must still tolerate compatibility jamo (ㄱ-ㅎ,
-// ㅏ-ㅣ) so an in-progress Hangul composition (a lone "ㅅ" before it becomes
-// "사") isn't stripped mid-keystroke. This is deliberately looser than
-// NICKNAME_FORMAT_PATTERN below — passing this filter does NOT mean the
-// nickname is valid, only that it's safe to hold in state.
-const NICKNAME_INPUT_DISALLOWED_CHARS = /[^A-Za-z0-9가-힣ㄱ-ㅎㅏ-ㅣ]/g;
+// Only A-Z, a-z, 0-9, and the three allowed special characters may ever sit
+// in state — everything else (whitespace, Hangul, other punctuation, emoji)
+// is stripped as it's typed. Case is never transformed; "abc" and "ABC" stay
+// distinct.
+const NICKNAME_INPUT_DISALLOWED_CHARS = /[^A-Za-z0-9._-]/g;
 
-// Final validity check. Deliberately stricter than the input filter above:
-// lone/compatibility jamo that never resolved into a complete syllable
-// (e.g. "ㄱㄱ", "ㅏㅏ", "ㄱ1") must NOT pass here, even though the input
-// filter has to let it sit in state mid-composition.
 const NICKNAME_FORMAT_PATTERN = new RegExp(
-  `^[A-Za-z0-9가-힣]{${NICKNAME_MIN_LENGTH},${NICKNAME_MAX_LENGTH}}$`,
+  `^[A-Za-z0-9._-]{${NICKNAME_MIN_LENGTH},${NICKNAME_MAX_LENGTH}}$`,
 );
 
 function sanitizeNickname(value: string) {
@@ -91,7 +85,8 @@ export default function NicknameScreen() {
   // signup UI flow (profile-photo, signup-complete) can be exercised in
   // development builds without a real availability check to pass.
   // formatValid is unaffected and still rejects the same invalid input
-  // (jamo-only, too short, whitespace/special characters) in dev builds.
+  // (too short/long, whitespace, disallowed special characters) in dev
+  // builds.
   const nicknameAvailabilityConfirmed = __DEV__ ? formatValid : false;
   const canSubmit = formatValid && nicknameAvailabilityConfirmed;
 
@@ -108,11 +103,12 @@ export default function NicknameScreen() {
   // Figma only designed two helper-text states: this initial guidance copy
   // and "사용 가능한 닉네임이에요." (shown only once a real duplicate-check
   // succeeds — see nicknameAvailabilityConfirmed above). There's no
-  // designed error copy for an invalid format (too short, jamo-only,
-  // etc.), so rather than inventing one, this stays the single guidance
-  // string regardless of validity — formatValid still gates canSubmit
-  // above, this text just isn't used to communicate that.
-  const helperText = "한글, 영어, 숫자 포함 2~10자까지 가능해요.";
+  // designed error copy for an invalid format (too short/long, disallowed
+  // characters, etc.), so rather than inventing one, this stays the single
+  // guidance string regardless of validity — formatValid still gates
+  // canSubmit above, this text just isn't used to communicate that.
+  const helperText =
+    "영어·숫자 및 특수기호(.,-,_)만 사용하여 3~20자로 입력해주세요.";
 
   return (
     <SafeAreaView
