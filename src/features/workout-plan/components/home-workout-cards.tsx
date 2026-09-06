@@ -277,7 +277,7 @@ export function TodayWorkoutCard({
               typography="caption-1-bold"
               themeColor="textSecondary"
             >
-              저장된 운동 계획
+              루틴
             </ThemedText>
 
             {savedWorkoutPlans.map((plan) => (
