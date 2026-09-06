@@ -1,8 +1,10 @@
 import * as WebBrowser from "expo-web-browser";
+import Constants from "expo-constants";
 import { router } from "expo-router";
 import { Alert, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { LEGAL_URLS } from "@/constants/legal-urls";
 import { logout } from "@/features/auth/logout";
@@ -16,6 +18,7 @@ import { goBackOrReplace } from "@/features/settings/navigation";
 const ACCOUNT_ITEMS = [
   { title: "계정 설정", href: "/mypage/settings/account" },
   { title: "알림 설정", href: "/mypage/settings/notification" },
+  { title: "앱 권한 및 연동", href: "/mypage/settings/permissions" },
 ] as const;
 
 const SERVICE_ITEMS = [
@@ -49,7 +52,7 @@ export default function SettingsScreen() {
 
       <View style={styles.content}>
         <View style={styles.section}>
-          <SettingsSectionLabel label="계정" />
+          <SettingsSectionLabel label="계정 및 앱 설정" />
           <View>
             {ACCOUNT_ITEMS.map((item) => (
               <SettingsRow
@@ -82,6 +85,14 @@ export default function SettingsScreen() {
             title="회원 탈퇴"
           />
         </View>
+
+        <ThemedText
+          style={styles.versionText}
+          themeColor="textDisabled"
+          typography="caption-2-regular"
+        >
+          {`현재 앱 버전 : ${Constants.expoConfig?.version ?? "-"}`}
+        </ThemedText>
       </View>
     </SafeAreaView>
   );
@@ -101,5 +112,9 @@ const styles = StyleSheet.create({
   },
   actionSection: {
     marginTop: 8,
+  },
+  versionText: {
+    marginTop: 32,
+    textAlign: "center",
   },
 });
