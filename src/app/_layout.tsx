@@ -38,6 +38,13 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" />
           <Stack.Screen name="login" />
           <Stack.Screen name="terms-agreement" />
+          <Stack.Screen name="nickname" />
+          <Stack.Screen name="profile-photo" />
+          <Stack.Screen name="profile-photo-adjust" />
+          <Stack.Screen
+            name="signup-complete"
+            options={{ gestureEnabled: false }}
+          />
           <Stack.Screen name="map" />
           <Stack.Screen name="camera" options={{ presentation: "modal" }} />
           <Stack.Screen name="test" />
