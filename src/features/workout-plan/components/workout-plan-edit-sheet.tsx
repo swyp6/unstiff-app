@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -18,6 +19,13 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+// 이 파일은 시트 드래그 애니메이션에 이미 RN 기본 Animated를 쓰고 있어서,
+// 스테퍼 추가/삭제용 reanimated는 이름 충돌 피하려고 별칭으로 가져온다.
+import ReanimatedAnimated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -25,6 +33,7 @@ import {
   formatStartTime,
   getIntensityLabel,
   type GoalType,
+  toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 
@@ -44,7 +53,20 @@ type WorkoutPlanEditSheetProps = {
   value: WorkoutPlanDraft;
   onClose: () => void;
   onDelete: () => void;
-  onSave: (value: WorkoutPlanDraft) => void;
+  // 신규 추가 흐름에서만 addToToday가 의미 있다(아래 토글) — 편집 흐름은
+  // 이미 저장된 계획을 고치는 것뿐이라 두 번째 인자를 그냥 무시하면 된다.
+  onSave: (value: WorkoutPlanDraft, addToToday: boolean) => void;
+  // 기존 계획 편집("운동 계획 편집"/"변경 저장"/삭제 링크 있음)과 신규 계획
+  // 추가("루틴 추가"/"루틴 추가하기"/삭제 링크 없음, Figma node
+  // 2929-5701)가 필드 구성이 완전히 같아서 하나의 시트를 재사용한다.
+  title?: string;
+  saveLabel?: string;
+  showDelete?: boolean;
+  // 신규 추가 흐름에서만 "오늘만 할래요" on/off 토글을 보여준다 — 편집
+  // 흐름의 계획은 이미 저장돼 있으니 토글이 필요 없다. 토글이 꺼져 있으면
+  // 재사용할 루틴이라 저장된 운동 계획에만 들어가고, 켜져 있으면 1회성
+  // 운동이라 저장된 운동 계획에는 안 들어가고 그날의 운동에만 추가된다.
+  showAddToTodayToggle?: boolean;
 };
 
 export function WorkoutPlanEditSheet({
@@ -53,10 +75,25 @@ export function WorkoutPlanEditSheet({
   onClose,
   onDelete,
   onSave,
+  title = "운동 계획 편집",
+  saveLabel = "변경 저장",
+  showDelete = true,
+  showAddToTodayToggle = false,
 }: WorkoutPlanEditSheetProps) {
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<WorkoutPlanDraft>(value);
+  const [addToToday, setAddToToday] = useState(false);
+  // "오늘만 할래요"를 체크하면 버튼도 그 의미(오늘의 운동에 바로 추가)에
+  // 맞춰 바뀐다 — 편집 흐름(showAddToTodayToggle=false)은 항상 전달받은
+  // saveLabel 그대로 쓴다.
+  const displayedSaveLabel =
+    showAddToTodayToggle && addToToday ? "오늘의 운동 추가하기" : saveLabel;
+  // 운동명·운동 종류·기록할 항목(4개 중 하나 이상) 셋 다 있어야 저장 가능.
+  const canSubmit =
+    draft.title.trim().length > 0 &&
+    draft.exerciseType.trim().length > 0 &&
+    draft.selectedGoalTypes.length > 0;
   const [isWorkoutTypeSheetVisible, setIsWorkoutTypeSheetVisible] =
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
@@ -188,17 +225,13 @@ export function WorkoutPlanEditSheet({
   );
 
   const toggleGoalType = (goalType: GoalType) => {
-    setDraft((current) => {
-      const selected = current.selectedGoalTypes.includes(goalType);
-      if (selected && current.selectedGoalTypes.length === 1) return current;
-
-      return {
-        ...current,
-        selectedGoalTypes: selected
-          ? current.selectedGoalTypes.filter((type) => type !== goalType)
-          : [...current.selectedGoalTypes, goalType],
-      };
-    });
+    setDraft((current) => ({
+      ...current,
+      selectedGoalTypes: toggleGoalTypeSelection(
+        current.selectedGoalTypes,
+        goalType,
+      ),
+    }));
   };
 
   return (
@@ -229,7 +262,7 @@ export function WorkoutPlanEditSheet({
                 </View>
                 <View style={styles.header}>
                   <ThemedText style={styles.title} typography="title-3-bold">
-                    운동 계획 편집
+                    {title}
                   </ThemedText>
                 </View>
 
@@ -278,20 +311,26 @@ export function WorkoutPlanEditSheet({
 
                     <View style={styles.steppers}>
                       {draft.selectedGoalTypes.map((type) => (
-                        <GoalStepper
+                        <ReanimatedAnimated.View
+                          entering={FadeIn}
+                          exiting={FadeOut}
                           key={type}
-                          onChange={(goalValue) =>
-                            setDraft((current) => ({
-                              ...current,
-                              goalValues: {
-                                ...current.goalValues,
-                                [type]: goalValue,
-                              },
-                            }))
-                          }
-                          type={type}
-                          value={draft.goalValues[type]}
-                        />
+                          layout={LinearTransition}
+                        >
+                          <GoalStepper
+                            onChange={(goalValue) =>
+                              setDraft((current) => ({
+                                ...current,
+                                goalValues: {
+                                  ...current.goalValues,
+                                  [type]: goalValue,
+                                },
+                              }))
+                            }
+                            type={type}
+                            value={draft.goalValues[type]}
+                          />
+                        </ReanimatedAnimated.View>
                       ))}
                     </View>
 
@@ -299,6 +338,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>예상 시작 시간</SectionLabel>
                       <SelectionRow
                         onPress={() => setIsTimeSheetVisible(true)}
+                        placeholder="선택해주세요"
                         value={formatStartTime(draft.startTime)}
                       />
                     </View>
@@ -307,6 +347,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>강도</SectionLabel>
                       <SelectionRow
                         onPress={() => setIsIntensitySheetVisible(true)}
+                        placeholder="선택해주세요"
                         value={getIntensityLabel(draft.intensity)}
                       />
                     </View>
@@ -326,34 +367,71 @@ export function WorkoutPlanEditSheet({
                         value={draft.memo}
                       />
                     </View>
+
+                    {showAddToTodayToggle && (
+                      <Pressable
+                        accessibilityLabel="오늘만 할래요"
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: addToToday }}
+                        hitSlop={8}
+                        onPress={() => setAddToToday((checked) => !checked)}
+                        style={styles.toggleRow}
+                      >
+                        <View
+                          style={[
+                            styles.checkbox,
+                            addToToday
+                              ? styles.checkboxChecked
+                              : styles.checkboxUnchecked,
+                          ]}
+                        >
+                          {addToToday && (
+                            <Ionicons
+                              color={semanticColors["label-inverse"]}
+                              name="checkmark"
+                              size={14}
+                            />
+                          )}
+                        </View>
+                        <ThemedText typography="body-2-regular">
+                          오늘만 할래요
+                        </ThemedText>
+                      </Pressable>
+                    )}
+
                     <View style={styles.actions}>
                       <PrimaryActionButton
-                        label="변경 저장"
-                        onPress={() => closeSheet(() => onSave(draft))}
+                        disabled={!canSubmit}
+                        label={displayedSaveLabel}
+                        onPress={() =>
+                          closeSheet(() => onSave(draft, addToToday))
+                        }
                       />
-                      <Pressable
-                        accessibilityRole="button"
-                        hitSlop={{ bottom: 13, left: 20, right: 20, top: 13 }}
-                        onPress={() => closeSheet(onDelete)}
-                        style={styles.deleteLinkPressable}
-                      >
-                        {({ pressed }) => (
-                          <View
-                            pointerEvents="none"
-                            style={[
-                              styles.deleteLink,
-                              pressed && styles.pressed,
-                            ]}
-                          >
-                            <ThemedText
-                              style={styles.deleteLinkText}
-                              typography="body-3-bold"
+                      {showDelete && (
+                        <Pressable
+                          accessibilityRole="button"
+                          hitSlop={{ bottom: 13, left: 20, right: 20, top: 13 }}
+                          onPress={() => closeSheet(onDelete)}
+                          style={styles.deleteLinkPressable}
+                        >
+                          {({ pressed }) => (
+                            <View
+                              pointerEvents="none"
+                              style={[
+                                styles.deleteLink,
+                                pressed && styles.pressed,
+                              ]}
                             >
-                              계획 삭제하기
-                            </ThemedText>
-                          </View>
-                        )}
-                      </Pressable>
+                              <ThemedText
+                                style={styles.deleteLinkText}
+                                typography="body-3-bold"
+                              >
+                                계획 삭제하기
+                              </ThemedText>
+                            </View>
+                          )}
+                        </Pressable>
+                      )}
                     </View>
                   </ScrollView>
                 </View>
@@ -474,6 +552,27 @@ const styles = StyleSheet.create({
   },
   steppers: {
     gap: 8,
+  },
+  toggleRow: {
+    alignItems: "center",
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    gap: 8,
+    height: 20,
+  },
+  checkbox: {
+    alignItems: "center",
+    borderRadius: 4,
+    height: 20,
+    justifyContent: "center",
+    width: 20,
+  },
+  checkboxChecked: {
+    backgroundColor: semanticColors["label-normal"],
+  },
+  checkboxUnchecked: {
+    borderColor: semanticColors["line-strong"],
+    borderWidth: 1,
   },
   actions: {
     gap: 16,

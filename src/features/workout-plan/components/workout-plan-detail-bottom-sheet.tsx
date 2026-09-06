@@ -8,6 +8,11 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, {
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+} from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -15,6 +20,7 @@ import {
   formatStartTime,
   getIntensityLabel,
   type GoalType,
+  toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 
@@ -96,17 +102,13 @@ export function WorkoutPlanDetailBottomSheet({
   }, []);
 
   const toggleGoalType = (goalType: GoalType) => {
-    setDetailDraft((current) => {
-      const selected = current.selectedGoalTypes.includes(goalType);
-      if (selected && current.selectedGoalTypes.length === 1) return current;
-
-      return {
-        ...current,
-        selectedGoalTypes: selected
-          ? current.selectedGoalTypes.filter((type) => type !== goalType)
-          : [...current.selectedGoalTypes, goalType],
-      };
-    });
+    setDetailDraft((current) => ({
+      ...current,
+      selectedGoalTypes: toggleGoalTypeSelection(
+        current.selectedGoalTypes,
+        goalType,
+      ),
+    }));
   };
 
   const savePlan = () => {
@@ -190,7 +192,11 @@ export function WorkoutPlanDetailBottomSheet({
     <WorkoutPlanBottomSheet
       expanded={isParentExpanded}
       fullHeight
-      initialHeightRatio={749 / 808}
+      // 713/814는 이 시트의 원래(축소 상태) 콘텐츠 높이 비율이다. 그 아래
+      // "계획 삭제하기" 링크(paddingTop 16 + gap 16 + 높이 18 = 50)가 나중에
+      // 추가됐는데 이 비율을 안 늘려서, 축소 상태에서 그 링크가 화면 아래로
+      // 밀려나 안 보였다 — 시트를 펼쳐야만(translateY 0) 보이던 상태.
+      initialHeightRatio={(713 + 50) / 814}
       onClose={onClose}
       onExpanded={handleParentExpanded}
       onExpandedChange={setIsParentExpanded}
@@ -262,20 +268,26 @@ export function WorkoutPlanDetailBottomSheet({
           {detailDraft.selectedGoalTypes.length > 0 && (
             <View style={styles.goals}>
               {detailDraft.selectedGoalTypes.map((type) => (
-                <GoalStepper
+                <Animated.View
+                  entering={FadeIn}
+                  exiting={FadeOut}
                   key={type}
-                  onChange={(goalValue) =>
-                    setDetailDraft((current) => ({
-                      ...current,
-                      goalValues: {
-                        ...current.goalValues,
-                        [type]: goalValue,
-                      },
-                    }))
-                  }
-                  type={type}
-                  value={detailDraft.goalValues[type]}
-                />
+                  layout={LinearTransition}
+                >
+                  <GoalStepper
+                    onChange={(goalValue) =>
+                      setDetailDraft((current) => ({
+                        ...current,
+                        goalValues: {
+                          ...current.goalValues,
+                          [type]: goalValue,
+                        },
+                      }))
+                    }
+                    type={type}
+                    value={detailDraft.goalValues[type]}
+                  />
+                </Animated.View>
               ))}
             </View>
           )}
@@ -286,6 +298,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SelectionRow
             accessibilityLabel="예상 시작 시간 선택"
             onPress={openTimePicker}
+            placeholder="선택해주세요"
             value={formatStartTime(detailDraft.startTime)}
           />
         </View>
@@ -295,6 +308,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SelectionRow
             accessibilityLabel="강도 선택"
             onPress={openIntensityPicker}
+            placeholder="선택해주세요"
             value={getIntensityLabel(detailDraft.intensity)}
           />
         </View>
@@ -341,7 +355,6 @@ const styles = StyleSheet.create({
   content: {
     gap: 20,
     paddingBottom: 20,
-    paddingHorizontal: 20,
     paddingTop: 19,
   },
   titleEditArea: {
@@ -400,7 +413,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     gap: 16,
-    paddingHorizontal: 20,
     paddingTop: 16,
   },
   deleteButton: {
@@ -410,7 +422,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   deleteText: {
-    color: semanticColors["label-disabled"],
+    color: semanticColors["label-subtle"],
   },
   pressed: {
     opacity: 0.7,

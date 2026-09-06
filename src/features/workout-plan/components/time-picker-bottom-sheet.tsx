@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import { useMemo, useRef, useState } from "react";
 import {
   FlatList,
@@ -59,7 +58,6 @@ export function TimePickerBottomSheet({
   onConfirm,
 }: TimePickerBottomSheetProps) {
   const [draft, setDraft] = useState(() => createTimeDraft(value));
-  const [isUnset, setIsUnset] = useState(value === null);
 
   return (
     <WorkoutPlanBottomSheet
@@ -74,22 +72,20 @@ export function TimePickerBottomSheet({
           columnStyle={styles.periodColumn}
           items={PERIOD_ITEMS}
           loop={false}
-          onChange={(next) => {
+          onChange={(next) =>
             setDraft((current) => ({
               ...current,
               period: next as "AM" | "PM",
-            }));
-            setIsUnset(false);
-          }}
+            }))
+          }
           selected={draft.period}
         />
         <PickerColumn
           columnStyle={styles.hourColumn}
           items={HOUR_ITEMS}
-          onChange={(next) => {
-            setDraft((current) => ({ ...current, hour: Number(next) }));
-            setIsUnset(false);
-          }}
+          onChange={(next) =>
+            setDraft((current) => ({ ...current, hour: Number(next) }))
+          }
           selected={String(draft.hour)}
         />
         <View pointerEvents="none" style={[styles.unit, styles.hourUnit]}>
@@ -100,10 +96,9 @@ export function TimePickerBottomSheet({
         <PickerColumn
           columnStyle={styles.minuteColumn}
           items={MINUTE_ITEMS}
-          onChange={(next) => {
-            setDraft((current) => ({ ...current, minute: Number(next) }));
-            setIsUnset(false);
-          }}
+          onChange={(next) =>
+            setDraft((current) => ({ ...current, minute: Number(next) }))
+          }
           selected={String(draft.minute)}
         />
         <View pointerEvents="none" style={[styles.unit, styles.minuteUnit]}>
@@ -114,38 +109,26 @@ export function TimePickerBottomSheet({
       </View>
 
       <Pressable
-        accessibilityRole="checkbox"
-        accessibilityState={{ checked: isUnset }}
-        onPress={() => setIsUnset((current) => !current)}
-        style={styles.unsetPressable}
-      >
-        {({ pressed }) => (
-          <View
-            pointerEvents="none"
-            style={[styles.unsetRow, pressed && styles.pressed]}
-          >
-            <View style={[styles.check, isUnset && styles.checkSelected]}>
-              {isUnset && (
-                <Ionicons
-                  color={semanticColors["label-inverse"]}
-                  name="checkmark"
-                  size={14}
-                />
-              )}
-            </View>
-            <ThemedText typography="body-3-medium">설정 안 함</ThemedText>
-          </View>
-        )}
-      </Pressable>
-
-      <Pressable
         accessibilityRole="button"
-        onPress={() => onConfirm(isUnset ? null : draft)}
+        onPress={() => onConfirm(draft)}
         style={({ pressed }) => pressed && styles.pressed}
       >
         <View style={styles.confirmButton}>
           <ThemedText style={styles.confirmText} typography="body-2-bold">
             확인
+          </ThemedText>
+        </View>
+      </Pressable>
+
+      <Pressable
+        accessibilityLabel="시작 시간 설정 안함"
+        accessibilityRole="button"
+        onPress={() => onConfirm(null)}
+        style={({ pressed }) => pressed && styles.pressed}
+      >
+        <View style={styles.unsetLink}>
+          <ThemedText typography="body-3-medium" themeColor="textSecondary">
+            설정 안함
           </ThemedText>
         </View>
       </Pressable>
@@ -360,30 +343,12 @@ const styles = StyleSheet.create({
   selectedOptionText: {
     color: semanticColors["label-normal"],
   },
-  unsetPressable: {
-    marginTop: 12,
-    minHeight: 44,
-    width: "100%",
-  },
-  unsetRow: {
+  unsetLink: {
     alignItems: "center",
-    flexDirection: "row",
-    gap: 10,
-    minHeight: 44,
-    paddingHorizontal: 4,
-  },
-  check: {
-    alignItems: "center",
-    borderColor: semanticColors["line-strong"],
-    borderRadius: 6,
-    borderWidth: 1,
-    height: 22,
     justifyContent: "center",
-    width: 22,
-  },
-  checkSelected: {
-    backgroundColor: semanticColors["label-normal"],
-    borderColor: semanticColors["label-normal"],
+    minHeight: 44,
+    marginTop: 4,
+    width: "100%",
   },
   confirmButton: {
     alignItems: "center",

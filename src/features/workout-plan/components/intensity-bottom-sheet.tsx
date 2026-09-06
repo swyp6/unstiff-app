@@ -43,7 +43,11 @@ export function IntensityBottomSheet({
               accessibilityRole="radio"
               accessibilityState={{ checked: isSelected }}
               key={option.value}
-              onPress={() => setSelected(option.value)}
+              onPress={() =>
+                setSelected((current) =>
+                  current === option.value ? null : option.value,
+                )
+              }
               style={styles.optionPressable}
             >
               {({ pressed }) => (

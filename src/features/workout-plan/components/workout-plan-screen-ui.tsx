@@ -56,15 +56,23 @@ export function SectionLabel({ children }: { children: ReactNode }) {
 export function SelectionRow({
   value,
   onPress,
+  placeholder = "선택하세요",
   accessibilityLabel,
 }: {
   value: string;
   onPress?: () => void;
+  placeholder?: string;
   accessibilityLabel?: string;
 }) {
+  const hasValue = value.length > 0;
   const content = (
     <>
-      <ThemedText typography="body-2-bold">{value}</ThemedText>
+      <ThemedText
+        style={!hasValue && { color: semanticColors["label-disabled"] }}
+        typography="body-2-bold"
+      >
+        {hasValue ? value : placeholder}
+      </ThemedText>
       <View style={styles.selectionValue}>
         {onPress && (
           <Ionicons
@@ -99,18 +107,27 @@ export function SelectionRow({
 export function PrimaryActionButton({
   label,
   onPress,
+  disabled = false,
 }: {
   label: string;
   onPress: () => void;
+  disabled?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
       onPress={onPress}
-      style={({ pressed }) => pressed && styles.pressed}
+      style={({ pressed }) => pressed && !disabled && styles.pressed}
     >
-      <View style={styles.primaryButton}>
-        <ThemedText style={styles.primaryText} typography="body-2-bold">
+      <View
+        style={[styles.primaryButton, disabled && styles.primaryButtonDisabled]}
+      >
+        <ThemedText
+          style={[styles.primaryText, disabled && styles.primaryTextDisabled]}
+          typography="body-1-bold"
+        >
           {label}
         </ThemedText>
       </View>
@@ -177,6 +194,12 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: semanticColors["label-inverse"],
+  },
+  primaryButtonDisabled: {
+    backgroundColor: semanticColors["fill-subtle"],
+  },
+  primaryTextDisabled: {
+    color: semanticColors["label-disabled"],
   },
   pressed: {
     opacity: 0.7,

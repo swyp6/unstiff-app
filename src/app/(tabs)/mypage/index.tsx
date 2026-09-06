@@ -6,6 +6,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { logout } from "@/features/auth/logout";
+import { StepCountCard } from "@/features/healthkit/components/step-count-card";
 import { useOnboardingStore } from "@/store/onboarding-store";
 
 // No Figma design has been shared for this tab yet — placeholder screen with
@@ -55,6 +56,8 @@ export default function MyPageScreen() {
         >
           마이페이지
         </ThemedText>
+
+        <StepCountCard />
 
         <Pressable
           className="items-center rounded-2xl border border-line-normal py-4"
