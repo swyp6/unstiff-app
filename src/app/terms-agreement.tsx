@@ -208,6 +208,11 @@ export default function TermsAgreementScreen() {
         .filter((term) => agreements[term.id])
         .map((term) => term.id);
       await agreeToTerms(agreedIds);
+      // Only flips true once the server call above actually succeeded —
+      // nickname/profile-photo/signup-complete's guards gate on this to
+      // block a new user from jumping straight past terms, so it must
+      // never be set on a click alone or a failed request.
+      useSignupStore.getState().setHasAgreedToRequiredTerms(true);
       if (useSignupStore.getState().isNewUser) {
         // Keep terms-agreement in the stack so nickname/profile-photo can
         // `router.back()` here — unlike the final /home hop, this isn't a

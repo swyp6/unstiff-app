@@ -14,36 +14,68 @@ import { useSignupStore } from "@/store/signup-store";
 // not on profile-photo's Next/Skip — because this screen still needs to
 // show the confirmed nickname/photo preview one last time before the user
 // leaves the signup flow.
+//
+// The whole terms → nickname → profile-photo → signup-complete chain is
+// router.push()-based (so mid-flow "back" keeps working), which means by
+// the time we're here the root Stack's history looks like
+// [..., terms-agreement, nickname, profile-photo, signup-complete] — a
+// plain router.replace("/home") would only swap this last entry, leaving
+// the rest reachable via swipe-back/hardware-back. dismissAll() (a
+// popToTop on the closest Stack — there's only one, the root Stack
+// registered in _layout.tsx, so this is unambiguous here) collapses that
+// back down to the single entry that sat below terms-agreement (whatever
+// login had replaced its way into), and the replace() below then turns
+// that into "/home" — leaving a single-entry stack with no onboarding
+// screen reachable by any back gesture.
+//
+// Order: reset() first, matching the "1. state 정리 2. history 정리 3. /home
+// 진입" sequence this was specced with. This is safe regardless of order
+// now — every guard in nickname/profile-photo/signup-complete reads
+// signup-store via getState() inside a mount-once (`[]`-deps) effect, not
+// a reactive selector, so clearing the store here can no longer re-trigger
+// a stale screen's redirect the way it did before that fix.
 function handleStart() {
   useSignupStore.getState().reset();
+  router.dismissAll();
   router.replace("/home");
 }
 
 export default function SignupCompleteScreen() {
   const confirmedPhotoUri = useSignupStore((state) => state.confirmedPhotoUri);
 
-  // Minimal guard against reaching this screen out of order (direct/deep
-  // link) — mirrors nickname.tsx/profile-photo.tsx's guard. Photo is
-  // optional so it isn't part of this check.
+  // Guard against reaching this screen out of order — redirects to
+  // whichever earlier step is actually incomplete: not a new-user session
+  // → /login; terms not agreed → /terms-agreement; no nickname yet →
+  // /nickname; profile-photo step not completed → /profile-photo. Photo
+  // itself is optional (Skip is a valid completion), so confirmedPhotoUri
+  // is deliberately NOT checked here — only hasCompletedProfileStep, which
+  // profile-photo sets on either Skip or Next.
   //
-  // Checked once at mount via getState() rather than reactive isNewUser/
-  // nickname dependencies. This screen's own "시작하기" calls
-  // useSignupStore.getState().reset(), which flips isNewUser/nickname back
-  // to their initial (falsy) values — with a reactive dependency, that
-  // reset triggered this same effect to re-run *while still mounted* (the
-  // replace("/home") navigation hadn't unmounted it yet) and fire
-  // router.replace("/login"), racing the intended navigation and
-  // occasionally winning it. This was the actual cause of a real-device
-  // report where completing signup landed on /login instead of /home —
-  // accessToken/auth-store were never involved.
+  // Checked once at mount via getState() rather than reactive dependencies.
+  // This screen's own "시작하기" calls useSignupStore.getState().reset(),
+  // which flips all of this back to its initial (falsy) values — with a
+  // reactive dependency, that reset triggered this same effect to re-run
+  // *while still mounted* (the replace("/home") navigation hadn't
+  // unmounted it yet) and fire router.replace("/login"), racing the
+  // intended navigation and occasionally winning it. This was the actual
+  // cause of a real-device report where completing signup landed on
+  // /login instead of /home — accessToken/auth-store were never involved.
   useEffect(() => {
     const state = useSignupStore.getState();
     if (!state.isNewUser) {
       router.replace("/login");
       return;
     }
+    if (!state.hasAgreedToRequiredTerms) {
+      router.replace("/terms-agreement");
+      return;
+    }
     if (!state.nickname) {
       router.replace("/nickname");
+      return;
+    }
+    if (!state.hasCompletedProfileStep) {
+      router.replace("/profile-photo");
     }
   }, []);
 

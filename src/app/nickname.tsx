@@ -53,18 +53,26 @@ export default function NicknameScreen() {
   const setStoredNickname = useSignupStore((state) => state.setNickname);
   const [nickname, setNickname] = useState(storedNickname);
 
-  // Minimal guard against reaching this screen by direct/deep-link
-  // navigation outside the SNS-login → terms flow (the in-memory signup
-  // store is only ever set to newUser there). Checked once at mount via
-  // getState() rather than a reactive `isNewUser` dependency — this screen
-  // stays mounted (not unmounted) underneath nickname/profile-photo/
-  // signup-complete in the push-based stack, so subscribing reactively
-  // meant signup-complete's own reset() (on "시작하기") flipped isNewUser
-  // back to false while this screen was still alive, firing this redirect
-  // and racing the intended router.replace("/home").
+  // Guard against reaching this screen out of order — two distinct cases,
+  // not conflated: (1) this isn't a new-user onboarding session at all
+  // (direct/deep link, or an existing user) → same fallback as before,
+  // /login; (2) it is a new-user session but required terms haven't
+  // actually been agreed to yet → /terms-agreement, not /login, since the
+  // user just needs to finish that step, not start over. Checked once at
+  // mount via getState() rather than reactive dependencies — this screen
+  // stays mounted (not unmounted) underneath profile-photo/signup-complete
+  // in the push-based stack, so subscribing reactively meant
+  // signup-complete's own reset() (on "시작하기") flipped this state back
+  // to its initial values while this screen was still alive, firing this
+  // redirect and racing the intended router.replace("/home").
   useEffect(() => {
-    if (!useSignupStore.getState().isNewUser) {
+    const state = useSignupStore.getState();
+    if (!state.isNewUser) {
       router.replace("/login");
+      return;
+    }
+    if (!state.hasAgreedToRequiredTerms) {
+      router.replace("/terms-agreement");
     }
   }, []);
 

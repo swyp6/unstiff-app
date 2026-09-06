@@ -26,8 +26,12 @@ function handleBack() {
 // Both skip and "다음" just move on to signup-complete — profile photo is
 // optional, so neither path is gated on having a confirmedPhotoUri. Signup
 // completion itself (and the temporary signup-store clear) happens on
-// signup-complete's "시작하기", not here.
+// signup-complete's "시작하기", not here. Marking hasCompletedProfileStep
+// here is what lets signup-complete's guard tell "skipped, no photo" apart
+// from "never reached this step" — both otherwise leave confirmedPhotoUri
+// null.
 function goToSignupComplete() {
+  useSignupStore.getState().setHasCompletedProfileStep(true);
   router.push("/signup-complete");
 }
 
@@ -35,18 +39,24 @@ export default function ProfilePhotoScreen() {
   const confirmedPhotoUri = useSignupStore((state) => state.confirmedPhotoUri);
   const [isPicking, setIsPicking] = useState(false);
 
-  // Minimal guard against reaching this screen out of order (direct/deep
-  // link, or skipping the nickname step) — mirrors nickname.tsx's guard.
-  // Checked once at mount via getState() rather than reactive isNewUser/
-  // nickname dependencies — this screen stays mounted underneath
-  // signup-complete in the push-based stack, so subscribing reactively
-  // meant signup-complete's own reset() (on "시작하기") flipped these back
-  // to their initial values while this screen was still alive, firing this
-  // redirect and racing the intended router.replace("/home").
+  // Guard against reaching this screen out of order — redirects to
+  // whichever earlier step is actually incomplete, not a single fallback:
+  // not a new-user session → /login; terms not agreed yet → /terms-
+  // agreement; terms agreed but no nickname yet → /nickname. Checked once
+  // at mount via getState() rather than reactive dependencies — this
+  // screen stays mounted underneath signup-complete in the push-based
+  // stack, so subscribing reactively meant signup-complete's own reset()
+  // (on "시작하기") flipped this state back to its initial values while
+  // this screen was still alive, firing this redirect and racing the
+  // intended router.replace("/home").
   useEffect(() => {
     const state = useSignupStore.getState();
     if (!state.isNewUser) {
       router.replace("/login");
+      return;
+    }
+    if (!state.hasAgreedToRequiredTerms) {
+      router.replace("/terms-agreement");
       return;
     }
     if (!state.nickname) {

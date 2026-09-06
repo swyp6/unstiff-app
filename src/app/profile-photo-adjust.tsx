@@ -50,8 +50,16 @@ export default function ProfilePhotoAdjustScreen() {
   const { width: stageWidth } = useWindowDimensions();
   const naturalWidth = Number(width);
   const naturalHeight = Number(height);
+  // Finite alone isn't enough — 0/negative dimensions are finite too, and
+  // would turn baseScale/cropSize into Infinity or a negative crop rect
+  // below. Both must be strictly positive for the render math and the
+  // eventual expo-image-manipulator crop() call to be well-defined.
   const hasValidParams =
-    !!uri && Number.isFinite(naturalWidth) && Number.isFinite(naturalHeight);
+    !!uri &&
+    Number.isFinite(naturalWidth) &&
+    Number.isFinite(naturalHeight) &&
+    naturalWidth > 0 &&
+    naturalHeight > 0;
 
   const [isSaving, setIsSaving] = useState(false);
 
