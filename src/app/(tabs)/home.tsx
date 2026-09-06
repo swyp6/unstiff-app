@@ -54,14 +54,6 @@ const MONTH_SWIPE_THRESHOLD = 60;
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
 const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
-// Mock content for the tapped-day detail card (DayRecordCard) only — the
-// calendar API returns just a per-day summary (count/photo/plan flag), not
-// per-record titles, so the detail list still stands in with mock content
-// until a records-detail API exists. The calendar grid's own photo/multi-photo
-// highlighting below is wired to the real API response.
-const MOCK_PHOTO_DAYS = new Set([4, 5, 6, 8, 10, 11, 12, 13, 14, 17, 18]);
-const MOCK_MULTI_PHOTO_DAYS = new Set([6, 11]);
-
 // Matches the mission title MissionCard renders for its "revealed"/"accepted"
 // states — no missions API exists yet, so both are the same mock literal.
 const MISSION_TITLE = "15분 걷기";
@@ -86,31 +78,13 @@ const INITIAL_SAVED_WORKOUT_PLANS: WorkoutPlanDraft[] = [
   },
 ];
 
+// calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
+// 상세 정보가 없다 — 그래서 미션 항목은 아예 만들 수 없고, "지난 운동"
+// 목록은 이 세션에서 사용자가 실제로 완료 처리한 로컬 운동(workoutsByDate)만
+// 보여준다. 상세 기록 조회 API가 생기면 이 타입을 확장한다.
 type DayRecord = {
-  missionTitle: string;
   workouts: { title: string; subtitle: string }[];
 };
-
-// 오늘이 아닌 날을 탭했을 때 보여줄 목데이터. MOCK_PHOTO_DAYS/MOCK_MULTI_PHOTO_DAYS
-// (이번 달 캘린더에 사진 배경으로 이미 표시 중인 날짜)와 신호를 맞춰서, 캘린더에서
-// 사진이 있는 것처럼 보이는 날을 탭하면 실제로 미션·운동 기록이 나오게 한다.
-function getMockDayRecord(date: Date, today: Date): DayRecord | null {
-  const isSameMonthAsToday =
-    date.getFullYear() === today.getFullYear() &&
-    date.getMonth() === today.getMonth();
-  if (!isSameMonthAsToday || !MOCK_PHOTO_DAYS.has(date.getDate())) return null;
-
-  const workoutCount = MOCK_MULTI_PHOTO_DAYS.has(date.getDate()) ? 2 : 1;
-  return {
-    missionTitle: MISSION_TITLE,
-    workouts: INITIAL_SAVED_WORKOUT_PLANS.slice(0, workoutCount).map(
-      (plan) => ({
-        title: plan.title,
-        subtitle: getWorkoutPlanSummary(plan),
-      }),
-    ),
-  };
-}
 
 let nextTodayWorkoutInstanceId = 0;
 
@@ -181,17 +155,19 @@ function WeekdayHeaderRow() {
 function DayRecordCard({
   dateLabel,
   record,
+  serverRecordCount,
   expanded,
   onToggleExpanded,
 }: {
   dateLabel: string;
   record: DayRecord | null;
+  // 로컬에 상세 항목이 없을 때(entries.length === 0) "기록이 없다"와 "서버에는
+  // 기록이 있지만 상세를 보여줄 수 없다"를 구분하는 데만 쓰인다.
+  serverRecordCount: number;
   expanded: boolean;
   onToggleExpanded: () => void;
 }) {
-  const entries = record
-    ? [{ title: record.missionTitle, subtitle: "미션" }, ...record.workouts]
-    : [];
+  const entries = record ? record.workouts : [];
 
   return (
     <View className="rounded-[20px] border border-line-normal bg-background-normal">
@@ -224,7 +200,9 @@ function DayRecordCard({
                   typography="body-3-medium"
                   themeColor="textSecondary"
                 >
-                  이 날의 기록이 없어요
+                  {serverRecordCount > 0
+                    ? `기록 ${serverRecordCount}개가 있어요`
+                    : "이 날의 기록이 없어요"}
                 </ThemedText>
               </View>
             ) : (
@@ -329,6 +307,23 @@ export default function HomeScreen() {
   // 동안에도 리셋하지 않고 마지막으로 받아온 값을 그대로 보여준다 — 초기
   // 로딩 전에만 0으로 안전하게 fallback한다.
   const [streakDays, setStreakDays] = useState(0);
+  // "정상 응답 + days가 빈 배열"과 "요청 자체가 실패"를 구분하기 위한 상태.
+  // calendarMonthData와 같은 방식으로 실패한 year/month를 같이 저장해두고,
+  // 지금 보고 있는 달과 비교해서 렌더링한다 — 달을 바꾸면 그 비교가 자연히
+  // 어긋나서 이전 달의 실패 상태가 다음 달로 남지 않는다.
+  const [calendarErrorMonth, setCalendarErrorMonth] = useState<{
+    year: number;
+    month: number;
+  } | null>(null);
+  const calendarError =
+    calendarErrorMonth?.year === viewedYear &&
+    calendarErrorMonth?.month === viewedMonthNumber;
+  // 로딩 중인지도 별도 setState 없이 파생한다 — 지금 보고 있는 달의 응답도
+  // 에러도 아직 없으면(=요청이 진행 중이면) loading이다.
+  const isCalendarDataForViewedMonth =
+    calendarMonthData?.year === viewedYear &&
+    calendarMonthData?.month === viewedMonthNumber;
+  const isCalendarLoading = !isCalendarDataForViewedMonth && !calendarError;
 
   useEffect(() => {
     let cancelled = false;
@@ -345,6 +340,9 @@ export default function HomeScreen() {
       })
       .catch((error) => {
         console.error("Failed to load calendar", error);
+        if (!cancelled) {
+          setCalendarErrorMonth({ year: viewedYear, month: viewedMonthNumber });
+        }
       });
     return () => {
       cancelled = true;
@@ -481,7 +479,12 @@ export default function HomeScreen() {
   const hasCompletedTodayWorkout = todayWorkouts.some(
     (workout) => workout.isDone,
   );
-  const isTodayRecorded = doneCount > 0;
+  // 로컬에서 아직 오늘 운동을 체크하지 않았어도, 서버 recordCount가 이미
+  // 0보다 크면(다른 기기에서 기록했거나 앱을 재실행한 경우) 오늘을 이미
+  // 기록된 날로 표시해야 한다 — recordCount는 그 날의 실제 기록 수이므로
+  // "오늘이 기록됐는지" 판정에 직접 연결한다.
+  const isTodayRecorded =
+    doneCount > 0 || (daysByDate.get(toDateKey(today))?.recordCount ?? 0) > 0;
   const todayPhotoUrl = todayWorkouts.find(
     (workout) => workout.photoUrl,
   )?.photoUrl;
@@ -493,10 +496,30 @@ export default function HomeScreen() {
   const isSelectedDateFuture =
     !isSelectedDateToday && selectedCalendarDate > today;
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
-  const selectedDayRecord =
-    isSelectedDateToday || isSelectedDateFuture
+  // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
+  // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
+  // 완료 처리한 로컬 기록(workoutsByDate)만 "지난 운동" 목록으로 보여준다.
+  const completedSelectedDateWorkouts = selectedDateWorkouts.filter(
+    (workout) => workout.isDone,
+  );
+  const selectedDayRecord: DayRecord | null =
+    isSelectedDateToday ||
+    isSelectedDateFuture ||
+    completedSelectedDateWorkouts.length === 0
       ? null
-      : getMockDayRecord(selectedCalendarDate, today);
+      : {
+          workouts: completedSelectedDateWorkouts.map((workout) => ({
+            title: workout.plan.title,
+            subtitle: getWorkoutPlanSummary(workout.plan),
+          })),
+        };
+  // 로컬에 상세가 없어도 서버 recordCount가 0보다 크면 "기록이 없다"고 하면
+  // 안 된다 — 서버 사실과 모순된다. DayRecordCard가 이 값을 받아 로컬 상세가
+  // 없을 때만 "이 날의 기록이 없어요" 대신 recordCount 기반 문구로 구분한다.
+  const selectedDayServerRecordCount =
+    isSelectedDateToday || isSelectedDateFuture
+      ? 0
+      : (daysByDate.get(toDateKey(selectedCalendarDate))?.recordCount ?? 0);
 
   // 드래그 중엔 캘린더가 손가락을 그대로 따라가다가(dragX), 손을 떼면 임계값을
   // 넘었는지에 따라 다음/이전 달 패널 쪽으로 마저 넘어가거나(withTiming) 제자리로
@@ -617,8 +640,11 @@ export default function HomeScreen() {
           // 스와이프 중인 옆 달 패널의 날짜는 자연히 매칭되지 않아 하이라이트가
           // 없는 상태로 보인다 — 그 달로 넘어가 API가 다시 조회되면 채워진다.
           const dayEntry = daysByDate.get(toDateKey(cellDate));
-          const hasPhoto =
-            dayEntry?.imageUrl != null || (isToday && isTodayRecorded);
+          // hasPhoto는 "사진이 있다"는 뜻이지 "기록이 있다"는 뜻이 아니다 — 이
+          // 값은 오늘이 아닌 셀에만 실제로 쓰이므로(아래 className/textColor는
+          // isToday를 먼저 분기해 오늘 셀에서는 이 값을 보지 않는다) imageUrl만
+          // 본다. 오늘 실제로 업로드된 사진은 todayPhotoUrl로 별도 렌더링된다.
+          const hasPhoto = dayEntry?.imageUrl != null;
           // recordCount는 "그 날 남긴 기록 수"이지 사진 수가 아니다 — API에
           // 사진 개수 필드가 없어서 이 값으로 "여러 장 사진" 스택 UI를 채우면
           // 사진이 하나도 없는 날에도 스택이 보이는 등 의미가 달라진다. 정확한
@@ -972,6 +998,24 @@ export default function HomeScreen() {
             </Pressable>
           </View>
 
+          {calendarError ? (
+            <ThemedText
+              typography="caption-1-medium"
+              themeColor="textSecondary"
+            >
+              캘린더 정보를 불러오지 못했어요
+            </ThemedText>
+          ) : (
+            isCalendarLoading && (
+              <ThemedText
+                typography="caption-1-medium"
+                themeColor="textSecondary"
+              >
+                캘린더 정보를 불러오는 중이에요
+              </ThemedText>
+            )
+          )}
+
           <GestureDetector gesture={monthSwipeGesture}>
             <View
               onLayout={(event) =>
@@ -1056,6 +1100,7 @@ export default function HomeScreen() {
             <DayRecordCard
               dateLabel={selectedDateLabel}
               record={selectedDayRecord}
+              serverRecordCount={selectedDayServerRecordCount}
               expanded={isTodayCardExpanded}
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
