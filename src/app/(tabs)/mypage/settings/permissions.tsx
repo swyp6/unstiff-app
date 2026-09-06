@@ -1,15 +1,24 @@
-import { useState } from "react";
-import { Alert, Linking, Platform, StyleSheet, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  AppState,
+  Alert,
+  Linking,
+  Platform,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   getStepCountAuthorizationStatus as getAndroidStepCountAuthorizationStatus,
   openHealthConnectSettings,
   requestStepCountAuthorization as requestAndroidStepCountAuthorization,
+  type HealthConnectStepCountStatus,
 } from "@/features/health-connect/api";
 import {
   getStepCountAuthorizationRequestStatus,
   requestStepCountAuthorization as requestIosStepCountAuthorization,
+  type HealthKitStepCountRequestStatus,
 } from "@/features/healthkit/api";
 import {
   getCameraPermissionStatus,
@@ -60,51 +69,91 @@ const DEVICE_PERMISSION_ROWS = [
   },
 ];
 
-async function handleHealthRowPress() {
-  if (Platform.OS === "ios") {
-    const status = await getStepCountAuthorizationRequestStatus();
-    if (status === "unavailable") {
-      Alert.alert("안내", "이 기기에서는 Health 연동을 사용할 수 없습니다.");
-      return;
-    }
-    if (status === "shouldRequest") {
-      try {
-        await requestIosStepCountAuthorization();
-      } catch {
-        Alert.alert("오류", "Health 권한 요청 중 문제가 발생했습니다.");
-      }
-      return;
-    }
-    // HealthKit never reveals whether a read permission was granted or
-    // denied once decided — the Health app is the only place to review it.
-    await Linking.openURL("x-apple-health://").catch(() => {
-      Alert.alert("안내", "건강 앱에서 연동 권한을 확인해주세요.");
-    });
-    return;
-  }
-
-  if (Platform.OS === "android") {
-    const status = await getAndroidStepCountAuthorizationStatus();
-    if (status === "unavailable") {
-      Alert.alert("안내", "이 기기에서는 Health Connect를 사용할 수 없습니다.");
-      return;
-    }
-    if (status === "granted") {
-      await openHealthConnectSettings();
-      return;
-    }
-    try {
-      await requestAndroidStepCountAuthorization();
-    } catch {
-      Alert.alert("오류", "Health 권한 요청 중 문제가 발생했습니다.");
-    }
-  }
-}
+type HealthStatus =
+  HealthKitStepCountRequestStatus | HealthConnectStepCountStatus;
 
 export default function PermissionsScreen() {
   const [pendingKeys, setPendingKeys] = useState<Set<PermissionRowKey>>(
     new Set(),
   );
+  const [healthStatus, setHealthStatus] = useState<HealthStatus | null>(null);
+  const healthStatusRequestRef = useRef<Promise<HealthStatus> | null>(null);
+
+  // Dedupes concurrent callers (mount, AppState foreground, and a tap that
+  // lands before the first check resolves) onto a single in-flight request
+  // instead of firing a fresh one each time.
+  const refreshHealthStatus = useCallback((): Promise<HealthStatus> => {
+    if (!healthStatusRequestRef.current) {
+      healthStatusRequestRef.current = (async () => {
+        const next: HealthStatus =
+          Platform.OS === "ios"
+            ? await getStepCountAuthorizationRequestStatus()
+            : Platform.OS === "android"
+              ? await getAndroidStepCountAuthorizationStatus()
+              : "unavailable";
+        setHealthStatus(next);
+        return next;
+      })().finally(() => {
+        healthStatusRequestRef.current = null;
+      });
+    }
+    return healthStatusRequestRef.current;
+  }, []);
+
+  // Health authorization is only ever changed by leaving the app (the
+  // Health app on iOS, Health Connect's settings on Android), so refreshing
+  // on foreground return — the same AppState pattern used for the FCM token
+  // in use-register-push-token.ts — is what picks up a change made there.
+  useEffect(() => {
+    refreshHealthStatus();
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState === "active") refreshHealthStatus();
+    });
+    return () => subscription.remove();
+  }, [refreshHealthStatus]);
+
+  const handleHealthPress = useCallback(async () => {
+    const status = healthStatus ?? (await refreshHealthStatus());
+
+    if (status === "unavailable") {
+      Alert.alert(
+        "안내",
+        Platform.OS === "ios"
+          ? "이 기기에서는 Health 연동을 사용할 수 없습니다."
+          : "이 기기에서는 Health Connect를 사용할 수 없습니다.",
+      );
+      return;
+    }
+
+    // HealthKit can report that it genuinely doesn't know yet (distinct
+    // from "unnecessary" because it's already been decided) — treat that
+    // as a failed check rather than silently assuming access is settled.
+    if (status === "unknown") {
+      throw new Error("HealthKit authorization status could not be determined");
+    }
+
+    if (status === "shouldRequest") {
+      await requestIosStepCountAuthorization();
+      await refreshHealthStatus();
+      return;
+    }
+
+    if (status === "notGranted") {
+      await requestAndroidStepCountAuthorization();
+      await refreshHealthStatus();
+      return;
+    }
+
+    if (status === "granted") {
+      await openHealthConnectSettings();
+      return;
+    }
+
+    // status === "unnecessary" (iOS, already decided) — HealthKit never
+    // reveals whether a read permission was granted or denied once
+    // decided, so the Health app is the only place left to review it.
+    await Linking.openURL("x-apple-health://");
+  }, [healthStatus, refreshHealthStatus]);
 
   async function runRowAction(
     key: PermissionRowKey,
@@ -114,6 +163,8 @@ export default function PermissionsScreen() {
     setPendingKeys((prev) => new Set(prev).add(key));
     try {
       await action();
+    } catch {
+      Alert.alert("오류", "요청을 처리하지 못했습니다. 다시 시도해주세요.");
     } finally {
       setPendingKeys((prev) => {
         const next = new Set(prev);
@@ -153,7 +204,7 @@ export default function PermissionsScreen() {
           <View>
             <SettingsValueRow
               disabled={pendingKeys.has("health")}
-              onPress={() => runRowAction("health", handleHealthRowPress)}
+              onPress={() => runRowAction("health", handleHealthPress)}
               title="Health 연동"
               value="걸음 수"
             />

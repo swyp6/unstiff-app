@@ -59,7 +59,7 @@ async function assertHealthKitAvailable() {
 // let the user review/change it is the Health app itself, not this app's
 // OS settings page.
 export type HealthKitStepCountRequestStatus =
-  "unavailable" | "shouldRequest" | "unnecessary";
+  "unavailable" | "shouldRequest" | "unnecessary" | "unknown";
 
 export async function getStepCountAuthorizationRequestStatus(): Promise<HealthKitStepCountRequestStatus> {
   if (!(await isHealthKitAvailable())) return "unavailable";
@@ -70,9 +70,14 @@ export async function getStepCountAuthorizationRequestStatus(): Promise<HealthKi
     toRead: [STEP_COUNT_IDENTIFIER],
   });
 
-  return status === AuthorizationRequestStatus.shouldRequest
-    ? "shouldRequest"
-    : "unnecessary";
+  switch (status) {
+    case AuthorizationRequestStatus.shouldRequest:
+      return "shouldRequest";
+    case AuthorizationRequestStatus.unnecessary:
+      return "unnecessary";
+    default:
+      return "unknown";
+  }
 }
 
 export async function requestStepCountAuthorization(): Promise<void> {

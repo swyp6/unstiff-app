@@ -95,7 +95,7 @@ export function SettingsValueRow({
 }: SettingsValueRowProps) {
   return (
     <Pressable
-      accessibilityLabel={title}
+      accessibilityLabel={value ? `${title}, ${value}` : title}
       accessibilityRole={onPress ? "button" : undefined}
       accessibilityState={disabled ? { disabled: true } : undefined}
       disabled={disabled || !onPress}

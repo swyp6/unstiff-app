@@ -152,7 +152,7 @@ export default function NotificationSettingsScreen() {
     if (targets.length === 0) return;
 
     setIsAllToggling(true);
-    setPendingTypes(new Set(targets));
+    setPendingTypes((prev) => new Set([...prev, ...targets]));
     setConfigs((prev) => {
       if (!prev) return prev;
       const next = { ...prev };
@@ -182,7 +182,11 @@ export default function NotificationSettingsScreen() {
       );
     }
 
-    setPendingTypes(new Set());
+    setPendingTypes((prev) => {
+      const next = new Set(prev);
+      for (const type of targets) next.delete(type);
+      return next;
+    });
     setIsAllToggling(false);
   }
 
@@ -230,6 +234,7 @@ export default function NotificationSettingsScreen() {
           <View style={styles.section}>
             <SettingsSectionLabel label="알림" />
             <NotificationSettingRow
+              disabled={pendingTypes.size > 0}
               onValueChange={handleToggleAll}
               title="전체 알림"
               value={allEnabled}

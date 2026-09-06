@@ -99,8 +99,11 @@ export async function requestPushPermission(): Promise<OsPermissionStatus> {
   return { granted, canAskAgain: !granted };
 }
 
+// Returns the same promise `Linking.openSettings()` gives back (rather than
+// swallowing it) so callers can await it and let a failure reach their own
+// error handling instead of it becoming an unhandled rejection.
 export function openOsSettings() {
-  void Linking.openSettings();
+  return Linking.openSettings();
 }
 
 // Runs the shared tap policy for a single OS permission row: request while
@@ -108,7 +111,8 @@ export function openOsSettings() {
 // page. Also covers the Android case where `canAskAgain` optimistically
 // said yes but the request silently resolves as blocked (no dialog shown)
 // — that result routes to settings immediately instead of requiring a
-// second tap.
+// second tap. Any failure (status check, request, or opening settings)
+// propagates to the caller instead of being handled here.
 export async function handlePermissionRowPress(kind: {
   getStatus: () => Promise<OsPermissionStatus>;
   request: () => Promise<OsPermissionStatus>;
@@ -116,12 +120,12 @@ export async function handlePermissionRowPress(kind: {
   const status = await kind.getStatus();
 
   if (status.granted || !status.canAskAgain) {
-    openOsSettings();
+    await openOsSettings();
     return;
   }
 
   const result = await kind.request();
   if (!result.granted && !result.canAskAgain) {
-    openOsSettings();
+    await openOsSettings();
   }
 }
