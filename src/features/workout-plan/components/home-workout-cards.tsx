@@ -1,12 +1,15 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   getWorkoutPlanSummary,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
+
+const MISSION_ILLUSTRATION = require("@/assets/home/mission-illustration.png");
 
 export type MissionStatus =
   "scheduled" | "revealed" | "accepted" | "completed" | "dismissed";
@@ -52,11 +55,17 @@ export function MissionCard({
   const isCompleted = status === "completed";
 
   return (
-    <View className="rounded-[20px] border border-line-normal bg-background-normal px-5 py-[18px]">
+    <View className="rounded-[24px] bg-background-normal px-5 py-[18px] shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
       <View className="min-h-8 flex-row items-center justify-between">
-        <ThemedText typography="caption-1-bold" themeColor="textSecondary">
-          오늘의 미션
-        </ThemedText>
+        <View>
+          {/* Figma node 3502:36610(scheduled)에는 이 라벨이 없다 — 대신
+              아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
+          {status !== "scheduled" && (
+            <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+              오늘의 미션
+            </ThemedText>
+          )}
+        </View>
         <View className="flex-row items-center gap-2">
           {status === "revealed" && (
             <View className="rounded-full bg-label-normal px-[9px] py-1">
@@ -92,9 +101,22 @@ export function MissionCard({
       </View>
 
       {status === "scheduled" && (
-        <View className="gap-5 pt-3">
-          <ThemedText typography="title-3-bold">{arrivalLabel}</ThemedText>
-          <MissionActionButton label="미리 받기" onPress={onReveal} outline />
+        <View className="items-center gap-4 pt-3">
+          <View className="items-center gap-1">
+            <ThemedText
+              typography="caption-1-bold"
+              style={{ color: primitiveColors.orange["500"] }}
+            >
+              오늘의 미션
+            </ThemedText>
+            <ThemedText typography="title-3-bold">{arrivalLabel}</ThemedText>
+          </View>
+          <Image
+            source={MISSION_ILLUSTRATION}
+            style={{ width: 120, height: 120, borderRadius: 16 }}
+            contentFit="cover"
+          />
+          <MissionActionButton label="미리 받기" onPress={onReveal} soft />
         </View>
       )}
 
@@ -157,26 +179,31 @@ export function MissionCard({
 function MissionActionButton({
   label,
   onPress,
-  outline = false,
+  soft = false,
 }: {
   label: string;
   onPress: () => void;
-  outline?: boolean;
+  // Figma node 3502:36610의 "미리 받기" 버튼 스타일(연한 오렌지 배경 pill).
+  soft?: boolean;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
       className={
-        outline
-          ? "h-[50px] items-center justify-center rounded-2xl border border-line-strong"
+        soft
+          ? "h-[50px] w-full items-center justify-center rounded-full bg-orange-50"
           : "h-[50px] items-center justify-center rounded-2xl bg-label-normal"
       }
       style={({ pressed }) => pressed && { opacity: 0.7 }}
     >
       <ThemedText
         typography="body-3-bold"
-        style={outline ? undefined : { color: semanticColors["label-inverse"] }}
+        style={{
+          color: soft
+            ? primitiveColors.orange["700"]
+            : semanticColors["label-inverse"],
+        }}
       >
         {label}
       </ThemedText>
@@ -224,31 +251,20 @@ export function TodayWorkoutCard({
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
 
   return (
-    <View className="rounded-[20px] border border-line-normal bg-background-normal">
-      <Pressable
-        accessibilityRole="button"
-        className="h-[60px] flex-row items-center justify-between px-5"
-        onPress={onToggleExpanded}
-      >
+    <View className="rounded-[24px] bg-background-normal shadow-[0px_4px_12px_0px_rgba(92,23,5,0.04)]">
+      <View className="h-[60px] flex-row items-center justify-between px-5">
         <View className="items-start gap-0.5">
           <ThemedText typography="body-2-bold">{title}</ThemedText>
           <ThemedText typography="caption-1-medium" themeColor="textSecondary">
             {dateLabel}
           </ThemedText>
         </View>
-        <View className="flex-row items-center gap-3">
-          {!readOnly && todayWorkouts.length > 0 && (
-            <ThemedText typography="caption-1-bold" themeColor="textSecondary">
-              {doneCount} / {todayWorkouts.length}
-            </ThemedText>
-          )}
-          <Ionicons
-            color={semanticColors["label-subtle"]}
-            name={expanded ? "chevron-up" : "chevron-down"}
-            size={14}
-          />
-        </View>
-      </Pressable>
+        {!readOnly && todayWorkouts.length > 0 && (
+          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+            {doneCount} / {todayWorkouts.length}
+          </ThemedText>
+        )}
+      </View>
 
       <View className="px-5 pb-5">
         <View className="h-px bg-line-subtle" />
@@ -274,18 +290,27 @@ export function TodayWorkoutCard({
           )}
         </View>
 
-        {/* 드롭다운(펼치기/접기)은 이 "저장된 운동 계획" 부분만 담당한다 —
-            위의 오늘 담은 운동 목록은 항상 보인다. */}
+        {/* Figma node 3502:36611 "루틴 헤더": 펼치기/접기 드롭다운이 카드
+            상단이 아니라 이 "루틴" 라벨과 같은 줄에 있다 — 라벨/화살표는
+            항상 보이고, 그 아래 저장된 운동 계획 목록만 expanded에 따라
+            접힌다. */}
+        <Pressable
+          accessibilityRole="button"
+          className="flex-row items-center justify-between py-1.5 pt-3"
+          onPress={onToggleExpanded}
+        >
+          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+            루틴
+          </ThemedText>
+          <Ionicons
+            color={semanticColors["label-subtle"]}
+            name={expanded ? "chevron-up" : "chevron-down"}
+            size={14}
+          />
+        </Pressable>
+
         {expanded && (
           <>
-            <ThemedText
-              className="pb-1 pt-3"
-              typography="caption-1-bold"
-              themeColor="textSecondary"
-            >
-              루틴
-            </ThemedText>
-
             {savedWorkoutPlans.map((plan) => (
               <SavedWorkoutPlanRow
                 key={plan.id}

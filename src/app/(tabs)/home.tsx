@@ -68,6 +68,17 @@ import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+// Figma node 3502:36518 요일 헤더: 일=red/5, 토=blue/7, 나머지 charcoal/5.
+// tokens.ts의 label-subtle과 값이 달라(#4e5968 vs #8c8c92) 여기서만 직접 지정한다.
+const WEEKDAY_TEXT_COLORS = [
+  "#ff2e5d",
+  "#8c8c92",
+  "#8c8c92",
+  "#8c8c92",
+  "#8c8c92",
+  "#8c8c92",
+  "#008dd8",
+];
 const MONTH_SWIPE_THRESHOLD = 60;
 
 // 캘린더 날짜 셀(43x60pt) 표시 크기의 2배(레티나 기준)로 요청 — 프리셋
@@ -146,9 +157,12 @@ function toDateKey(date: Date): string {
 function WeekdayHeaderRow() {
   return (
     <View className="flex-row items-center justify-between">
-      {WEEKDAY_LABELS.map((label) => (
+      {WEEKDAY_LABELS.map((label, index) => (
         <View key={label} className="w-[43px] items-center">
-          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+          <ThemedText
+            typography="caption-1-bold"
+            style={{ color: WEEKDAY_TEXT_COLORS[index] }}
+          >
             {label}
           </ThemedText>
         </View>
@@ -1136,23 +1150,7 @@ export default function HomeScreen() {
             gap: Spacing.four,
           }}
         >
-          <View className="h-10 flex-row items-center justify-between">
-            <ThemedText typography="title-2-bold">LOGO</ThemedText>
-            <Pressable
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="알림"
-              onPress={() => console.log("notifications pressed")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color={theme.text}
-              />
-            </Pressable>
-          </View>
-
-          <View className="flex-row items-center justify-between">
+          <View className="h-12 flex-row items-center justify-between">
             <View className="flex-row items-center gap-1">
               <Pressable
                 hitSlop={8}
@@ -1173,17 +1171,32 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            <Pressable
-              className="flex-row items-center gap-1 rounded-full bg-fill-subtle px-3 py-1.5"
-              accessibilityRole="button"
-              accessibilityLabel="연속 스트릭"
-              onPress={() => console.log("streak badge pressed")}
-            >
-              <Ionicons name="flame" size={16} color={theme.text} />
-              <ThemedText typography="caption-1-medium">
-                {streakDays}일
-              </ThemedText>
-            </Pressable>
+            <View className="flex-row items-center gap-1.5">
+              <Pressable
+                className="flex-row items-center gap-0.5 rounded-full bg-fill-normal py-1.5 pl-2.5 pr-3"
+                accessibilityRole="button"
+                accessibilityLabel="연속 스트릭"
+                onPress={() => console.log("streak badge pressed")}
+              >
+                <Ionicons name="flame" size={24} color={theme.text} />
+                <ThemedText typography="caption-1-bold">
+                  {streakDays}일
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="알림"
+                onPress={() => console.log("notifications pressed")}
+                className="h-9 w-9 items-center justify-center rounded-full bg-fill-normal"
+              >
+                <Ionicons
+                  name="notifications-outline"
+                  size={20}
+                  color={theme.text}
+                />
+              </Pressable>
+            </View>
           </View>
 
           {calendarError ? (
