@@ -63,3 +63,18 @@ export type PlanPresetUpdateRequest = PlanPresetCreateRequest;
 
 // PUT /api/v1/daily-plans/{id} — planDate는 등록 시점 값이라 수정할 수 없다.
 export type DailyPlanUpdateRequest = Omit<DailyPlanCreateRequest, "planDate">;
+
+// GET /api/v1/plan-presets
+export type PlanPresetResponse = {
+  id: number;
+  name: string;
+  exerciseType: string;
+  targets: ExerciseMeasuresDto;
+  startTime?: string; // "HH:mm:ss"
+  intensity?: IntensityDto;
+  memo?: string;
+};
+
+export type PlanPresetListResponse = {
+  planPresets: PlanPresetResponse[];
+};

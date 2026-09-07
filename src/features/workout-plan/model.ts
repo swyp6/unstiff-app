@@ -1,4 +1,8 @@
-import type { DailyPlanResponse } from "./types";
+import type {
+  DailyPlanResponse,
+  ExerciseMeasuresDto,
+  PlanPresetResponse,
+} from "./types";
 
 export type GoalType = "time" | "distance" | "reps" | "sets";
 
@@ -210,10 +214,21 @@ function fromApiIntensity(value?: "LIGHT" | "MODERATE" | "HARD"): Intensity {
   return value ? (value.toLowerCase() as Exclude<Intensity, null>) : null;
 }
 
-// 오늘의 운동 조회 API 응답(서버 기준값)을 화면이 쓰는 WorkoutPlanDraft로
-// 되돌린다 — toExerciseMeasuresDto/toApiStartTime/toApiIntensity의 역변환.
-export function fromDailyPlanResponse(
-  response: DailyPlanResponse,
+// 루틴/오늘의 운동 조회 API 응답 둘 다 이 필드 구성(및 그 역변환 규칙)을
+// 공유한다 — toPlanRequestFields/toExerciseMeasuresDto/toApiStartTime/
+// toApiIntensity의 역변환.
+type PlanResponseFields = {
+  id: number;
+  name: string;
+  exerciseType: string;
+  targets: ExerciseMeasuresDto;
+  startTime?: string;
+  intensity?: "LIGHT" | "MODERATE" | "HARD";
+  memo?: string;
+};
+
+function fromPlanResponseFields(
+  response: PlanResponseFields,
 ): WorkoutPlanDraft {
   const blank = createBlankWorkoutPlanDraft(String(response.id));
   const goalValues = { ...blank.goalValues };
@@ -239,6 +254,21 @@ export function fromDailyPlanResponse(
     intensity: fromApiIntensity(response.intensity),
     memo: response.memo ?? "",
   };
+}
+
+// 오늘의 운동 조회 API 응답(서버 기준값)을 화면이 쓰는 WorkoutPlanDraft로
+// 되돌린다.
+export function fromDailyPlanResponse(
+  response: DailyPlanResponse,
+): WorkoutPlanDraft {
+  return fromPlanResponseFields(response);
+}
+
+// 루틴 조회 API 응답을 화면이 쓰는 WorkoutPlanDraft로 되돌린다.
+export function fromPlanPresetResponse(
+  response: PlanPresetResponse,
+): WorkoutPlanDraft {
+  return fromPlanResponseFields(response);
 }
 
 export function serializeWorkoutPlan(plan: WorkoutPlanDraft) {

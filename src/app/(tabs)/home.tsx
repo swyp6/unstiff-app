@@ -33,6 +33,7 @@ import {
   deleteDailyPlan,
   deletePlanPreset,
   getDailyPlans,
+  getPlanPresets,
   updateDailyPlan,
   updatePlanPreset,
 } from "@/features/workout-plan/api";
@@ -46,8 +47,8 @@ import { WorkoutPlanDetailBottomSheet } from "@/features/workout-plan/components
 import { WorkoutPlanEditSheet } from "@/features/workout-plan/components/workout-plan-edit-sheet";
 import {
   createBlankWorkoutPlanDraft,
-  createMockWorkoutPlan,
   fromDailyPlanResponse,
+  fromPlanPresetResponse,
   getWorkoutPlanSummary,
   toPlanRequestFields,
   type WorkoutPlanDraft,
@@ -73,21 +74,6 @@ const MISSION_TITLE = "15분 걷기";
 // from the `today-${Date.now()}-${counter}` ids createTodayWorkoutInstance
 // generates.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
-
-const INITIAL_SAVED_WORKOUT_PLANS: WorkoutPlanDraft[] = [
-  createMockWorkoutPlan("saved-plan-1", "15분 가볍게 뛰기"),
-  {
-    ...createMockWorkoutPlan("saved-plan-2", "퇴근 후 러닝"),
-    selectedGoalTypes: ["distance"],
-    goalValues: {
-      time: 30,
-      distance: 3,
-      reps: 10,
-      sets: 3,
-    },
-    memo: "퇴근 후 가볍게 달리기",
-  },
-];
 
 // calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
 // 상세 정보가 없다 — 그래서 미션 항목은 아예 만들 수 없고, "지난 운동"
@@ -259,9 +245,26 @@ export default function HomeScreen() {
   const [isTodayCardExpanded, setIsTodayCardExpanded] = useState(true);
   const [missionStatus, setMissionStatus] =
     useState<MissionStatus>("scheduled");
-  const [savedWorkoutPlans, setSavedWorkoutPlans] = useState(
-    INITIAL_SAVED_WORKOUT_PLANS,
-  );
+  const [savedWorkoutPlans, setSavedWorkoutPlans] = useState<
+    WorkoutPlanDraft[]
+  >([]);
+
+  // GET /api/v1/plan-presets — 루틴 목록 조회. 마운트 시 한 번 불러온다.
+  useEffect(() => {
+    let cancelled = false;
+    getPlanPresets()
+      .then(({ planPresets }) => {
+        if (!cancelled) {
+          setSavedWorkoutPlans(planPresets.map(fromPlanPresetResponse));
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load plan presets", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // 날짜별 오늘의 운동 목록. 오늘뿐 아니라 미래 날짜에 담아둔 운동도 그 날짜의
   // 캘린더 점 표시(hasScheduledWorkout)에 반영해야 해서 날짜 문자열로 나눠
   // 저장한다.
