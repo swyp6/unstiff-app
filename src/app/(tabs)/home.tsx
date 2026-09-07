@@ -28,6 +28,11 @@ import { semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
+  createDailyPlan,
+  createPlanPreset,
+  getDailyPlans,
+} from "@/features/workout-plan/api";
+import {
   MissionCard,
   type MissionStatus,
   TodayWorkoutCard,
@@ -38,7 +43,11 @@ import { WorkoutPlanEditSheet } from "@/features/workout-plan/components/workout
 import {
   createBlankWorkoutPlanDraft,
   createMockWorkoutPlan,
+  fromDailyPlanResponse,
   getWorkoutPlanSummary,
+  toApiIntensity,
+  toApiStartTime,
+  toExerciseMeasuresDto,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
@@ -86,18 +95,14 @@ type DayRecord = {
   workouts: { title: string; subtitle: string }[];
 };
 
-let nextTodayWorkoutInstanceId = 0;
-
 function createTodayWorkoutInstance(
   plan: WorkoutPlanDraft,
+  instanceId: string,
 ): TodayWorkoutInstance {
-  nextTodayWorkoutInstanceId += 1;
-  const instanceId = `today-${Date.now()}-${nextTodayWorkoutInstanceId}`;
   // 저장된 계획을 그대로 복사해 완전히 독립적인 사본을 만든다 — 이후 원본을
-  // 수정하거나 삭제해도 이 인스턴스는 영향받지 않는다(실제 백엔드 연동
-  // 시에도 별도 레코드로 저장될 예정). plan.id도 이 인스턴스 id로 새로
-  // 부여해서, 점세개로 이 사본을 수정/삭제할 때 원본 저장 목록과 완전히
-  // 분리된다.
+  // 수정하거나 삭제해도 이 인스턴스는 영향받지 않는다. plan.id도 서버가
+  // 발급한 오늘의 운동 id로 새로 부여해서, 점세개로 이 사본을 수정/삭제할
+  // 때 원본 저장 목록과 완전히 분리된다.
   return {
     id: instanceId,
     isDone: false,
@@ -275,6 +280,34 @@ export default function HomeScreen() {
       ...current,
       [key]: updater(current[key] ?? []),
     }));
+  }
+
+  // GET /api/v1/daily-plans?date= 로 채운 날짜는 세션 동안 다시 불러오지
+  // 않는다 — ref라 값이 바뀌어도 리렌더를 트리거하지 않고, 이미 로드된
+  // 날짜에 로컬로 추가한 항목(addSavedPlanToDate 등)이 재조회로 덮어써지지
+  // 않게 막아준다.
+  const loadedWorkoutDateKeysRef = useRef(new Set<string>());
+
+  function loadWorkoutsForDate(date: Date) {
+    const key = date.toDateString();
+    if (loadedWorkoutDateKeysRef.current.has(key)) return;
+    loadedWorkoutDateKeysRef.current.add(key);
+
+    getDailyPlans(toDateKey(date))
+      .then(({ dailyPlans }) => {
+        setWorkoutsByDate((current) => ({
+          ...current,
+          [key]: dailyPlans.map((dailyPlan) => ({
+            id: String(dailyPlan.id),
+            plan: fromDailyPlanResponse(dailyPlan),
+            isDone: dailyPlan.status === "COMPLETED",
+          })),
+        }));
+      })
+      .catch((error) => {
+        console.error("Failed to load daily plans", error);
+        loadedWorkoutDateKeysRef.current.delete(key);
+      });
   }
   // 상세/수정 시트가 지금 "저장된 운동 계획" 하나를 편집 중인지, 아니면
   // 어떤 날짜의 독립적인 운동 인스턴스(workout.plan)를 편집 중인지 구분한다
@@ -502,6 +535,19 @@ export default function HomeScreen() {
   // 먼저 걸러낸 뒤 비교하므로 시각(time-of-day) 차이는 결과에 영향 없다.
   const isSelectedDateFuture =
     !isSelectedDateToday && selectedCalendarDate > today;
+
+  // 오늘(뱃지·스트릭 계산에 항상 필요)과 지금 보고 있는 날짜의 오늘의 운동을
+  // 불러온다 — 지난 날짜는 TodayWorkoutCard 대신 DayRecordCard(캘린더 기반)를
+  // 보여주므로 이 목록이 필요 없다.
+  useEffect(() => {
+    loadWorkoutsForDate(today);
+    if (isSelectedDateToday || isSelectedDateFuture) {
+      loadWorkoutsForDate(selectedCalendarDate);
+    }
+    // today는 매 렌더 새로 만들어지는 Date라 deps에 넣으면 매번 재실행된다.
+    // 실제 재조회 여부는 loadWorkoutsForDate 내부의 날짜별 캐시(ref)가 결정한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCalendarDate, isSelectedDateToday, isSelectedDateFuture]);
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
   // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
   // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
@@ -754,26 +800,59 @@ export default function HomeScreen() {
           )?.plan ?? null)
         : null;
 
-  function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
-    updateWorkoutsForDate(date, (workouts) => [
-      ...workouts,
-      createTodayWorkoutInstance(plan),
-    ]);
+  // POST /api/v1/daily-plans — 오늘의 운동 등록. 서버가 발급한 id로 로컬
+  // 인스턴스를 만들어야 이후 상세 조회/수정(/api/v1/daily-plans/{id})과
+  // 이어질 수 있다.
+  async function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
+    try {
+      const { id } = await createDailyPlan({
+        name: plan.title,
+        exerciseType: plan.exerciseType,
+        planDate: toDateKey(date),
+        targets: toExerciseMeasuresDto(plan),
+        startTime: toApiStartTime(plan.startTime),
+        intensity: toApiIntensity(plan.intensity),
+        memo: plan.memo || undefined,
+      });
+      updateWorkoutsForDate(date, (workouts) => [
+        ...workouts,
+        createTodayWorkoutInstance(plan, String(id)),
+      ]);
+    } catch {
+      Alert.alert(
+        "오류",
+        "오늘의 운동을 등록하지 못했습니다. 다시 시도해주세요.",
+      );
+    }
   }
 
   function openNewPlanSheet() {
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
 
-  function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
+  async function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
     // "오늘만 할래요"(addToToday)가 켜져 있으면 1회성 운동이므로 저장된
     // 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시 실제
     // 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
-    // 꺼져 있으면 재사용할 루틴이므로 저장된 운동 계획에만 넣는다.
+    // 꺼져 있으면 재사용할 루틴이므로 POST /api/v1/plan-presets로 등록한다.
     if (addToToday) {
-      addSavedPlanToDate(plan, selectedCalendarDate);
-    } else {
-      setSavedWorkoutPlans((plans) => [...plans, plan]);
+      await addSavedPlanToDate(plan, selectedCalendarDate);
+      setNewPlanDraft(null);
+      return;
+    }
+
+    try {
+      const { id } = await createPlanPreset({
+        name: plan.title,
+        exerciseType: plan.exerciseType,
+        targets: toExerciseMeasuresDto(plan),
+        startTime: toApiStartTime(plan.startTime),
+        intensity: toApiIntensity(plan.intensity),
+        memo: plan.memo || undefined,
+      });
+      setSavedWorkoutPlans((plans) => [...plans, { ...plan, id: String(id) }]);
+    } catch {
+      Alert.alert("오류", "루틴을 등록하지 못했습니다. 다시 시도해주세요.");
     }
     setNewPlanDraft(null);
   }

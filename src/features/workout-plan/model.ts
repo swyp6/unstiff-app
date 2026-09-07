@@ -1,3 +1,5 @@
+import type { DailyPlanResponse } from "./types";
+
 export type GoalType = "time" | "distance" | "reps" | "sets";
 
 export type Intensity = "light" | "moderate" | "hard" | null;
@@ -139,6 +141,91 @@ export function getWorkoutPlanSummary(plan: WorkoutPlanDraft) {
     firstGoalType,
     plan.goalValues[firstGoalType],
   )}`;
+}
+
+const GOAL_TYPE_TO_MEASURE_KEY: Record<
+  GoalType,
+  "duration" | "distance" | "count" | "sets"
+> = {
+  time: "duration",
+  distance: "distance",
+  reps: "count",
+  sets: "sets",
+};
+
+// 등록 API(루틴/오늘의 운동 생성)가 공통으로 쓰는 필드 변환 — targets는 켠
+// 항목만 담아야 하므로 selectedGoalTypes만 순회한다.
+export function toExerciseMeasuresDto(plan: WorkoutPlanDraft) {
+  const targets: Partial<
+    Record<"duration" | "distance" | "count" | "sets", number>
+  > = {};
+  for (const type of plan.selectedGoalTypes) {
+    targets[GOAL_TYPE_TO_MEASURE_KEY[type]] = plan.goalValues[type];
+  }
+  return targets;
+}
+
+export function toApiStartTime(value: StartTime) {
+  if (!value) return undefined;
+  const hour24 = (value.hour % 12) + (value.period === "PM" ? 12 : 0);
+  return `${String(hour24).padStart(2, "0")}:${String(value.minute).padStart(2, "0")}:00`;
+}
+
+export function toApiIntensity(value: Intensity) {
+  return value
+    ? (value.toUpperCase() as "LIGHT" | "MODERATE" | "HARD")
+    : undefined;
+}
+
+const MEASURE_KEY_TO_GOAL_TYPE = {
+  duration: "time",
+  distance: "distance",
+  count: "reps",
+  sets: "sets",
+} as const;
+
+function fromApiStartTime(value?: string): StartTime {
+  if (!value) return null;
+  const [hourStr, minuteStr] = value.split(":");
+  const hour24 = Number(hourStr);
+  const period: "AM" | "PM" = hour24 < 12 ? "AM" : "PM";
+  const hour = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  return { period, hour, minute: Number(minuteStr) };
+}
+
+function fromApiIntensity(value?: "LIGHT" | "MODERATE" | "HARD"): Intensity {
+  return value ? (value.toLowerCase() as Exclude<Intensity, null>) : null;
+}
+
+// 오늘의 운동 조회 API 응답(서버 기준값)을 화면이 쓰는 WorkoutPlanDraft로
+// 되돌린다 — toExerciseMeasuresDto/toApiStartTime/toApiIntensity의 역변환.
+export function fromDailyPlanResponse(
+  response: DailyPlanResponse,
+): WorkoutPlanDraft {
+  const blank = createBlankWorkoutPlanDraft(String(response.id));
+  const goalValues = { ...blank.goalValues };
+  const selectedGoalTypes: GoalType[] = [];
+  for (const [measureKey, goalType] of Object.entries(
+    MEASURE_KEY_TO_GOAL_TYPE,
+  ) as [keyof typeof MEASURE_KEY_TO_GOAL_TYPE, GoalType][]) {
+    const value = response.targets[measureKey];
+    if (value == null) continue;
+    goalValues[goalType] = value;
+    selectedGoalTypes.push(goalType);
+  }
+
+  return {
+    ...blank,
+    title: response.name,
+    exerciseType: response.exerciseType,
+    selectedGoalTypes: GOAL_TYPES.filter((type) =>
+      selectedGoalTypes.includes(type),
+    ),
+    goalValues,
+    startTime: fromApiStartTime(response.startTime),
+    intensity: fromApiIntensity(response.intensity),
+    memo: response.memo ?? "",
+  };
 }
 
 export function serializeWorkoutPlan(plan: WorkoutPlanDraft) {
