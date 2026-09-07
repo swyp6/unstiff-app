@@ -368,14 +368,21 @@ export default function HomeScreen() {
 
     getDailyPlans(toDateKey(date))
       .then(({ dailyPlans }) => {
-        setWorkoutsByDate((current) => ({
-          ...current,
-          [key]: dailyPlans.map((dailyPlan) => ({
-            id: String(dailyPlan.id),
-            plan: fromDailyPlanResponse(dailyPlan),
-            isDone: dailyPlan.status === "COMPLETED",
-          })),
+        const fetched = dailyPlans.map((dailyPlan) => ({
+          id: String(dailyPlan.id),
+          plan: fromDailyPlanResponse(dailyPlan),
+          isDone: dailyPlan.status === "COMPLETED",
         }));
+        setWorkoutsByDate((current) => {
+          // 이 요청이 떠 있는 동안 addSavedPlanToDate 등으로 로컬에 먼저
+          // 추가된 항목은 이 스냅샷에 없을 수 있다 — 통째로 덮어쓰면
+          // 사라지므로, 응답에 없는 로컬 항목만 뒤에 이어붙인다.
+          const fetchedIds = new Set(fetched.map((workout) => workout.id));
+          const localOnly = (current[key] ?? []).filter(
+            (workout) => !fetchedIds.has(workout.id),
+          );
+          return { ...current, [key]: [...fetched, ...localOnly] };
+        });
       })
       .catch((error) => {
         console.error("Failed to load daily plans", error);
