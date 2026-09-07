@@ -1,10 +1,18 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
+import { unregister } from "@/features/auth/api";
+import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
@@ -63,6 +71,24 @@ function WithdrawalCheckbox({ value, onValueChange }: WithdrawalCheckboxProps) {
 
 export default function WithdrawalScreen() {
   const [isConfirmed, setIsConfirmed] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleWithdraw() {
+    if (!isConfirmed || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      await unregister();
+      logout();
+    } catch {
+      Alert.alert(
+        "오류",
+        "탈퇴 처리 중 문제가 발생했습니다. 다시 시도해주세요.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   return (
     <SafeAreaView
@@ -102,19 +128,24 @@ export default function WithdrawalScreen() {
         <Pressable
           accessibilityLabel="계속하기"
           accessibilityRole="button"
-          accessibilityState={{ disabled: !isConfirmed }}
-          disabled={!isConfirmed}
+          accessibilityState={{ disabled: !isConfirmed || isSubmitting }}
+          disabled={!isConfirmed || isSubmitting}
+          onPress={handleWithdraw}
           style={[
             styles.continueButton,
-            !isConfirmed && styles.continueButtonDisabled,
+            (!isConfirmed || isSubmitting) && styles.continueButtonDisabled,
           ]}
         >
-          <ThemedText
-            style={styles.continueButtonText}
-            typography="body-1-medium"
-          >
-            계속하기
-          </ThemedText>
+          {isSubmitting ? (
+            <ActivityIndicator color={semanticColors["primary-on"]} />
+          ) : (
+            <ThemedText
+              style={styles.continueButtonText}
+              typography="body-1-medium"
+            >
+              계속하기
+            </ThemedText>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>

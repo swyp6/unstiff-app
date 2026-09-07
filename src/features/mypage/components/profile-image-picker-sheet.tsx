@@ -75,26 +75,35 @@ export function ProfileImagePickerSheet({
     >
       <Ionicons color={semanticColors["label-subtle"]} name="add" size={22} />
     </Pressable>,
+    // A fixed 48x48 footprint for every option (Figma shows no selected
+    // state at all) — a checkmark overlay marks the pick instead of a
+    // border ring, which would otherwise grow the touch target and throw
+    // off the 4-per-row spacing when toggled.
+    //
+    // Disabled — PUT /api/v1/users/me/profile only accepts a real
+    // Cloudinary/workers.dev image URL, and there's no API yet for saving
+    // a preset (solid-color) choice. Selecting one would look like a
+    // successful save (picker closes, screen navigates back) while
+    // silently never reaching the server, so these stay non-interactive
+    // until a save path exists, reusing the same disabled/opacity
+    // treatment used elsewhere in the app rather than inventing new copy.
     ...AVATAR_PRESETS.map((preset) => {
-      // A fixed 48x48 footprint for every option (Figma shows no selected
-      // state at all) — a checkmark overlay marks the pick instead of a
-      // border ring, which would otherwise grow the touch target and throw
-      // off the 4-per-row spacing when toggled.
       const selected =
         pending?.type === "preset" && pending.presetId === preset.id;
       return (
         <Pressable
           accessibilityLabel={`${preset.id} 프로필 색상`}
           accessibilityRole="button"
-          accessibilityState={{ selected }}
+          accessibilityState={{ disabled: true, selected }}
+          disabled
           key={preset.id}
-          onPress={() => setPending({ type: "preset", presetId: preset.id })}
           style={{
             alignItems: "center",
             backgroundColor: preset.color,
             borderRadius: OPTION_SIZE / 2,
             height: OPTION_SIZE,
             justifyContent: "center",
+            opacity: 0.4,
             width: OPTION_SIZE,
           }}
         >

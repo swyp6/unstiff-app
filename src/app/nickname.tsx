@@ -1,5 +1,5 @@
-import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,10 +14,10 @@ import { radius, semanticColors, typography } from "@/constants/tokens";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import {
-  NICKNAME_FORMAT_PATTERN,
   NICKNAME_MAX_LENGTH,
   sanitizeNickname,
 } from "@/features/auth/nickname-validation";
+import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
 import { useSignupStore } from "@/store/signup-store";
 
 function handleBack() {
@@ -57,23 +57,22 @@ export default function NicknameScreen() {
   }, []);
 
   const hasInput = nickname.length > 0;
-  const formatValid = NICKNAME_FORMAT_PATTERN.test(nickname);
 
-  // No nickname duplicate-check endpoint exists anywhere in the current API
-  // surface (confirmed by searching the whole codebase) — until the backend
-  // adds one, real availability can never be confirmed, so this stays
-  // hard-coded false in production and the CTA below stays disabled even
-  // for an otherwise-valid nickname. Do not derive this from format
-  // validation.
-  //
-  // TODO(backend): remove this __DEV__ bypass once the duplicate-check API
-  // exists and is wired up here — it exists solely so the rest of the
-  // signup UI flow (profile-photo, signup-complete) can be exercised in
-  // development builds without a real availability check to pass.
-  // formatValid is unaffected and still rejects the same invalid input
-  // (too short/long, Korean/whitespace/disallowed characters) in dev builds.
-  const nicknameAvailabilityConfirmed = __DEV__ ? formatValid : false;
-  const canSubmit = formatValid && nicknameAvailabilityConfirmed;
+  // Bumped on every focus so a nickname already marked "available" gets
+  // re-checked if the user is sent back here after it was rejected as
+  // NICKNAME_ALREADY_USED at final save (profile-photo/signup-complete stay
+  // mounted underneath this screen, so this component instance — and its
+  // stale availability state — would otherwise survive that round trip
+  // untouched).
+  const [refreshKey, setRefreshKey] = useState(0);
+  useFocusEffect(
+    useCallback(() => {
+      setRefreshKey((key) => key + 1);
+    }, []),
+  );
+
+  const availability = useNicknameAvailability(nickname, { refreshKey });
+  const canSubmit = availability === "available";
 
   function handleChangeText(text: string) {
     setNickname(sanitizeNickname(text));
@@ -85,14 +84,15 @@ export default function NicknameScreen() {
     router.push("/profile-photo");
   }
 
-  // Figma only designed two helper-text states: this initial guidance copy
-  // and "사용 가능한 닉네임이에요." (shown only once a real duplicate-check
-  // succeeds — see nicknameAvailabilityConfirmed above). There's no
-  // designed error copy for an invalid format (too short/long, disallowed
-  // character, etc.), so rather than inventing one, this stays the single
-  // guidance string regardless of validity — formatValid still gates
-  // canSubmit above, this text just isn't used to communicate that.
-  const helperText = "영문, 숫자, 특수기호(. _) 포함 2~10자까지 가능해요.";
+  // Figma only designed two helper-text states: this default guidance copy
+  // and "사용 가능한 닉네임이에요." (shown once the duplicate-check confirms
+  // availability). There's no designed copy for "unavailable"/"checking"/
+  // "error" — those states are only communicated via the CTA staying
+  // disabled, not by changing this text.
+  const helperText =
+    availability === "available"
+      ? "사용 가능한 닉네임이에요."
+      : "영문, 숫자, 특수기호(. _) 포함 2~10자까지 가능해요.";
 
   return (
     <SafeAreaView

@@ -1,11 +1,7 @@
-// No backend API exists yet for nickname/streak/badges/activity summary
-// (UserProfile only has id/authType/createdAt/updatedAt) — this file stands
-// in for that data until the real endpoints land.
-
-// Must satisfy NICKNAME_FORMAT_PATTERN (features/auth/nickname-validation.ts)
-// — English/digits/`. _ -` only, no space — since this doubles as a valid
-// starting value on the edit screen.
-export const MOCK_NICKNAME = "user_nickname";
+// No backend API exists yet for streak/badges/activity summary
+// (UserProfile now also has nickname/profileImageUrl, but nothing for
+// these) — this file stands in for that data until the real endpoints
+// land.
 
 // true/false = recorded/unrecorded day; null = outside the selected month
 // (a leading/trailing calendar cell), rendered blank rather than as a dot.

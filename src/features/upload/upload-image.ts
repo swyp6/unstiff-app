@@ -1,3 +1,5 @@
+import { Image } from "react-native";
+
 import { getUploadSignature } from "./api";
 import { uploadImageToCloudinary } from "./cloudinary";
 import { resizeImageForUpload } from "./resize";
@@ -20,4 +22,21 @@ export async function uploadPickedImage(
     signature,
   );
   return uploaded.secure_url;
+}
+
+// For callers that already hold a local file uri (e.g. a previously
+// cropped/confirmed photo) without the width/height `uploadPickedImage`
+// needs — reads natural dimensions first, then runs the same
+// resize/signature/Cloudinary pipeline.
+export async function uploadImageFromUri(
+  uri: string,
+  type: ImageUploadType,
+): Promise<string> {
+  const { width, height } = await new Promise<{
+    width: number;
+    height: number;
+  }>((resolve, reject) => {
+    Image.getSize(uri, (w, h) => resolve({ width: w, height: h }), reject);
+  });
+  return uploadPickedImage(uri, width, height, type);
 }

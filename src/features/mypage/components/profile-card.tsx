@@ -7,7 +7,9 @@ import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import type { AvatarSelection } from "@/features/mypage/avatar-presets";
 
 type ProfileCardProps = {
-  nickname: string;
+  // null until the user has completed profile setup (server never received
+  // a nickname yet) — shown as a plain placeholder, never a fake name.
+  nickname: string | null;
   avatar: AvatarSelection;
   onEditPress?: () => void;
 };
@@ -50,7 +52,7 @@ export function ProfileCard({
           </Pressable>
         </View>
         <ThemedText className="mt-2" typography="body-1-bold">
-          {nickname}
+          {nickname ?? "닉네임을 입력해주세요"}
         </ThemedText>
       </View>
     </View>

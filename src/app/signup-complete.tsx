@@ -1,13 +1,24 @@
 import { router } from "expo-router";
-import { useEffect } from "react";
-import { BackHandler, StyleSheet, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { Alert, BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import {
+  isNicknameAlreadyUsedError,
+  updateMyProfile,
+} from "@/features/auth/api";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import { ProfileAvatarPreview } from "@/features/auth/components/profile-avatar-preview";
+import type { UpdateProfileRequest } from "@/features/auth/types";
+import { useMyProfileStore } from "@/features/mypage/profile-store";
+import {
+  ImageUploadError,
+  logImageUploadError,
+} from "@/features/upload/cloudinary";
+import { uploadImageFromUri } from "@/features/upload/upload-image";
 import { useSignupStore } from "@/store/signup-store";
 
 // This is where the temporary signup-store state actually gets cleared —
@@ -34,7 +45,7 @@ import { useSignupStore } from "@/store/signup-store";
 // signup-store via getState() inside a mount-once (`[]`-deps) effect, not
 // a reactive selector, so clearing the store here can no longer re-trigger
 // a stale screen's redirect the way it did before that fix.
-function handleStart() {
+function finishSignup() {
   useSignupStore.getState().reset();
   router.dismissAll();
   router.replace("/home");
@@ -42,6 +53,13 @@ function handleStart() {
 
 export default function SignupCompleteScreen() {
   const confirmedPhotoUri = useSignupStore((state) => state.confirmedPhotoUri);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Caches the last successful upload for this exact local photo so a retry
+  // after a PUT failure (nickname taken, network, etc.) doesn't re-upload
+  // the same confirmed image to Cloudinary a second time.
+  const uploadedPhotoRef = useRef<{ uri: string; secureUrl: string } | null>(
+    null,
+  );
 
   // Guard against reaching this screen out of order — redirects to
   // whichever earlier step is actually incomplete: not a new-user session
@@ -91,6 +109,60 @@ export default function SignupCompleteScreen() {
     return () => subscription.remove();
   }, []);
 
+  async function handleStart() {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      const { nickname } = useSignupStore.getState();
+
+      let profileImageUrl: string | undefined;
+      if (confirmedPhotoUri) {
+        if (uploadedPhotoRef.current?.uri === confirmedPhotoUri) {
+          profileImageUrl = uploadedPhotoRef.current.secureUrl;
+        } else {
+          profileImageUrl = await uploadImageFromUri(
+            confirmedPhotoUri,
+            "USER_PROFILE",
+          );
+          uploadedPhotoRef.current = {
+            uri: confirmedPhotoUri,
+            secureUrl: profileImageUrl,
+          };
+        }
+      }
+
+      // Photo is optional onboarding input — a skipped photo must still let
+      // nickname-only save through, not be blocked by it.
+      const body: UpdateProfileRequest = { nickname };
+      if (profileImageUrl) body.profileImageUrl = profileImageUrl;
+      await updateMyProfile(body);
+
+      useMyProfileStore.getState().setNickname(nickname);
+      if (profileImageUrl) {
+        useMyProfileStore
+          .getState()
+          .setAvatar({ type: "photo", uri: profileImageUrl });
+      }
+
+      finishSignup();
+    } catch (error) {
+      if (isNicknameAlreadyUsedError(error)) {
+        Alert.alert("오류", "이미 사용 중인 닉네임이에요. 다시 입력해주세요.");
+        router.dismissTo("/nickname");
+        return;
+      }
+      logImageUploadError("signup profile save failed", error);
+      Alert.alert(
+        "오류",
+        error instanceof ImageUploadError
+          ? error.message
+          : "프로필 저장에 실패했습니다. 다시 시도해주세요.",
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
   return (
     <SafeAreaView
       edges={["top", "left", "right", "bottom"]}
@@ -115,7 +187,7 @@ export default function SignupCompleteScreen() {
 
       <View style={styles.footer}>
         <OnboardingCtaButton
-          disabled={false}
+          disabled={isSubmitting}
           label="시작하기"
           onPress={handleStart}
         />
