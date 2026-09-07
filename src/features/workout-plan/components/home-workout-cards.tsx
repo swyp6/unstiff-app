@@ -296,6 +296,7 @@ export function TodayWorkoutCard({
             접힌다. */}
         <Pressable
           accessibilityRole="button"
+          accessibilityState={{ expanded }}
           className="flex-row items-center justify-between py-1.5 pt-3"
           onPress={onToggleExpanded}
         >
