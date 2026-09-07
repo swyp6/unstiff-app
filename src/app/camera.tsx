@@ -15,8 +15,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { logImageUploadError } from "@/features/upload/cloudinary";
-import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { uploadPickedImage } from "@/features/upload/upload-image";
+import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
 // Figma 1917:24863/1917:24879 배경색과 동일한 값 — 하드코딩 대신 토큰을 쓴다.
 const CAMERA_BG = semanticColors["label-normal"];
@@ -54,37 +54,29 @@ function ViewfinderCorner({
   );
 }
 
-// [체크] 1.10/1.10.2 카메라 · 촬영 결과 (Figma) — 오늘의 미션/계획 완료 시
-// 인증 사진을 촬영하는 커스텀 카메라 화면. 촬영 후 확인까지 마치면
-// Cloudinary 업로드를 수행하고, 결과는 daily-photo-store를 통해 홈 화면으로
-// 전달한다. PLAN(오늘의 운동) 항목은 서버 refType/refId도 함께 넘기지만,
-// 실제 수행값(measures) 입력 UI가 아직 없어 POST /api/v1/workouts(운동
-// 기록 저장, features/workout-record)는 아직 호출하지 않고 로컬 상태로만
-// 완료 처리한다.
+// [체크] 1.10/1.10.2 카메라 · 촬영 결과 (Figma) — 오늘의 미션/계획 완료 시,
+// 또는 하단 카메라 탭에서 곧장 인증 사진을 촬영하는 커스텀 카메라 화면.
+// 촬영 후 확인까지 마치면 Cloudinary 업로드를 수행하고, 결과는
+// record-flow-store를 거쳐 다음 화면으로 넘어간다:
+// - refType/refId가 이미 있으면(PLAN/MISSION에서 진입) 대상 선택을 건너뛰고
+//   바로 실제 수행값 입력(record-editor)으로 이어간다.
+// - 없으면(하단 카메라 탭에서 진입) 대상 선택 화면(record-target)에서
+//   오늘의 미션/오늘의 운동/루틴 중 무엇에 연결할지 고르게 한다.
 export default function CameraScreen() {
-  const {
-    title,
-    planItemId,
-    refType,
-    refId,
-    pickedUri,
-    pickedWidth,
-    pickedHeight,
-  } = useLocalSearchParams<{
-    title?: string;
-    planItemId?: string;
-    // PLAN 항목(오늘의 운동)에서 들어올 때만 채워지는 실제 서버 id와 그
-    // 타입 — MISSION_PLAN_ITEM_ID sentinel(홈 화면)로 들어오는 미션
-    // 경로에서는 비어 있다.
-    refType?: "PLAN" | "MISSION";
-    refId?: string;
-    // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
-    // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
-    // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
-    pickedUri?: string;
-    pickedWidth?: string;
-    pickedHeight?: string;
-  }>();
+  const { title, refType, refId, pickedUri, pickedWidth, pickedHeight } =
+    useLocalSearchParams<{
+      title?: string;
+      // PLAN/MISSION 화면에서 이미 대상이 정해진 채로 들어올 때만 채워짐
+      // — 하단 카메라 탭(standalone)에서는 둘 다 비어 있다.
+      refType?: "PLAN" | "MISSION";
+      refId?: string;
+      // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
+      // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
+      // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
+      pickedUri?: string;
+      pickedWidth?: string;
+      pickedHeight?: string;
+    }>();
   // expo-camera 문서: "Only one Camera preview can be active at any given
   // time. If you have multiple screens in your app, you should unmount
   // Camera components whenever a screen is unfocused." 이 화면(/camera)은
@@ -200,7 +192,7 @@ export default function CameraScreen() {
   }
 
   async function handleUsePhoto() {
-    if (!photo || !planItemId || isUploading) return;
+    if (!photo || isUploading) return;
 
     setIsUploading(true);
     setError(null);
@@ -211,15 +203,26 @@ export default function CameraScreen() {
         photo.height,
         "DAILY_PHOTO",
       );
-      useDailyPhotoStore.getState().setResult({
-        planItemId,
-        secureUrl,
-        ...(refType === "PLAN" && refId
-          ? { refType, refId: Number(refId) }
-          : null),
-      });
+      useRecordFlowStore.getState().setPhoto({ secureUrl });
+
+      // 화면을 이미 벗어났으면(뒤로가기 등) 업로드 결과는 store에 남기되
+      // 강제로 다음 화면을 밀어넣지 않는다 — 사용자가 이미 다른 곳으로
+      // 이동한 뒤라 예상 밖의 화면 전환이 된다.
       if (!hasLeftRef.current) {
-        router.back();
+        if (refType && refId) {
+          useRecordFlowStore.getState().setTarget({
+            refType,
+            refId: Number(refId),
+            title: title ?? "",
+          });
+          router.push("/record-editor");
+        } else {
+          // 하단 카메라 탭(capture/index)에서 진입한 경우만 여기로 온다
+          // — 대상 선택 화면은 그 탭의 nested route(capture/target)라
+          // Native TabBar가 계속 보인다(camera 탭 자체가 root fullScreenModal
+          // 이 아니라 탭 콘텐츠라서 이 분기는 항상 그 안에서만 실행된다).
+          router.push("/capture/target");
+        }
       }
     } catch (uploadError) {
       logImageUploadError("daily photo upload failed", uploadError);

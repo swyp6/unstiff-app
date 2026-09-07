@@ -50,3 +50,11 @@ export async function dismissMission(missionId: number) {
   );
   return data;
 }
+
+// POST /api/v1/missions/{missionId}/complete — 오늘의 미션 완료
+export async function completeMission(missionId: number) {
+  const { data } = await apiClient.post<DailyMissionResponse>(
+    `/api/v1/missions/${missionId}/complete`,
+  );
+  return data;
+}

@@ -47,6 +47,19 @@ export default function RootLayout() {
               name="camera"
               options={{ presentation: "fullScreenModal" }}
             />
+            {/* record-target(3642)은 root route가 아니다 — Figma에 Native
+                TabBar가 보여서 (tabs)/capture/target.tsx로 그 탭의 nested
+                stack 안에 있다(capture/_layout.tsx 참고). record-editor/
+                record-complete는 Figma에 탭바가 없어 root fullScreenModal로
+                남는다. */}
+            <Stack.Screen
+              name="record-editor"
+              options={{ presentation: "fullScreenModal" }}
+            />
+            <Stack.Screen
+              name="record-complete"
+              options={{ presentation: "fullScreenModal" }}
+            />
             <Stack.Screen name="test" />
           </Stack>
         </ThemeProvider>
