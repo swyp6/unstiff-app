@@ -34,3 +34,12 @@ export function formatOfferTimeLabel(offerTime: string): string {
   const meridiemLabel = meridiem === "AM" ? "오전" : "오후";
   return `${meridiemLabel} ${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
+
+// 오늘의 미션 카드가 아직 제공 전(NOT_OFFERED)일 때 보여주는 "오전 10시에
+// 도착해요" 문구.
+export function formatOfferArrivalLabel(offerTime: string): string {
+  const { meridiem, hour12, minute } = parseOfferTime(offerTime);
+  const meridiemLabel = meridiem === "AM" ? "오전" : "오후";
+  const minuteLabel = minute > 0 ? ` ${minute}분` : "";
+  return `${meridiemLabel} ${hour12}시${minuteLabel}에 도착해요`;
+}

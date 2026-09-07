@@ -28,6 +28,14 @@ import { semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
+  acceptMission,
+  dismissMission,
+  getDailyMission,
+  prefetchDailyMission,
+} from "@/features/missions/api";
+import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
+import type { DailyMissionResponse } from "@/features/missions/types";
+import {
   createDailyPlan,
   createPlanPreset,
   deleteDailyPlan,
@@ -66,9 +74,17 @@ const MONTH_SWIPE_THRESHOLD = 60;
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
 const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
-// Matches the mission title MissionCard renders for its "revealed"/"accepted"
-// states — no missions API exists yet, so both are the same mock literal.
-const MISSION_TITLE = "15분 걷기";
+// DailyMissionResponse.status → MissionCard가 쓰는 상태값.
+const DAILY_MISSION_STATUS_MAP: Record<
+  DailyMissionResponse["status"],
+  MissionStatus
+> = {
+  NOT_OFFERED: "scheduled",
+  OFFERED: "revealed",
+  ACCEPTED: "accepted",
+  COMPLETED: "completed",
+  DISMISSED: "dismissed",
+};
 // Sentinel planItemId so the shared daily-photo-store result can be routed
 // to the mission's completion instead of a todayWorkouts entry — distinct
 // from the `today-${Date.now()}-${counter}` ids createTodayWorkoutInstance
@@ -243,8 +259,54 @@ export default function HomeScreen() {
   // chat/mypage tabs after switching away without closing it first.
   const isFocused = useIsFocused();
   const [isTodayCardExpanded, setIsTodayCardExpanded] = useState(true);
+  const [missionId, setMissionId] = useState<number | null>(null);
   const [missionStatus, setMissionStatus] =
     useState<MissionStatus>("scheduled");
+  const [missionTitle, setMissionTitle] = useState("");
+  const [missionDescription, setMissionDescription] = useState("");
+  const [missionArrivalLabel, setMissionArrivalLabel] = useState("");
+
+  function applyMissionResponse(response: DailyMissionResponse) {
+    setMissionId(response.missionId);
+    setMissionStatus(DAILY_MISSION_STATUS_MAP[response.status]);
+    setMissionTitle(response.title ?? "");
+    setMissionDescription(response.description ?? "");
+    setMissionArrivalLabel(formatOfferArrivalLabel(response.offerTime));
+  }
+
+  // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
+  useEffect(() => {
+    getDailyMission()
+      .then(applyMissionResponse)
+      .catch((error) => console.error("Failed to load daily mission", error));
+  }, []);
+
+  async function handleMissionReveal() {
+    try {
+      applyMissionResponse(await prefetchDailyMission());
+    } catch {
+      Alert.alert("오류", "미션을 받지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
+  async function handleMissionAccept() {
+    if (missionId == null) return;
+    try {
+      applyMissionResponse(await acceptMission(missionId));
+    } catch {
+      Alert.alert("오류", "미션을 수락하지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
+  async function handleMissionDismiss() {
+    if (missionId == null) return;
+    try {
+      applyMissionResponse(await dismissMission(missionId));
+    } catch {
+      Alert.alert("오류", "미션을 닫지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
   const [savedWorkoutPlans, setSavedWorkoutPlans] = useState<
     WorkoutPlanDraft[]
   >([]);
@@ -426,7 +488,7 @@ export default function HomeScreen() {
   const [pendingRecordPlanItemId, setPendingRecordPlanItemId] = useState<
     string | null
   >(null);
-  const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
+  const [recordModalTitle, setRecordModalTitle] = useState("");
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
   // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
@@ -965,7 +1027,7 @@ export default function HomeScreen() {
       return;
     }
     setMissionStatus("completed");
-    openRecordMethodModal(MISSION_PLAN_ITEM_ID, MISSION_TITLE);
+    openRecordMethodModal(MISSION_PLAN_ITEM_ID, missionTitle);
   }
 
   // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 그리고
@@ -1172,12 +1234,15 @@ export default function HomeScreen() {
 
           {isSelectedDateToday && (
             <MissionCard
+              arrivalLabel={missionArrivalLabel}
               canDismiss={hasCompletedTodayWorkout}
-              onAccept={() => setMissionStatus("accepted")}
-              onDismiss={() => setMissionStatus("dismissed")}
-              onReveal={() => setMissionStatus("revealed")}
+              description={missionDescription}
+              onAccept={handleMissionAccept}
+              onDismiss={handleMissionDismiss}
+              onReveal={handleMissionReveal}
               onToggleComplete={handleMissionCompletePress}
               status={missionStatus}
+              title={missionTitle}
             />
           )}
 

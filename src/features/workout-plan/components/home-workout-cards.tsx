@@ -24,6 +24,11 @@ export type TodayWorkoutInstance = {
 type MissionCardProps = {
   status: MissionStatus;
   canDismiss: boolean;
+  // NOT_OFFERED 상태일 때만 쓰는 "오전 10시에 도착해요" 문구.
+  arrivalLabel: string;
+  // OFFERED 이후에만 서버가 내려주는 실제 미션 내용.
+  title: string;
+  description: string;
   onReveal: () => void;
   onAccept: () => void;
   onToggleComplete: () => void;
@@ -33,6 +38,9 @@ type MissionCardProps = {
 export function MissionCard({
   status,
   canDismiss,
+  arrivalLabel,
+  title,
+  description,
   onReveal,
   onAccept,
   onToggleComplete,
@@ -85,16 +93,14 @@ export function MissionCard({
 
       {status === "scheduled" && (
         <View className="gap-5 pt-3">
-          <ThemedText typography="title-3-bold">
-            오전 10시에 도착해요
-          </ThemedText>
+          <ThemedText typography="title-3-bold">{arrivalLabel}</ThemedText>
           <MissionActionButton label="미리 받기" onPress={onReveal} outline />
         </View>
       )}
 
       {status === "revealed" && (
         <View className="gap-5 pt-3">
-          <ThemedText typography="title-3-bold">15분 걷기</ThemedText>
+          <ThemedText typography="title-3-bold">{title}</ThemedText>
           <MissionActionButton label="미션 수락하기" onPress={onAccept} />
         </View>
       )}
@@ -129,7 +135,7 @@ export function MissionCard({
                 isCompleted ? { textDecorationLine: "line-through" } : null
               }
             >
-              15분 걷기
+              {title}
             </ThemedText>
             <ThemedText
               typography="caption-1-regular"
@@ -139,7 +145,7 @@ export function MissionCard({
                   : semanticColors["label-subtle"],
               }}
             >
-              걷기 15분
+              {description}
             </ThemedText>
           </View>
         </View>

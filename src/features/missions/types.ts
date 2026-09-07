@@ -12,3 +12,19 @@ export type MissionSettingResponse = {
 export type MissionSettingUpdateRequest = {
   offerTime: string;
 };
+
+export type DailyMissionStatus =
+  "NOT_OFFERED" | "OFFERED" | "ACCEPTED" | "COMPLETED" | "DISMISSED";
+
+// GET /api/v1/missions/daily, POST .../prefetch, .../accept, .../dismiss,
+// .../complete가 전부 이 형태를 반환한다. 제공 시간 전(NOT_OFFERED)이면
+// title/description/message는 비어 있고 offerTime만 의미가 있다.
+export type DailyMissionResponse = {
+  missionId: number;
+  status: DailyMissionStatus;
+  missionDate: string; // "YYYY-MM-DD"
+  offerTime: string; // "HH:mm:ss" 또는 "HH:mm"
+  message?: string;
+  title?: string;
+  description?: string;
+};
