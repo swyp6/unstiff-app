@@ -4,8 +4,10 @@ import type {
   DailyPlanCreateRequest,
   DailyPlanCreateResponse,
   DailyPlanListResponse,
+  DailyPlanUpdateRequest,
   PlanPresetCreateRequest,
   PlanPresetCreateResponse,
+  PlanPresetUpdateRequest,
 } from "./types";
 
 // POST /api/v1/plan-presets — 루틴 등록
@@ -33,4 +35,20 @@ export async function getDailyPlans(date: string) {
     { params: { date } },
   );
   return data;
+}
+
+// PUT /api/v1/plan-presets/{id} — 루틴 수정
+export async function updatePlanPreset(
+  id: number,
+  request: PlanPresetUpdateRequest,
+) {
+  await apiClient.put(`/api/v1/plan-presets/${id}`, request);
+}
+
+// PUT /api/v1/daily-plans/{id} — 오늘의 운동 수정
+export async function updateDailyPlan(
+  id: number,
+  request: DailyPlanUpdateRequest,
+) {
+  await apiClient.put(`/api/v1/daily-plans/${id}`, request);
 }

@@ -57,3 +57,9 @@ export type DailyPlanResponse = {
 export type DailyPlanListResponse = {
   dailyPlans: DailyPlanResponse[];
 };
+
+// PUT /api/v1/plan-presets/{id} — 필드 구성이 생성 요청과 동일하다.
+export type PlanPresetUpdateRequest = PlanPresetCreateRequest;
+
+// PUT /api/v1/daily-plans/{id} — planDate는 등록 시점 값이라 수정할 수 없다.
+export type DailyPlanUpdateRequest = Omit<DailyPlanCreateRequest, "planDate">;

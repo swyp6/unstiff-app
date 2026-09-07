@@ -177,6 +177,19 @@ export function toApiIntensity(value: Intensity) {
     : undefined;
 }
 
+// 루틴/오늘의 운동 등록·수정 요청이 공통으로 쓰는 필드(날짜 등 요청별로
+// 다른 값은 호출부에서 따로 채운다).
+export function toPlanRequestFields(plan: WorkoutPlanDraft) {
+  return {
+    name: plan.title,
+    exerciseType: plan.exerciseType,
+    targets: toExerciseMeasuresDto(plan),
+    startTime: toApiStartTime(plan.startTime),
+    intensity: toApiIntensity(plan.intensity),
+    memo: plan.memo || undefined,
+  };
+}
+
 const MEASURE_KEY_TO_GOAL_TYPE = {
   duration: "time",
   distance: "distance",

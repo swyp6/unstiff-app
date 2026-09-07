@@ -31,6 +31,8 @@ import {
   createDailyPlan,
   createPlanPreset,
   getDailyPlans,
+  updateDailyPlan,
+  updatePlanPreset,
 } from "@/features/workout-plan/api";
 import {
   MissionCard,
@@ -45,9 +47,7 @@ import {
   createMockWorkoutPlan,
   fromDailyPlanResponse,
   getWorkoutPlanSummary,
-  toApiIntensity,
-  toApiStartTime,
-  toExerciseMeasuresDto,
+  toPlanRequestFields,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
@@ -806,13 +806,8 @@ export default function HomeScreen() {
   async function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
     try {
       const { id } = await createDailyPlan({
-        name: plan.title,
-        exerciseType: plan.exerciseType,
+        ...toPlanRequestFields(plan),
         planDate: toDateKey(date),
-        targets: toExerciseMeasuresDto(plan),
-        startTime: toApiStartTime(plan.startTime),
-        intensity: toApiIntensity(plan.intensity),
-        memo: plan.memo || undefined,
       });
       updateWorkoutsForDate(date, (workouts) => [
         ...workouts,
@@ -842,14 +837,7 @@ export default function HomeScreen() {
     }
 
     try {
-      const { id } = await createPlanPreset({
-        name: plan.title,
-        exerciseType: plan.exerciseType,
-        targets: toExerciseMeasuresDto(plan),
-        startTime: toApiStartTime(plan.startTime),
-        intensity: toApiIntensity(plan.intensity),
-        memo: plan.memo || undefined,
-      });
+      const { id } = await createPlanPreset(toPlanRequestFields(plan));
       setSavedWorkoutPlans((plans) => [...plans, { ...plan, id: String(id) }]);
     } catch {
       Alert.alert("오류", "루틴을 등록하지 못했습니다. 다시 시도해주세요.");
@@ -892,21 +880,37 @@ export default function HomeScreen() {
   }
 
   // WorkoutPlanDetailBottomSheet는 "저장된 계획"과 "오늘의 운동 인스턴스"
-  // 둘 다에 재사용된다 — planDetailTarget의 종류에 따라 저장/삭제를 올바른
-  // 쪽(savedWorkoutPlans 또는 그 날짜의 workoutsByDate)으로 돌려준다.
-  function updateDetailPlan(updatedPlan: WorkoutPlanDraft) {
+  // 둘 다에 재사용된다 — planDetailTarget의 종류에 따라 PUT
+  // /api/v1/plan-presets/{id} 또는 PUT /api/v1/daily-plans/{id}로 보내고,
+  // 성공하면 그 쪽(savedWorkoutPlans 또는 그 날짜의 workoutsByDate)만
+  // 갱신한다.
+  async function updateDetailPlan(updatedPlan: WorkoutPlanDraft) {
     if (!planDetailTarget) return;
-    if (planDetailTarget.kind === "saved") {
-      updateSavedPlan(updatedPlan);
-      return;
+
+    try {
+      if (planDetailTarget.kind === "saved") {
+        await updatePlanPreset(
+          Number(updatedPlan.id),
+          toPlanRequestFields(updatedPlan),
+        );
+        updateSavedPlan(updatedPlan);
+        return;
+      }
+
+      await updateDailyPlan(
+        Number(updatedPlan.id),
+        toPlanRequestFields(updatedPlan),
+      );
+      updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
+        workouts.map((workout) =>
+          workout.id === planDetailTarget.instanceId
+            ? { ...workout, plan: updatedPlan }
+            : workout,
+        ),
+      );
+    } catch {
+      Alert.alert("오류", "수정하지 못했습니다. 다시 시도해주세요.");
     }
-    updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
-      workouts.map((workout) =>
-        workout.id === planDetailTarget.instanceId
-          ? { ...workout, plan: updatedPlan }
-          : workout,
-      ),
-    );
   }
 
   function deleteDetailPlan() {
