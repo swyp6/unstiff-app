@@ -52,3 +52,13 @@ export async function updateDailyPlan(
 ) {
   await apiClient.put(`/api/v1/daily-plans/${id}`, request);
 }
+
+// DELETE /api/v1/plan-presets/{id} — 루틴 삭제
+export async function deletePlanPreset(id: number) {
+  await apiClient.delete(`/api/v1/plan-presets/${id}`);
+}
+
+// DELETE /api/v1/daily-plans/{id} — 오늘의 운동에서 제외
+export async function deleteDailyPlan(id: number) {
+  await apiClient.delete(`/api/v1/daily-plans/${id}`);
+}

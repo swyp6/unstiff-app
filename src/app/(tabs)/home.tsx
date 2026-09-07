@@ -30,6 +30,8 @@ import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   createDailyPlan,
   createPlanPreset,
+  deleteDailyPlan,
+  deletePlanPreset,
   getDailyPlans,
   updateDailyPlan,
   updatePlanPreset,
@@ -913,18 +915,36 @@ export default function HomeScreen() {
     }
   }
 
-  function deleteDetailPlan() {
+  // planDetailTarget의 종류에 따라 DELETE /api/v1/plan-presets/{id} 또는
+  // DELETE /api/v1/daily-plans/{id}를 먼저 보내고, 성공했을 때만 로컬
+  // 목록에서 지운다.
+  async function deleteDetailPlan() {
     if (!planDetailTarget) return;
+
     if (planDetailTarget.kind === "saved") {
-      deleteSavedPlan(planDetailTarget.planId);
-    } else {
+      try {
+        await deletePlanPreset(Number(planDetailTarget.planId));
+        deleteSavedPlan(planDetailTarget.planId);
+        setPlanDetailTarget(null);
+      } catch {
+        Alert.alert("오류", "삭제하지 못했습니다. 다시 시도해주세요.");
+      }
+      return;
+    }
+
+    try {
+      await deleteDailyPlan(Number(planDetailTarget.instanceId));
       updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
         workouts.filter(
           (workout) => workout.id !== planDetailTarget.instanceId,
         ),
       );
+      setPlanDetailTarget(null);
+    } catch {
+      // 이미 완료 처리한 오늘의 운동은 서버가 제외(삭제)를 거절한다
+      // (API 설명: "이미 완료 처리한 운동은 제외할 수 없다").
+      Alert.alert("오류", "이미 완료 처리한 운동은 제외할 수 없습니다.");
     }
-    setPlanDetailTarget(null);
   }
 
   // 빈 체크를 탭하면 즉시(optimistic) 체크 UI를 켜는 동시에 같은 이벤트에서
