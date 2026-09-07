@@ -1,8 +1,16 @@
 import { create } from "zustand";
 
+import type { WorkoutRefType } from "@/features/workout-record/types";
+
 type DailyPhotoResult = {
   planItemId: string;
   secureUrl: string;
+  // PLAN 항목일 때만 채워진다 — 오늘의 운동 서버 id(refId)와 그 타입.
+  // 실제 수행값(measures) 입력 UI가 없어 POST /api/v1/workouts 호출은 아직
+  // 이 값들을 쓰지 않지만, 그 UI가 생기면 바로 이어붙일 수 있도록 여기까지는
+  // 미리 전달해둔다.
+  refType?: WorkoutRefType;
+  refId?: number;
 };
 
 type DailyPhotoStore = {

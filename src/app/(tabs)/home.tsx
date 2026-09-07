@@ -87,8 +87,9 @@ const DAILY_MISSION_STATUS_MAP: Record<
 };
 // Sentinel planItemId so the shared daily-photo-store result can be routed
 // to the mission's completion instead of a todayWorkouts entry — distinct
-// from the `today-${Date.now()}-${counter}` ids createTodayWorkoutInstance
-// generates.
+// from the real server 오늘의 운동(daily-plan) ids createTodayWorkoutInstance
+// receives (see addSavedPlanToDate/loadWorkoutsForDate). Never sent as a
+// PLAN refId — see buildRecordCameraParams.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
 
 // calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
@@ -1072,14 +1073,29 @@ export default function HomeScreen() {
     setPendingRecordPlanItemId(null);
   }
 
+  // PLAN 항목(오늘의 운동 instance)일 때만 실제 서버 id를 refId로 함께
+  // 넘긴다 — planItemId는 로컬 라우팅(daily-photo-store 결과를 다시 이
+  // instance로 연결)에 계속 쓰이므로 그대로 두고, refId는 그 값이 서버가
+  // 발급한 오늘의 운동 id라는 걸 명확히 하기 위한 별도 필드다.
+  // MISSION_PLAN_ITEM_ID sentinel은 서버 id가 아니므로 refType/refId로
+  // 보내지 않는다.
+  function buildRecordCameraParams() {
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const isPlanInstance = planItemId !== MISSION_PLAN_ITEM_ID;
+    return {
+      title: recordModalTitle,
+      planItemId,
+      ...(isPlanInstance
+        ? { refType: "PLAN" as const, refId: planItemId }
+        : null),
+    };
+  }
+
   function startRecordPhotoCapture() {
     setIsRecordMethodModalVisible(false);
     router.push({
       pathname: "/camera",
-      params: {
-        title: recordModalTitle,
-        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
-      },
+      params: buildRecordCameraParams(),
     });
   }
 
@@ -1111,8 +1127,7 @@ export default function HomeScreen() {
       router.push({
         pathname: "/camera",
         params: {
-          title: recordModalTitle,
-          planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
+          ...buildRecordCameraParams(),
           pickedUri: asset.uri,
           pickedWidth: String(asset.width),
           pickedHeight: String(asset.height),

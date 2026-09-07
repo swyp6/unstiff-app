@@ -1,7 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import {
+  router,
+  useIsFocused,
+  useLocalSearchParams,
+  useNavigation,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, View } from "react-native";
@@ -52,19 +57,42 @@ function ViewfinderCorner({
 // [체크] 1.10/1.10.2 카메라 · 촬영 결과 (Figma) — 오늘의 미션/계획 완료 시
 // 인증 사진을 촬영하는 커스텀 카메라 화면. 촬영 후 확인까지 마치면
 // Cloudinary 업로드를 수행하고, 결과는 daily-photo-store를 통해 홈 화면으로
-// 전달한다(저장 API가 아직 없어 로컬 상태로만 반영됨).
+// 전달한다. PLAN(오늘의 운동) 항목은 서버 refType/refId도 함께 넘기지만,
+// 실제 수행값(measures) 입력 UI가 아직 없어 POST /api/v1/workouts(운동
+// 기록 저장, features/workout-record)는 아직 호출하지 않고 로컬 상태로만
+// 완료 처리한다.
 export default function CameraScreen() {
-  const { title, planItemId, pickedUri, pickedWidth, pickedHeight } =
-    useLocalSearchParams<{
-      title?: string;
-      planItemId?: string;
-      // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
-      // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
-      // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
-      pickedUri?: string;
-      pickedWidth?: string;
-      pickedHeight?: string;
-    }>();
+  const {
+    title,
+    planItemId,
+    refType,
+    refId,
+    pickedUri,
+    pickedWidth,
+    pickedHeight,
+  } = useLocalSearchParams<{
+    title?: string;
+    planItemId?: string;
+    // PLAN 항목(오늘의 운동)에서 들어올 때만 채워지는 실제 서버 id와 그
+    // 타입 — MISSION_PLAN_ITEM_ID sentinel(홈 화면)로 들어오는 미션
+    // 경로에서는 비어 있다.
+    refType?: "PLAN" | "MISSION";
+    refId?: string;
+    // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
+    // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
+    // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
+    pickedUri?: string;
+    pickedWidth?: string;
+    pickedHeight?: string;
+  }>();
+  // expo-camera 문서: "Only one Camera preview can be active at any given
+  // time. If you have multiple screens in your app, you should unmount
+  // Camera components whenever a screen is unfocused." 이 화면(/camera)은
+  // Stack push/pop으로 마운트/언마운트되지만, 뒤로 나가는 전환 애니메이션이
+  // 끝나기 전에 다시 진입하면 이전 인스턴스가 아직 언마운트되는 중일 수
+  // 있다 — isFocused로 CameraView를 직접 게이팅해 그 순간에도 두 세션이
+  // 겹치지 않게 한다.
+  const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [photo, setPhoto] = useState<CapturedPhoto | null>(() =>
@@ -100,6 +128,15 @@ export default function CameraScreen() {
       hasLeftRef.current = true;
     });
   }, [navigation]);
+
+  // 포커스를 잃는 즉시(cleanup) ready 상태를 내려서, 화면이 아직 완전히
+  // unmount되지 않은 전환 애니메이션 도중에도 셔터가 눌리지 않게 막는다.
+  // 다시 포커스를 받으면 CameraView가 새로 mount되며 onCameraReady가 다시
+  // 불릴 때까지는 계속 false로 남는다.
+  useEffect(() => {
+    if (!isFocused) return;
+    return () => setIsCameraReady(false);
+  }, [isFocused]);
 
   async function handleCapture() {
     try {
@@ -174,7 +211,13 @@ export default function CameraScreen() {
         photo.height,
         "DAILY_PHOTO",
       );
-      useDailyPhotoStore.getState().setResult({ planItemId, secureUrl });
+      useDailyPhotoStore.getState().setResult({
+        planItemId,
+        secureUrl,
+        ...(refType === "PLAN" && refId
+          ? { refType, refId: Number(refId) }
+          : null),
+      });
       if (!hasLeftRef.current) {
         router.back();
       }
@@ -211,16 +254,18 @@ export default function CameraScreen() {
         </View>
 
         <View className="relative mt-6 flex-1 overflow-hidden bg-[#292e33]">
-          {photo ? (
-            <Image
-              source={{ uri: photo.uri }}
-              className="flex-1"
-              resizeMode="cover"
-            />
-          ) : permission?.granted ? (
+          {permission?.granted && isFocused ? (
+            // photo 유무와 무관하게 계속 mount된 상태로 둔다 — "다시
+            // 찍기"마다 이 CameraView를 unmount/remount하면(예전엔 photo가
+            // 있을 때 이 자리에 <Image>를 대신 렌더해 매번 없앴다가 다시
+            // 만들었다) 네이티브 세션이 새로 뜨는 도중에 촬영하는 셈이 돼
+            // takePictureAsync가 응답하지 않는 문제가 실기기/시뮬레이터
+            // 모두에서 재현됐다. 촬영된 사진은 이 위에 <Image>로 덮어
+            // 보여주고, 세션 자체는 화면 포커스를 잃을 때만 내린다.
             <CameraView
-              // facing이 바뀌면 강제로 재마운트해 새 카메라 세션이 열릴 때까지
-              // (onCameraReady가 다시 불릴 때까지) 촬영이 막히도록 한다.
+              // facing이 바뀔 때만 강제로 재마운트해 새 카메라 세션이 열릴
+              // 때까지(onCameraReady가 다시 불릴 때까지) 촬영이 막히도록
+              // 한다 — photo는 이제 이 key에 관여하지 않는다.
               key={facing}
               ref={cameraRef}
               style={{ flex: 1 }}
@@ -231,7 +276,12 @@ export default function CameraScreen() {
                 setError(mountError.message || "카메라를 열지 못했어요.");
               }}
             />
-          ) : (
+          ) : permission?.granted ? (
+            // 포커스를 잃은 동안(전환 애니메이션 등)에는 CameraView 자체를
+            // 렌더하지 않는다 — expo-camera 문서 권고: 동시에 활성화된
+            // 프리뷰는 하나만 유지해야 한다.
+            <View style={{ flex: 1 }} />
+          ) : !photo ? (
             <Pressable
               className="flex-1 items-center justify-center gap-4 px-8"
               accessibilityRole="button"
@@ -247,6 +297,15 @@ export default function CameraScreen() {
                 <ThemedText typography="body-3-bold">권한 허용</ThemedText>
               </View>
             </Pressable>
+          ) : null}
+          {photo && (
+            // CameraView 위를 완전히 덮는 오버레이로 찍은 사진을 보여준다 —
+            // 아래 CameraView는 이 동안에도 계속 살아 있다(위 주석 참고).
+            <Image
+              source={{ uri: photo.uri }}
+              className="absolute inset-0"
+              resizeMode="cover"
+            />
           )}
           <ViewfinderCorner position="tl" />
           <ViewfinderCorner position="tr" />
@@ -274,10 +333,10 @@ export default function CameraScreen() {
                 className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white/[0.16]"
                 accessibilityRole="button"
                 disabled={isUploading}
-                onPress={() => {
-                  setPhoto(null);
-                  setIsCameraReady(false);
-                }}
+                // CameraView는 photo가 있는 동안에도 계속 mount돼 있으므로
+                // (위 뷰파인더 참고) isCameraReady를 여기서 다시 false로
+                // 내릴 필요가 없다 — 이미 준비된 같은 세션을 그대로 쓴다.
+                onPress={() => setPhoto(null)}
               >
                 <ThemedText
                   typography="body-3-bold"
