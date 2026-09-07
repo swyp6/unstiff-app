@@ -14,12 +14,24 @@ import type { AvatarSelection } from "@/features/mypage/avatar-presets";
 // after a PUT /users/me/profile succeeds, in nickname.tsx (onboarding) and
 // edit-profile.tsx (mypage) — never optimistically, only once the server
 // call has actually succeeded.
+//
+// `revision` guards against a GET started earlier resolving *after* a
+// newer local change: it bumps on every setNickname/setAvatar/reset, and
+// hydrate() only applies its result if the store's revision is still the
+// one its caller captured before starting the request — otherwise
+// something more authoritative (a successful PUT, or a logout/reset)
+// already happened in the meantime, so the stale GET is silently dropped.
 type MyProfileState = {
   nickname: string | null;
   avatar: AvatarSelection;
+  revision: number;
   setNickname: (nickname: string) => void;
   setAvatar: (avatar: AvatarSelection) => void;
-  hydrate: (nickname: string | null, profileImageUrl: string) => void;
+  hydrate: (
+    nickname: string | null,
+    profileImageUrl: string,
+    expectedRevision: number,
+  ) => void;
   reset: () => void;
 };
 
@@ -30,14 +42,23 @@ const initialState = {
 
 export const useMyProfileStore = create<MyProfileState>((set) => ({
   ...initialState,
-  setNickname: (nickname) => set({ nickname }),
-  setAvatar: (avatar) => set({ avatar }),
-  hydrate: (nickname, profileImageUrl) =>
-    set({ nickname, avatar: { type: "photo", uri: profileImageUrl } }),
+  revision: 0,
+  setNickname: (nickname) =>
+    set((state) => ({ nickname, revision: state.revision + 1 })),
+  setAvatar: (avatar) =>
+    set((state) => ({ avatar, revision: state.revision + 1 })),
+  hydrate: (nickname, profileImageUrl, expectedRevision) =>
+    set((state) => {
+      if (state.revision !== expectedRevision) return state;
+      return { nickname, avatar: { type: "photo", uri: profileImageUrl } };
+    }),
   // Not persisted, but the store instance itself outlives any one user's
   // session — without this, logging out and into a different account on
   // the same app process would still show the previous account's
   // nickname/avatar until the next hydrate() completed. Called from
-  // logout() so every logout path (including withdrawal) clears it.
-  reset: () => set(initialState),
+  // logout() so every logout path (including withdrawal) clears it. Also
+  // bumps revision, so a GET started under the previous account can never
+  // land after this and reinsert that account's profile.
+  reset: () =>
+    set((state) => ({ ...initialState, revision: state.revision + 1 })),
 }));

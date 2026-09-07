@@ -31,14 +31,20 @@ export default function MyPageScreen() {
   // leaves whatever the store already had (pre-hydration defaults, or a
   // still-valid value from a PUT made earlier this session) rather than
   // blocking this screen or showing an error for a background refresh.
+  //
+  // The revision captured here before the request starts is checked again
+  // by hydrate() itself when the response arrives — if a PUT (edit-profile)
+  // or a logout/reset happened in between, that revision has moved on and
+  // this GET's now-stale result is dropped instead of overwriting it.
   useEffect(() => {
+    const requestRevision = useMyProfileStore.getState().revision;
     let cancelled = false;
     getMyProfile()
       .then((profile) => {
         if (cancelled) return;
         useMyProfileStore
           .getState()
-          .hydrate(profile.nickname, profile.profileImageUrl);
+          .hydrate(profile.nickname, profile.profileImageUrl, requestRevision);
       })
       .catch(() => {});
     return () => {

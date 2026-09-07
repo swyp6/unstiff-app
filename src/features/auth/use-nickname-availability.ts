@@ -24,25 +24,42 @@ type UseNicknameAvailabilityOptions = {
 };
 
 type CheckResult = {
-  nickname: string;
-  refreshKey: number | undefined;
+  generation: number;
   status: "available" | "unavailable" | "error";
 };
 
-// Debounced, race-safe nickname duplicate-check. "idle"/"available" (skip
-// match) are derived directly from the arguments on every render — no
-// state needed for those. Only the actual async result is state, and it's
-// only ever written from inside the request's own callback (React's
-// recommended effect shape), never synchronously in the effect body — the
-// stored (nickname, refreshKey) pair is compared against the current
-// arguments at render time, so a stale result (superseded by a newer
-// keystroke, or invalidated by a refreshKey bump) is never returned even
-// for the one render before the corresponding effect gets a chance to run.
+// Debounced, race-safe nickname duplicate-check.
+//
+// `generation` identifies one specific (nickname, refreshKey) occurrence —
+// bumped synchronously during render (React's documented "adjust state
+// when a prop changes" pattern, already used in profile-image-picker-
+// sheet.tsx's `wasVisible`) whenever either argument changes, INCLUDING a
+// return to a value seen before. Matching a result by generation rather
+// than by the nickname string itself is what stops this sequence from
+// resolving wrong:
+//   foo -> "available" completes
+//   bar -> (new generation; foo's old result no longer matches)
+//   foo again -> a NEW generation, distinct from foo's first one — its own
+//                pending check must complete before this can read
+//                "available" again; the earlier completed result for the
+//                literal string "foo" is never reused for it.
+// "idle"/"available" (skip match) need no state at all — derived directly
+// from the arguments every render. The async result is only ever written
+// from inside the request's own callback (never synchronously in the
+// effect body), and a `cancelled` flag per effect run additionally stops
+// a slow, superseded response from landing after a newer one already has.
 export function useNicknameAvailability(
   nickname: string,
   { skipValue, refreshKey }: UseNicknameAvailabilityOptions = {},
 ): NicknameAvailabilityStatus {
   const [checkResult, setCheckResult] = useState<CheckResult | null>(null);
+  const [generation, setGeneration] = useState(0);
+  const [prevKey, setPrevKey] = useState({ nickname, refreshKey });
+
+  if (prevKey.nickname !== nickname || prevKey.refreshKey !== refreshKey) {
+    setPrevKey({ nickname, refreshKey });
+    setGeneration((g) => g + 1);
+  }
 
   const isSkipped = skipValue !== undefined && nickname === skipValue;
   const isFormatValid = NICKNAME_FORMAT_PATTERN.test(nickname);
@@ -51,20 +68,20 @@ export function useNicknameAvailability(
   useEffect(() => {
     if (!shouldCheck) return;
 
+    const myGeneration = generation;
     let cancelled = false;
     const timeoutId = setTimeout(() => {
       checkNicknameAvailability(nickname)
         .then((available) => {
           if (cancelled) return;
           setCheckResult({
-            nickname,
-            refreshKey,
+            generation: myGeneration,
             status: available ? "available" : "unavailable",
           });
         })
         .catch(() => {
           if (cancelled) return;
-          setCheckResult({ nickname, refreshKey, status: "error" });
+          setCheckResult({ generation: myGeneration, status: "error" });
           Alert.alert(
             "오류",
             "닉네임 확인 중 문제가 발생했습니다. 다시 시도해주세요.",
@@ -76,15 +93,10 @@ export function useNicknameAvailability(
       cancelled = true;
       clearTimeout(timeoutId);
     };
-  }, [nickname, shouldCheck, refreshKey]);
+  }, [nickname, shouldCheck, refreshKey, generation]);
 
   if (isSkipped) return "available";
   if (!isFormatValid) return "idle";
-  if (
-    checkResult?.nickname === nickname &&
-    checkResult.refreshKey === refreshKey
-  ) {
-    return checkResult.status;
-  }
+  if (checkResult?.generation === generation) return checkResult.status;
   return "checking";
 }
