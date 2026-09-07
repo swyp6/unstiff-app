@@ -98,6 +98,7 @@ export function WorkoutPlanEditSheet({
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
   const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
   const initialHeight = windowHeight * (713 / 814);
   const expandedHeight =
     windowHeight - Math.max(insets.top, windowHeight * (58 / 808));
@@ -268,11 +269,11 @@ export function WorkoutPlanEditSheet({
 
                 <View style={styles.scrollViewport}>
                   <ScrollView
-                    automaticallyAdjustKeyboardInsets
                     contentContainerStyle={styles.content}
                     keyboardDismissMode="on-drag"
                     keyboardShouldPersistTaps="handled"
                     nestedScrollEnabled
+                    ref={scrollRef}
                     showsVerticalScrollIndicator={false}
                     style={styles.scrollView}
                   >
@@ -280,7 +281,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>운동명</SectionLabel>
                       <TextInput
                         accessibilityLabel="운동명"
-                        maxLength={40}
+                        maxLength={20}
                         onChangeText={(title) =>
                           setDraft((current) => ({ ...current, title }))
                         }
@@ -356,10 +357,23 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>한 줄 메모</SectionLabel>
                       <TextInput
                         accessibilityLabel="한 줄 메모"
-                        maxLength={100}
+                        maxLength={20}
                         onChangeText={(memo) =>
                           setDraft((current) => ({ ...current, memo }))
                         }
+                        // 마지막 쪽 필드라 포커스되면 스크롤을 끝까지 밀어서
+                        // 키보드 위로 보이게 한다 — 수정 모달과 동일하게,
+                        // 키보드 애니메이션이 끝날 즈음 한 번 더 밀어준다.
+                        onFocus={() => {
+                          scrollRef.current?.scrollToEnd({ animated: true });
+                          setTimeout(
+                            () =>
+                              scrollRef.current?.scrollToEnd({
+                                animated: true,
+                              }),
+                            300,
+                          );
+                        }}
                         placeholder="메모를 입력해 주세요"
                         placeholderTextColor={semanticColors["label-disabled"]}
                         returnKeyType="done"

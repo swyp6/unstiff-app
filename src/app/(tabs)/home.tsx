@@ -28,6 +28,24 @@ import { semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
+  acceptMission,
+  dismissMission,
+  getDailyMission,
+  prefetchDailyMission,
+} from "@/features/missions/api";
+import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
+import type { DailyMissionResponse } from "@/features/missions/types";
+import {
+  createDailyPlan,
+  createPlanPreset,
+  deleteDailyPlan,
+  deletePlanPreset,
+  getDailyPlans,
+  getPlanPresets,
+  updateDailyPlan,
+  updatePlanPreset,
+} from "@/features/workout-plan/api";
+import {
   MissionCard,
   type MissionStatus,
   TodayWorkoutCard,
@@ -37,8 +55,10 @@ import { WorkoutPlanDetailBottomSheet } from "@/features/workout-plan/components
 import { WorkoutPlanEditSheet } from "@/features/workout-plan/components/workout-plan-edit-sheet";
 import {
   createBlankWorkoutPlanDraft,
-  createMockWorkoutPlan,
+  fromDailyPlanResponse,
+  fromPlanPresetResponse,
   getWorkoutPlanSummary,
+  toPlanRequestFields,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
@@ -54,29 +74,22 @@ const MONTH_SWIPE_THRESHOLD = 60;
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
 const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
-// Matches the mission title MissionCard renders for its "revealed"/"accepted"
-// states — no missions API exists yet, so both are the same mock literal.
-const MISSION_TITLE = "15분 걷기";
+// DailyMissionResponse.status → MissionCard가 쓰는 상태값.
+const DAILY_MISSION_STATUS_MAP: Record<
+  DailyMissionResponse["status"],
+  MissionStatus
+> = {
+  NOT_OFFERED: "scheduled",
+  OFFERED: "revealed",
+  ACCEPTED: "accepted",
+  COMPLETED: "completed",
+  DISMISSED: "dismissed",
+};
 // Sentinel planItemId so the shared daily-photo-store result can be routed
 // to the mission's completion instead of a todayWorkouts entry — distinct
 // from the `today-${Date.now()}-${counter}` ids createTodayWorkoutInstance
 // generates.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
-
-const INITIAL_SAVED_WORKOUT_PLANS: WorkoutPlanDraft[] = [
-  createMockWorkoutPlan("saved-plan-1", "15분 가볍게 뛰기"),
-  {
-    ...createMockWorkoutPlan("saved-plan-2", "퇴근 후 러닝"),
-    selectedGoalTypes: ["distance"],
-    goalValues: {
-      time: 30,
-      distance: 3,
-      reps: 10,
-      sets: 3,
-    },
-    memo: "퇴근 후 가볍게 달리기",
-  },
-];
 
 // calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
 // 상세 정보가 없다 — 그래서 미션 항목은 아예 만들 수 없고, "지난 운동"
@@ -86,18 +99,14 @@ type DayRecord = {
   workouts: { title: string; subtitle: string }[];
 };
 
-let nextTodayWorkoutInstanceId = 0;
-
 function createTodayWorkoutInstance(
   plan: WorkoutPlanDraft,
+  instanceId: string,
 ): TodayWorkoutInstance {
-  nextTodayWorkoutInstanceId += 1;
-  const instanceId = `today-${Date.now()}-${nextTodayWorkoutInstanceId}`;
   // 저장된 계획을 그대로 복사해 완전히 독립적인 사본을 만든다 — 이후 원본을
-  // 수정하거나 삭제해도 이 인스턴스는 영향받지 않는다(실제 백엔드 연동
-  // 시에도 별도 레코드로 저장될 예정). plan.id도 이 인스턴스 id로 새로
-  // 부여해서, 점세개로 이 사본을 수정/삭제할 때 원본 저장 목록과 완전히
-  // 분리된다.
+  // 수정하거나 삭제해도 이 인스턴스는 영향받지 않는다. plan.id도 서버가
+  // 발급한 오늘의 운동 id로 새로 부여해서, 점세개로 이 사본을 수정/삭제할
+  // 때 원본 저장 목록과 완전히 분리된다.
   return {
     id: instanceId,
     isDone: false,
@@ -250,11 +259,80 @@ export default function HomeScreen() {
   // chat/mypage tabs after switching away without closing it first.
   const isFocused = useIsFocused();
   const [isTodayCardExpanded, setIsTodayCardExpanded] = useState(true);
+  const [missionId, setMissionId] = useState<number | null>(null);
   const [missionStatus, setMissionStatus] =
     useState<MissionStatus>("scheduled");
-  const [savedWorkoutPlans, setSavedWorkoutPlans] = useState(
-    INITIAL_SAVED_WORKOUT_PLANS,
-  );
+  const [missionTitle, setMissionTitle] = useState("");
+  const [missionDescription, setMissionDescription] = useState("");
+  const [missionArrivalLabel, setMissionArrivalLabel] = useState("");
+
+  function applyMissionResponse(response: DailyMissionResponse) {
+    setMissionId(response.missionId);
+    setMissionStatus(DAILY_MISSION_STATUS_MAP[response.status]);
+    setMissionTitle(response.title ?? "");
+    setMissionDescription(response.description ?? "");
+    setMissionArrivalLabel(formatOfferArrivalLabel(response.offerTime));
+  }
+
+  // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
+  useEffect(() => {
+    getDailyMission()
+      .then((response) => {
+        // offerTime이 빈 문자열/undefined로 오면 도착 문구만 조용히
+        // 비어버리는 문제가 있어(포맷 함수는 방어했지만 원인 확인용),
+        // 실제 응답 값을 남겨서 기기 로그에서 확인할 수 있게 한다.
+        console.log("[mission] daily mission response", response);
+        applyMissionResponse(response);
+      })
+      .catch((error) => console.error("Failed to load daily mission", error));
+  }, []);
+
+  async function handleMissionReveal() {
+    try {
+      applyMissionResponse(await prefetchDailyMission());
+    } catch {
+      Alert.alert("오류", "미션을 받지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
+  async function handleMissionAccept() {
+    if (missionId == null) return;
+    try {
+      applyMissionResponse(await acceptMission(missionId));
+    } catch {
+      Alert.alert("오류", "미션을 수락하지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
+  async function handleMissionDismiss() {
+    if (missionId == null) return;
+    try {
+      applyMissionResponse(await dismissMission(missionId));
+    } catch {
+      Alert.alert("오류", "미션을 닫지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
+  const [savedWorkoutPlans, setSavedWorkoutPlans] = useState<
+    WorkoutPlanDraft[]
+  >([]);
+
+  // GET /api/v1/plan-presets — 루틴 목록 조회. 마운트 시 한 번 불러온다.
+  useEffect(() => {
+    let cancelled = false;
+    getPlanPresets()
+      .then(({ planPresets }) => {
+        if (!cancelled) {
+          setSavedWorkoutPlans(planPresets.map(fromPlanPresetResponse));
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load plan presets", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   // 날짜별 오늘의 운동 목록. 오늘뿐 아니라 미래 날짜에 담아둔 운동도 그 날짜의
   // 캘린더 점 표시(hasScheduledWorkout)에 반영해야 해서 날짜 문자열로 나눠
   // 저장한다.
@@ -275,6 +353,41 @@ export default function HomeScreen() {
       ...current,
       [key]: updater(current[key] ?? []),
     }));
+  }
+
+  // GET /api/v1/daily-plans?date= 로 채운 날짜는 세션 동안 다시 불러오지
+  // 않는다 — ref라 값이 바뀌어도 리렌더를 트리거하지 않고, 이미 로드된
+  // 날짜에 로컬로 추가한 항목(addSavedPlanToDate 등)이 재조회로 덮어써지지
+  // 않게 막아준다.
+  const loadedWorkoutDateKeysRef = useRef(new Set<string>());
+
+  function loadWorkoutsForDate(date: Date) {
+    const key = date.toDateString();
+    if (loadedWorkoutDateKeysRef.current.has(key)) return;
+    loadedWorkoutDateKeysRef.current.add(key);
+
+    getDailyPlans(toDateKey(date))
+      .then(({ dailyPlans }) => {
+        const fetched = dailyPlans.map((dailyPlan) => ({
+          id: String(dailyPlan.id),
+          plan: fromDailyPlanResponse(dailyPlan),
+          isDone: dailyPlan.status === "COMPLETED",
+        }));
+        setWorkoutsByDate((current) => {
+          // 이 요청이 떠 있는 동안 addSavedPlanToDate 등으로 로컬에 먼저
+          // 추가된 항목은 이 스냅샷에 없을 수 있다 — 통째로 덮어쓰면
+          // 사라지므로, 응답에 없는 로컬 항목만 뒤에 이어붙인다.
+          const fetchedIds = new Set(fetched.map((workout) => workout.id));
+          const localOnly = (current[key] ?? []).filter(
+            (workout) => !fetchedIds.has(workout.id),
+          );
+          return { ...current, [key]: [...fetched, ...localOnly] };
+        });
+      })
+      .catch((error) => {
+        console.error("Failed to load daily plans", error);
+        loadedWorkoutDateKeysRef.current.delete(key);
+      });
   }
   // 상세/수정 시트가 지금 "저장된 운동 계획" 하나를 편집 중인지, 아니면
   // 어떤 날짜의 독립적인 운동 인스턴스(workout.plan)를 편집 중인지 구분한다
@@ -388,7 +501,7 @@ export default function HomeScreen() {
   const [pendingRecordPlanItemId, setPendingRecordPlanItemId] = useState<
     string | null
   >(null);
-  const [recordModalTitle, setRecordModalTitle] = useState(MISSION_TITLE);
+  const [recordModalTitle, setRecordModalTitle] = useState("");
 
   // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
   // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
@@ -502,6 +615,19 @@ export default function HomeScreen() {
   // 먼저 걸러낸 뒤 비교하므로 시각(time-of-day) 차이는 결과에 영향 없다.
   const isSelectedDateFuture =
     !isSelectedDateToday && selectedCalendarDate > today;
+
+  // 오늘(뱃지·스트릭 계산에 항상 필요)과 지금 보고 있는 날짜의 오늘의 운동을
+  // 불러온다 — 지난 날짜는 TodayWorkoutCard 대신 DayRecordCard(캘린더 기반)를
+  // 보여주므로 이 목록이 필요 없다.
+  useEffect(() => {
+    loadWorkoutsForDate(today);
+    if (isSelectedDateToday || isSelectedDateFuture) {
+      loadWorkoutsForDate(selectedCalendarDate);
+    }
+    // today는 매 렌더 새로 만들어지는 Date라 deps에 넣으면 매번 재실행된다.
+    // 실제 재조회 여부는 loadWorkoutsForDate 내부의 날짜별 캐시(ref)가 결정한다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCalendarDate, isSelectedDateToday, isSelectedDateFuture]);
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
   // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
   // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
@@ -754,26 +880,47 @@ export default function HomeScreen() {
           )?.plan ?? null)
         : null;
 
-  function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
-    updateWorkoutsForDate(date, (workouts) => [
-      ...workouts,
-      createTodayWorkoutInstance(plan),
-    ]);
+  // POST /api/v1/daily-plans — 오늘의 운동 등록. 서버가 발급한 id로 로컬
+  // 인스턴스를 만들어야 이후 상세 조회/수정(/api/v1/daily-plans/{id})과
+  // 이어질 수 있다.
+  async function addSavedPlanToDate(plan: WorkoutPlanDraft, date: Date) {
+    try {
+      const { id } = await createDailyPlan({
+        ...toPlanRequestFields(plan),
+        planDate: toDateKey(date),
+      });
+      updateWorkoutsForDate(date, (workouts) => [
+        ...workouts,
+        createTodayWorkoutInstance(plan, String(id)),
+      ]);
+    } catch {
+      Alert.alert(
+        "오류",
+        "오늘의 운동을 등록하지 못했습니다. 다시 시도해주세요.",
+      );
+    }
   }
 
   function openNewPlanSheet() {
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
 
-  function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
+  async function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
     // "오늘만 할래요"(addToToday)가 켜져 있으면 1회성 운동이므로 저장된
     // 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시 실제
     // 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
-    // 꺼져 있으면 재사용할 루틴이므로 저장된 운동 계획에만 넣는다.
+    // 꺼져 있으면 재사용할 루틴이므로 POST /api/v1/plan-presets로 등록한다.
     if (addToToday) {
-      addSavedPlanToDate(plan, selectedCalendarDate);
-    } else {
-      setSavedWorkoutPlans((plans) => [...plans, plan]);
+      await addSavedPlanToDate(plan, selectedCalendarDate);
+      setNewPlanDraft(null);
+      return;
+    }
+
+    try {
+      const { id } = await createPlanPreset(toPlanRequestFields(plan));
+      setSavedWorkoutPlans((plans) => [...plans, { ...plan, id: String(id) }]);
+    } catch {
+      Alert.alert("오류", "루틴을 등록하지 못했습니다. 다시 시도해주세요.");
     }
     setNewPlanDraft(null);
   }
@@ -813,35 +960,69 @@ export default function HomeScreen() {
   }
 
   // WorkoutPlanDetailBottomSheet는 "저장된 계획"과 "오늘의 운동 인스턴스"
-  // 둘 다에 재사용된다 — planDetailTarget의 종류에 따라 저장/삭제를 올바른
-  // 쪽(savedWorkoutPlans 또는 그 날짜의 workoutsByDate)으로 돌려준다.
-  function updateDetailPlan(updatedPlan: WorkoutPlanDraft) {
+  // 둘 다에 재사용된다 — planDetailTarget의 종류에 따라 PUT
+  // /api/v1/plan-presets/{id} 또는 PUT /api/v1/daily-plans/{id}로 보내고,
+  // 성공하면 그 쪽(savedWorkoutPlans 또는 그 날짜의 workoutsByDate)만
+  // 갱신한다.
+  async function updateDetailPlan(updatedPlan: WorkoutPlanDraft) {
     if (!planDetailTarget) return;
-    if (planDetailTarget.kind === "saved") {
-      updateSavedPlan(updatedPlan);
-      return;
+
+    try {
+      if (planDetailTarget.kind === "saved") {
+        await updatePlanPreset(
+          Number(updatedPlan.id),
+          toPlanRequestFields(updatedPlan),
+        );
+        updateSavedPlan(updatedPlan);
+        return;
+      }
+
+      await updateDailyPlan(
+        Number(updatedPlan.id),
+        toPlanRequestFields(updatedPlan),
+      );
+      updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
+        workouts.map((workout) =>
+          workout.id === planDetailTarget.instanceId
+            ? { ...workout, plan: updatedPlan }
+            : workout,
+        ),
+      );
+    } catch {
+      Alert.alert("오류", "수정하지 못했습니다. 다시 시도해주세요.");
     }
-    updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
-      workouts.map((workout) =>
-        workout.id === planDetailTarget.instanceId
-          ? { ...workout, plan: updatedPlan }
-          : workout,
-      ),
-    );
   }
 
-  function deleteDetailPlan() {
+  // planDetailTarget의 종류에 따라 DELETE /api/v1/plan-presets/{id} 또는
+  // DELETE /api/v1/daily-plans/{id}를 먼저 보내고, 성공했을 때만 로컬
+  // 목록에서 지운다.
+  async function deleteDetailPlan() {
     if (!planDetailTarget) return;
+
     if (planDetailTarget.kind === "saved") {
-      deleteSavedPlan(planDetailTarget.planId);
-    } else {
+      try {
+        await deletePlanPreset(Number(planDetailTarget.planId));
+        deleteSavedPlan(planDetailTarget.planId);
+        setPlanDetailTarget(null);
+      } catch {
+        Alert.alert("오류", "삭제하지 못했습니다. 다시 시도해주세요.");
+      }
+      return;
+    }
+
+    try {
+      await deleteDailyPlan(Number(planDetailTarget.instanceId));
       updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
         workouts.filter(
           (workout) => workout.id !== planDetailTarget.instanceId,
         ),
       );
+      setPlanDetailTarget(null);
+    } catch {
+      // 이미 완료 처리한 오늘의 운동은 서버가 제외(삭제)를 거절한다
+      // (API 설명: "이미 완료 처리한 운동은 제외할 수 없다").
+      Alert.alert("오류", "이미 완료 처리한 운동은 제외할 수 없습니다.");
     }
-    setPlanDetailTarget(null);
   }
 
   // 빈 체크를 탭하면 즉시(optimistic) 체크 UI를 켜는 동시에 같은 이벤트에서
@@ -859,7 +1040,7 @@ export default function HomeScreen() {
       return;
     }
     setMissionStatus("completed");
-    openRecordMethodModal(MISSION_PLAN_ITEM_ID, MISSION_TITLE);
+    openRecordMethodModal(MISSION_PLAN_ITEM_ID, missionTitle);
   }
 
   // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 그리고
@@ -1066,12 +1247,15 @@ export default function HomeScreen() {
 
           {isSelectedDateToday && (
             <MissionCard
+              arrivalLabel={missionArrivalLabel}
               canDismiss={hasCompletedTodayWorkout}
-              onAccept={() => setMissionStatus("accepted")}
-              onDismiss={() => setMissionStatus("dismissed")}
-              onReveal={() => setMissionStatus("revealed")}
+              description={missionDescription}
+              onAccept={handleMissionAccept}
+              onDismiss={handleMissionDismiss}
+              onReveal={handleMissionReveal}
               onToggleComplete={handleMissionCompletePress}
               status={missionStatus}
+              title={missionTitle}
             />
           )}
 

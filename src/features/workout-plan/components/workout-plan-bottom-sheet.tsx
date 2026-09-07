@@ -38,6 +38,11 @@ type WorkoutPlanBottomSheetProps = PropsWithChildren<{
   expanded?: boolean;
   initialHeightRatio?: number;
   overlay?: ReactNode;
+  // 시트 안의 KeyboardAvoidingView가 이 fullHeight 시트(Modal + 애니메이션
+  // transform 중첩) 구조에서는 신뢰할 수 없어서(계산이 안 먹거나 스크롤
+  // 가능 범위를 예측 못 하게 줄여버림), 직접 키보드 높이를 추적해 처리하는
+  // 호출부는 이 값을 false로 줘서 끌 수 있게 한다.
+  keyboardAvoiding?: boolean;
   onClose: () => void;
   onExpanded?: () => void;
   onExpandedChange?: (expanded: boolean) => void;
@@ -63,6 +68,7 @@ export const WorkoutPlanBottomSheet = forwardRef<
     expanded = false,
     initialHeightRatio = 1,
     overlay,
+    keyboardAvoiding = true,
     onClose,
     onExpanded,
     onExpandedChange,
@@ -283,7 +289,9 @@ export const WorkoutPlanBottomSheet = forwardRef<
         ]}
       >
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          behavior={
+            keyboardAvoiding && Platform.OS === "ios" ? "padding" : undefined
+          }
           style={hasConstrainedHeight ? styles.flex : undefined}
         >
           <SafeAreaView
