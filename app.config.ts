@@ -11,6 +11,7 @@ const apsEnvironment =
 const config: ExpoConfig = {
   name: "unstiff",
   slug: "unstiff",
+  owner: "yerimi00",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
@@ -144,7 +145,8 @@ const config: ExpoConfig = {
       {
         NSHealthShareUsageDescription:
           "걸음 수 데이터를 불러오기 위해 건강 데이터 접근 권한이 필요합니다.",
-        NSHealthUpdateUsageDescription: false,
+        NSHealthUpdateUsageDescription:
+          "건강 데이터를 기록하기 위해 건강 데이터 쓰기 권한이 필요합니다.",
         background: false,
       },
     ],
@@ -153,6 +155,12 @@ const config: ExpoConfig = {
   experiments: {
     typedRoutes: true,
     reactCompiler: true,
+  },
+
+  extra: {
+    eas: {
+      projectId: "11509332-c0c8-48fd-92f4-8e152f7052a1",
+    },
   },
 };
 

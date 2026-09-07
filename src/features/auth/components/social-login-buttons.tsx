@@ -63,6 +63,16 @@ async function handleGoogleLogin() {
       throw new Error("Google sign-in did not return an idToken");
     }
 
+    console.log(
+      "google credential:",
+      "len:",
+      googleIdToken.length,
+      "dots:",
+      (googleIdToken.match(/\./g) || []).length,
+      "head:",
+      googleIdToken.slice(0, 20),
+    );
+
     const signInResponse = await signIn("google", googleIdToken);
     console.log("google login success!");
     await routeAfterSignIn(signInResponse);
@@ -76,6 +86,7 @@ async function handleGoogleLogin() {
         status: error.response?.status,
         data: error.response?.data,
         url: error.config?.url,
+        message: error.message,
       });
     } else {
       console.error("google login failed", error);
@@ -98,6 +109,16 @@ async function handleAppleLogin() {
       throw new Error("Apple sign-in did not return an identityToken");
     }
 
+    console.log(
+      "apple credential:",
+      "len:",
+      credential.identityToken.length,
+      "dots:",
+      (credential.identityToken.match(/\./g) || []).length,
+      "head:",
+      credential.identityToken.slice(0, 20),
+    );
+
     const signInResponse = await signIn("apple", credential.identityToken);
     console.log("apple login success! ");
     await routeAfterSignIn(signInResponse);
@@ -116,6 +137,7 @@ async function handleAppleLogin() {
         status: error.response?.status,
         data: error.response?.data,
         url: error.config?.url,
+        message: error.message,
       });
     } else {
       console.error("apple login failed", error);
@@ -132,6 +154,20 @@ async function handleKakaoLogin() {
     // confirmed with the backend team, requires OpenID Connect enabled on
     // the Kakao app, which it is).
     const { idToken: kakaoIdToken } = await kakaoLogin();
+    if (!kakaoIdToken) {
+      throw new Error("Kakao sign-in did not return an idToken");
+    }
+
+    console.log(
+      "kakao credential:",
+      "len:",
+      kakaoIdToken.length,
+      "dots:",
+      (kakaoIdToken.match(/\./g) || []).length,
+      "head:",
+      kakaoIdToken.slice(0, 20),
+    );
+
     const signInResponse = await signIn("kakao", kakaoIdToken);
     console.log("kakao login success!");
     await routeAfterSignIn(signInResponse);
@@ -141,6 +177,7 @@ async function handleKakaoLogin() {
         status: error.response?.status,
         data: error.response?.data,
         url: error.config?.url,
+        message: error.message,
       });
     } else {
       console.error("kakao login failed", error);
