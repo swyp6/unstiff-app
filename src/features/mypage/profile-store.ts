@@ -11,11 +11,22 @@ type MyProfileState = {
   avatar: AvatarSelection;
   setNickname: (nickname: string) => void;
   setAvatar: (avatar: AvatarSelection) => void;
+  reset: () => void;
+};
+
+const initialState = {
+  nickname: MOCK_NICKNAME,
+  avatar: null as AvatarSelection,
 };
 
 export const useMyProfileStore = create<MyProfileState>((set) => ({
-  nickname: MOCK_NICKNAME,
-  avatar: null,
+  ...initialState,
   setNickname: (nickname) => set({ nickname }),
   setAvatar: (avatar) => set({ avatar }),
+  // Not persisted, but the store instance itself outlives any one user's
+  // session — without this, logging out and into a different account on
+  // the same app process would still show the previous account's
+  // nickname/avatar until edit-profile was opened again. Called from
+  // logout() so every logout path (including withdrawal) clears it.
+  reset: () => set(initialState),
 }));
