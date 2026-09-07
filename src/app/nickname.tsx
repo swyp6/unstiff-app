@@ -92,7 +92,7 @@ export default function NicknameScreen() {
   // character, etc.), so rather than inventing one, this stays the single
   // guidance string regardless of validity — formatValid still gates
   // canSubmit above, this text just isn't used to communicate that.
-  const helperText = "영문, 숫자, 특수기호(. _ -) 포함 3~20자까지 가능해요.";
+  const helperText = "영문, 숫자, 특수기호(. _) 포함 2~10자까지 가능해요.";
 
   return (
     <SafeAreaView

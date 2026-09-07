@@ -78,6 +78,7 @@ export default function EditProfileScreen() {
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
+              maxLength={NICKNAME_MAX_LENGTH}
               onChangeText={(text) => setDraftNickname(sanitizeNickname(text))}
               placeholder="닉네임을 입력해주세요"
               placeholderTextColor={semanticColors["label-disabled"]}
@@ -97,7 +98,7 @@ export default function EditProfileScreen() {
             </ThemedText>
           </View>
           <ThemedText themeColor="textSecondary" typography="caption-1-regular">
-            영어·숫자 및 특수기호(.,-,_)만 사용하여 3~20자로 입력해주세요.
+            영어·숫자 및 특수기호(.,_)만 사용하여 2~10자로 입력해주세요.
           </ThemedText>
         </View>
 
