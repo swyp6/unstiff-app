@@ -36,8 +36,11 @@ export function formatOfferTimeLabel(offerTime: string): string {
 }
 
 // 오늘의 미션 카드가 아직 제공 전(NOT_OFFERED)일 때 보여주는 "오전 10시에
-// 도착해요" 문구.
-export function formatOfferArrivalLabel(offerTime: string): string {
+// 도착해요" 문구. offerTime이 없으면(서버 응답에 값이 안 실려 있는 경우)
+// parseOfferTime이 예외를 던져 위 카드 표시 전체가 조용히 실패하니, 빈
+// 문자열로 방어해 최소한 나머지 값은 정상 표시되게 한다.
+export function formatOfferArrivalLabel(offerTime?: string | null): string {
+  if (!offerTime) return "";
   const { meridiem, hour12, minute } = parseOfferTime(offerTime);
   const meridiemLabel = meridiem === "AM" ? "오전" : "오후";
   const minuteLabel = minute > 0 ? ` ${minute}분` : "";

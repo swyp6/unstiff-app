@@ -277,7 +277,13 @@ export default function HomeScreen() {
   // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
   useEffect(() => {
     getDailyMission()
-      .then(applyMissionResponse)
+      .then((response) => {
+        // offerTime이 빈 문자열/undefined로 오면 도착 문구만 조용히
+        // 비어버리는 문제가 있어(포맷 함수는 방어했지만 원인 확인용),
+        // 실제 응답 값을 남겨서 기기 로그에서 확인할 수 있게 한다.
+        console.log("[mission] daily mission response", response);
+        applyMissionResponse(response);
+      })
       .catch((error) => console.error("Failed to load daily mission", error));
   }, []);
 
