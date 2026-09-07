@@ -1,9 +1,13 @@
+import axios from "axios";
+
 import { apiClient } from "@/lib/api-client";
 
 import type {
+  NicknameAvailabilityResponse,
   OAuth2SignInResponse,
   OAuthProvider,
   TermsListResponse,
+  UpdateProfileRequest,
   UserProfile,
 } from "./types";
 
@@ -22,6 +26,33 @@ export async function getMyProfile() {
 
 export async function unregister() {
   await apiClient.delete("/api/v1/users/me");
+}
+
+export async function checkNicknameAvailability(nickname: string) {
+  const { data } = await apiClient.get<NicknameAvailabilityResponse>(
+    "/api/v1/users/nickname/availability",
+    { params: { nickname } },
+  );
+  return data.available;
+}
+
+// Response body isn't part of the documented contract — only the success
+// status is needed by any current caller, so this resolves to nothing
+// rather than guessing at a shape.
+export async function updateMyProfile(payload: UpdateProfileRequest) {
+  await apiClient.put("/api/v1/users/me/profile", payload);
+}
+
+// NICKNAME_ALREADY_USED is returned with no `errors` array, just this code
+// and a human-readable `detail` — distinguishing it from a generic
+// network/5xx failure lets callers route the user back to fix the nickname
+// specifically instead of showing a generic retry message.
+export function isNicknameAlreadyUsedError(error: unknown) {
+  return (
+    axios.isAxiosError(error) &&
+    (error.response?.data as { code?: string } | undefined)?.code ===
+      "NICKNAME_ALREADY_USED"
+  );
 }
 
 export async function getTerms() {

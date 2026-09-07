@@ -1,21 +1,30 @@
 import { create } from "zustand";
 
 import type { AvatarSelection } from "@/features/mypage/avatar-presets";
-import { MOCK_NICKNAME } from "@/features/mypage/mock-data";
 
-// No backend field exists yet for nickname/avatar (see mock-data.ts), so
-// edits here are in-memory only — not persisted, since faking persistence
-// now would just get silently overwritten once a real API lands.
+// GET /api/v1/users/me is this store's source of truth — hydrated once per
+// app session from mypage/index.tsx on mount. nickname can genuinely be
+// null server-side (profile setup never completed — see UserProfile in
+// features/auth/types.ts) and is shown as-is, never replaced with a fake
+// placeholder name. profileImageUrl is never null (a default-*.png
+// character is assigned at signup), so avatar only stays null before the
+// very first hydrate()/setAvatar() call of the session.
+//
+// setNickname/setAvatar are also called directly (not via hydrate) right
+// after a PUT /users/me/profile succeeds, in nickname.tsx (onboarding) and
+// edit-profile.tsx (mypage) — never optimistically, only once the server
+// call has actually succeeded.
 type MyProfileState = {
-  nickname: string;
+  nickname: string | null;
   avatar: AvatarSelection;
   setNickname: (nickname: string) => void;
   setAvatar: (avatar: AvatarSelection) => void;
+  hydrate: (nickname: string | null, profileImageUrl: string) => void;
   reset: () => void;
 };
 
 const initialState = {
-  nickname: MOCK_NICKNAME,
+  nickname: null as string | null,
   avatar: null as AvatarSelection,
 };
 
@@ -23,10 +32,12 @@ export const useMyProfileStore = create<MyProfileState>((set) => ({
   ...initialState,
   setNickname: (nickname) => set({ nickname }),
   setAvatar: (avatar) => set({ avatar }),
+  hydrate: (nickname, profileImageUrl) =>
+    set({ nickname, avatar: { type: "photo", uri: profileImageUrl } }),
   // Not persisted, but the store instance itself outlives any one user's
   // session — without this, logging out and into a different account on
   // the same app process would still show the previous account's
-  // nickname/avatar until edit-profile was opened again. Called from
+  // nickname/avatar until the next hydrate() completed. Called from
   // logout() so every logout path (including withdrawal) clears it.
   reset: () => set(initialState),
 }));

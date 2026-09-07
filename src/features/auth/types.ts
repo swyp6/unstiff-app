@@ -8,6 +8,12 @@ export type OAuth2SignInResponse = {
 export type UserProfile = {
   id: number;
   authType: "APPLE" | "KAKAO" | "GOOGLE";
+  // null until the user completes profile setup (PUT /users/me/profile has
+  // never been called for them).
+  nickname: string | null;
+  // Never null — a default-*.png character is assigned at signup, before
+  // any real photo is ever uploaded.
+  profileImageUrl: string;
   createdAt: string;
   updatedAt: string;
 };
@@ -27,4 +33,16 @@ export type Term = {
 
 export type TermsListResponse = {
   terms: Term[];
+};
+
+export type NicknameAvailabilityResponse = {
+  available: boolean;
+};
+
+// Server saves only whatever fields are sent — omit a field entirely to
+// leave it unchanged. Sending neither is a 400, and if both are sent, a
+// failure on either means neither is saved.
+export type UpdateProfileRequest = {
+  nickname?: string;
+  profileImageUrl?: string;
 };
