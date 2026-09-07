@@ -84,6 +84,7 @@ type TermRowProps = {
   required: boolean;
   checked: boolean;
   onToggle: () => void;
+  hasDetail: boolean;
   onPressDetail?: () => void;
 };
 
@@ -92,6 +93,7 @@ function TermRow({
   required,
   checked,
   onToggle,
+  hasDetail,
   onPressDetail,
 }: TermRowProps) {
   return (
@@ -109,7 +111,7 @@ function TermRow({
           {title}
         </ThemedText>
       </Pressable>
-      {onPressDetail ? (
+      {hasDetail ? (
         <Pressable
           accessibilityLabel={`${title} 상세 보기`}
           accessibilityRole="button"
@@ -124,15 +126,9 @@ function TermRow({
           />
         </Pressable>
       ) : (
-        // No server Term/contentUrl backs this row, so the chevron is
-        // shown for visual parity with Figma but isn't interactive.
-        <View style={styles.chevronButton}>
-          <Ionicons
-            color={semanticColors["label-subtle"]}
-            name="chevron-forward"
-            size={18}
-          />
-        </View>
+        // Keeps the same-width column so rows without a detail page still
+        // align their checkbox/text with rows that have a chevron.
+        <View style={styles.chevronButton} />
       )}
     </View>
   );
@@ -309,25 +305,34 @@ export default function TermsAgreementScreen() {
         <View style={styles.termsList}>
           <TermRow
             checked={ageRequirementAgreed}
+            hasDetail={false}
             onToggle={() => setAgeRequirementAgreed((value) => !value)}
             required
             title={AGE_REQUIREMENT_TITLE}
           />
-          {terms.map((term) => (
-            <TermRow
-              checked={agreements[term.id] ?? false}
-              key={term.id}
-              onPressDetail={() => openTermContent(term.title, term.contentUrl)}
-              onToggle={() =>
-                setAgreements((current) => ({
-                  ...current,
-                  [term.id]: !current[term.id],
-                }))
-              }
-              required={term.required}
-              title={term.title}
-            />
-          ))}
+          {terms.map((term) => {
+            const hasDetail = isValidHttpUrl(term.contentUrl);
+            return (
+              <TermRow
+                checked={agreements[term.id] ?? false}
+                hasDetail={hasDetail}
+                key={term.id}
+                onPressDetail={
+                  hasDetail
+                    ? () => openTermContent(term.title, term.contentUrl)
+                    : undefined
+                }
+                onToggle={() =>
+                  setAgreements((current) => ({
+                    ...current,
+                    [term.id]: !current[term.id],
+                  }))
+                }
+                required={term.required}
+                title={term.title}
+              />
+            );
+          })}
         </View>
       </View>
 
