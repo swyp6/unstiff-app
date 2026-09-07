@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 
 type ChatInputBarProps = {
   onSend: (text: string) => void;
@@ -37,15 +37,11 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
         disabled={!canSend}
         hitSlop={8}
         onPress={handleSend}
-        style={[styles.sendButton, canSend && styles.sendButtonActive]}
+        style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
       >
         <Ionicons
-          color={
-            canSend
-              ? semanticColors["label-inverse"]
-              : semanticColors["label-disabled"]
-          }
-          name="arrow-up"
+          color={semanticColors["label-inverse"]}
+          name="send"
           size={18}
         />
       </Pressable>
@@ -56,17 +52,15 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
 const styles = StyleSheet.create({
   container: {
     alignItems: "flex-end",
-    borderTopColor: semanticColors["line-normal"],
-    borderTopWidth: 1,
     flexDirection: "row",
-    gap: 12,
+    gap: 8,
     paddingBottom: 12,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
     paddingTop: 12,
   },
   input: {
-    backgroundColor: semanticColors["fill-normal"],
-    borderRadius: 22,
+    backgroundColor: primitiveColors.charcoal["1"],
+    borderRadius: 24,
     color: semanticColors["label-normal"],
     flex: 1,
     fontSize: 16,
@@ -77,13 +71,13 @@ const styles = StyleSheet.create({
   },
   sendButton: {
     alignItems: "center",
-    backgroundColor: semanticColors["fill-normal"],
+    backgroundColor: primitiveColors.charcoal["12"],
     borderRadius: 22,
     height: 44,
     justifyContent: "center",
     width: 44,
   },
-  sendButtonActive: {
-    backgroundColor: semanticColors["label-normal"],
+  sendButtonDisabled: {
+    opacity: 0.4,
   },
 });

@@ -1,7 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors } from "@/constants/tokens";
 
 type ChatHeaderProps = {
   // 가장 최근 메시지의 시각 — 아직 대화가 시작되지 않았으면 생략한다.
@@ -12,7 +12,7 @@ type ChatHeaderProps = {
 export function ChatHeader({ subtitle }: ChatHeaderProps) {
   return (
     <View style={styles.header}>
-      <ThemedText typography="body-2-bold">대화</ThemedText>
+      <ThemedText typography="heading-1-bold">채팅</ThemedText>
       {!!subtitle && (
         <ThemedText style={styles.subtitle} typography="caption-2-regular">
           {subtitle}
@@ -25,13 +25,13 @@ export function ChatHeader({ subtitle }: ChatHeaderProps) {
 const styles = StyleSheet.create({
   header: {
     alignItems: "center",
-    borderBottomColor: semanticColors["line-normal"],
+    borderBottomColor: primitiveColors.charcoal["1"],
     borderBottomWidth: 1,
     gap: 2,
     height: 56,
     justifyContent: "center",
   },
   subtitle: {
-    color: semanticColors["label-disabled"],
+    color: primitiveColors.charcoal["4"],
   },
 });
