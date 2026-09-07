@@ -268,7 +268,6 @@ export function WorkoutPlanEditSheet({
 
                 <View style={styles.scrollViewport}>
                   <ScrollView
-                    automaticallyAdjustKeyboardInsets
                     contentContainerStyle={styles.content}
                     keyboardDismissMode="on-drag"
                     keyboardShouldPersistTaps="handled"
@@ -280,7 +279,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>운동명</SectionLabel>
                       <TextInput
                         accessibilityLabel="운동명"
-                        maxLength={40}
+                        maxLength={20}
                         onChangeText={(title) =>
                           setDraft((current) => ({ ...current, title }))
                         }
@@ -356,7 +355,7 @@ export function WorkoutPlanEditSheet({
                       <SectionLabel>한 줄 메모</SectionLabel>
                       <TextInput
                         accessibilityLabel="한 줄 메모"
-                        maxLength={100}
+                        maxLength={20}
                         onChangeText={(memo) =>
                           setDraft((current) => ({ ...current, memo }))
                         }

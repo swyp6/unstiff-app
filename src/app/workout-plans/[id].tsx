@@ -189,7 +189,7 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
             <SectionLabel>한 줄 메모</SectionLabel>
             <TextInput
               accessibilityLabel="한 줄 메모"
-              maxLength={100}
+              maxLength={20}
               onChangeText={(memo) =>
                 setPlan((current) => ({ ...current, memo }))
               }
