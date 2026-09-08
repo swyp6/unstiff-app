@@ -233,14 +233,16 @@ export default function TermsAgreementScreen() {
 
   // required 약관만 본다 — MARKETING은 required=false라 미동의여도 다음 단계로
   // 진행할 수 있다.
-  const requiredAgreed = useMemo(
-    () =>
-      terms !== null &&
-      terms
-        .filter((term) => term.required)
-        .every((term) => agreements[term.id]),
-    [terms, agreements],
-  );
+  const requiredAgreed = useMemo(() => {
+    if (terms === null) return false;
+    const requiredTerms = terms.filter((term) => term.required);
+    // 빈 배열의 every()는 true라 length 확인이 필요하다 — 서버가 필수 약관을
+    // 하나도 내려주지 않으면 아무것도 동의하지 않은 채로 다음 버튼이 열린다.
+    return (
+      requiredTerms.length > 0 &&
+      requiredTerms.every((term) => agreements[term.id])
+    );
+  }, [terms, agreements]);
 
   function toggleAll(value: boolean) {
     if (!terms) return;
