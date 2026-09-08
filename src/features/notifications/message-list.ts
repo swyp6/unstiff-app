@@ -53,6 +53,9 @@ export function buildNotificationListEntries(
   const entries: NotificationListEntry[] = [];
   let currentDateKey: string | null = null;
   let isFirstInSection = false;
+  // 같은 날짜 사이에 sentAt을 해석할 수 없는 항목이 끼면 같은 dateKey 섹션이
+  // 다시 열릴 수 있어, 섹션 key에는 등장 순서를 함께 넣어 항상 유일하게 한다.
+  let sectionIndex = 0;
 
   for (const message of messages) {
     const sent = new Date(message.sentAt);
@@ -65,11 +68,12 @@ export function buildNotificationListEntries(
       // sentAt을 해석할 수 없을 때는 날짜 제목을 지어내지 않고 행만 잇는다.
       if (isValidDate) {
         entries.push({
-          key: `section-${dateKey}`,
+          key: `section-${dateKey}-${sectionIndex}`,
           kind: "section",
           spacingTop: entries.length === 0 ? 0 : SECTION_GAP,
           title: formatSectionTitle(sent, now),
         });
+        sectionIndex += 1;
       }
     }
 

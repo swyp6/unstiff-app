@@ -60,10 +60,9 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     flexDirection: "row",
     gap: 14,
-    // 높이가 70으로 고정이라 제목/본문은 각각 한 줄로 잘라 카드가 밀리지
-    // 않게 한다(Figma도 overflow clip).
-    height: 70,
-    overflow: "hidden",
+    // Figma 기본 높이는 70이지만, 시스템 글꼴을 키우면 한 줄짜리 제목/본문도
+    // 70을 넘기므로 고정 height 대신 minHeight로 두어 잘리지 않고 늘어나게 한다.
+    minHeight: 70,
     padding: 16,
     width: "100%",
   },

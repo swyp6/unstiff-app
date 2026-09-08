@@ -1,5 +1,5 @@
 import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 
 import { getUnreadPushCount } from "@/features/notifications/api";
 import { useUnreadPushCountStore } from "@/features/notifications/unread-count-store";
@@ -14,14 +14,26 @@ export function useUnreadPushCount() {
   const setUnreadCount = useUnreadPushCountStore(
     (state) => state.setUnreadCount,
   );
+  // 이 hook 인스턴스가 마지막으로 조회를 시작한 accessToken.
+  const requestedTokenRef = useRef<string | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       // 로그아웃 직후 이전 사용자의 개수가 남지 않도록 비운다.
       if (!accessToken) {
+        requestedTokenRef.current = null;
         setUnreadCount(0);
         return;
       }
+
+      // store는 모듈 스코프라 로그아웃으로 화면이 언마운트돼도 값이 남는다.
+      // 이 인스턴스가 아직 한 번도 조회하지 않았다면 남아 있는 값은 이전
+      // 계정의 것일 수 있으므로, 새 응답이 도착하기 전에 먼저 비운다 —
+      // A 로그아웃 → B 로그인에서 A의 dot이 B 화면에 남는 순간이 없다.
+      // (같은 세션에서 서버가 토큰만 재발급한 경우는 이미 조회한 적이 있어
+      // 불필요하게 깜빡이지 않는다.)
+      if (requestedTokenRef.current === null) setUnreadCount(0);
+      requestedTokenRef.current = accessToken;
 
       let cancelled = false;
       getUnreadPushCount()
