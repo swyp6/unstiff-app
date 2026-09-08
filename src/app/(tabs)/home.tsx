@@ -35,6 +35,7 @@ import {
 } from "@/features/missions/api";
 import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
 import type { DailyMissionResponse } from "@/features/missions/types";
+import { useUnreadPushCount } from "@/features/notifications/use-unread-push-count";
 import {
   createDailyPlan,
   createPlanPreset,
@@ -416,6 +417,9 @@ export default function HomeScreen() {
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
     null,
   );
+  // 헤더 알림 아이콘이 가리키는 안 읽은 알림 개수 — 화면이 포커스를 받을
+  // 때마다 다시 조회되므로 알림함에서 읽고 돌아오면 바로 반영된다.
+  const unreadPushCount = useUnreadPushCount();
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
   // 조회 중인 달의 캘린더 API 응답. year/month를 응답과 함께 묶어 보관해서,
   // 달을 빠르게 연속으로 넘길 때 아직 도착 안 한 이전 요청의 응답이 섞이지
@@ -1145,13 +1149,40 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            paddingHorizontal: Spacing.three,
+            // Figma 2674:14628 "스크롤 영역" — px 20 / pt 12 / section gap 20.
+            paddingHorizontal: 20,
+            paddingTop: 12,
             paddingBottom: Spacing.four,
-            gap: Spacing.four,
+            gap: 20,
           }}
         >
-          <View className="h-12 flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1">
+          {/* 1행 Header (Figma 2674:14629) — LOGO와 알림이 같은 row에 온다. */}
+          <View className="w-full flex-row items-center justify-between">
+            {/* Figma에도 아직 실제 로고 asset 없이 "LOGO" 텍스트 placeholder만
+                정의돼 있다 — BrandMark(스플래시/로그인용 박스형 placeholder)를
+                끌어오지 않고 같은 의도의 텍스트만 헤더 규격으로 렌더한다. */}
+            <ThemedText typography="title-2-bold">LOGO</ThemedText>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                unreadPushCount > 0
+                  ? `알림, 읽지 않은 알림 ${unreadPushCount}개`
+                  : "알림"
+              }
+              onPress={() => router.push("/notifications")}
+              className="h-12 w-12 items-center justify-center"
+            >
+              <Ionicons
+                name="notifications-outline"
+                size={24}
+                color={theme.text}
+              />
+            </Pressable>
+          </View>
+
+          {/* 2행 (Figma 2674:14635) — 월 선택과 연속 스트릭이 같은 row에 온다. */}
+          <View className="w-full flex-row items-center justify-between">
+            <View className="h-[47px] flex-row items-center gap-1">
               <Pressable
                 hitSlop={8}
                 accessibilityRole="button"
@@ -1171,32 +1202,17 @@ export default function HomeScreen() {
               </Pressable>
             </View>
 
-            <View className="flex-row items-center gap-1.5">
-              <Pressable
-                className="flex-row items-center gap-0.5 rounded-full bg-fill-normal py-1.5 pl-2.5 pr-3"
-                accessibilityRole="button"
-                accessibilityLabel="연속 스트릭"
-                onPress={() => console.log("streak badge pressed")}
-              >
-                <Ionicons name="flame" size={24} color={theme.text} />
-                <ThemedText typography="caption-1-bold">
-                  {streakDays}일
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                hitSlop={8}
-                accessibilityRole="button"
-                accessibilityLabel="알림"
-                onPress={() => console.log("notifications pressed")}
-                className="h-9 w-9 items-center justify-center rounded-full bg-fill-normal"
-              >
-                <Ionicons
-                  name="notifications-outline"
-                  size={20}
-                  color={theme.text}
-                />
-              </Pressable>
-            </View>
+            <Pressable
+              className="flex-row items-center gap-[5px] rounded-full bg-fill-subtle py-1.5 pl-2.5 pr-3"
+              accessibilityRole="button"
+              accessibilityLabel="연속 스트릭"
+              onPress={() => console.log("streak badge pressed")}
+            >
+              <Ionicons name="flame" size={16} color={theme.text} />
+              <ThemedText typography="caption-1-bold">
+                {streakDays}일
+              </ThemedText>
+            </Pressable>
           </View>
 
           {calendarError ? (
