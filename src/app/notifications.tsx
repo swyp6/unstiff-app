@@ -2,7 +2,6 @@ import { router } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   StyleSheet,
@@ -11,10 +10,9 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { radius, semanticColors } from "@/constants/tokens";
+import { primitiveColors, radius, semanticColors } from "@/constants/tokens";
 import {
   getPushMessages,
-  markAllPushMessagesRead,
   markPushMessageRead,
 } from "@/features/notifications/api";
 import { NotificationEmptyState } from "@/features/notifications/components/notification-empty-state";
@@ -28,6 +26,11 @@ import {
 import type { PushMessageResponse } from "@/features/notifications/types";
 import { useUnreadPushCountStore } from "@/features/notifications/unread-count-store";
 
+// Figma `surface/background`. tokens.ts는 Figma Variables sync 결과인데 아직
+// surface/* 가 포함돼 있지 않아 값으로 둔다. 빈 상태 종 일러스트의 사선 여백도
+// 이 색으로 그려져 있어 화면 배경과 반드시 같아야 한다.
+const SURFACE_BACKGROUND = "#fafafa";
+
 const PAGE_SIZE = 20;
 
 // 서버 응답이 비어 있는 것(빈 상태)과 못 불러온 것(에러)을 섞지 않기 위해 로딩
@@ -38,12 +41,8 @@ export default function NotificationsScreen() {
   const [messages, setMessages] = useState<PushMessageResponse[]>([]);
   const [status, setStatus] = useState<LoadStatus>("loading");
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const setUnreadCount = useUnreadPushCountStore(
-    (state) => state.setUnreadCount,
-  );
   const decrementUnreadCount = useUnreadPushCountStore(
     (state) => state.decrementUnreadCount,
   );
@@ -59,7 +58,6 @@ export default function NotificationsScreen() {
   // 읽음 상태는 monotonic(false → true)이다. 뒤늦게 도착한 페이지가 이미 읽음
   // 처리한 알림을 다시 안 읽음으로 되돌리지 않도록 로컬 결과를 기억해 둔다.
   const readIdsRef = useRef<Set<number>>(new Set());
-  const isAllReadRef = useRef(false);
   // 같은 알림을 연타해도 읽음 요청이 한 번만 나가게 한다.
   const pendingReadIdsRef = useRef<Set<number>>(new Set());
 
@@ -71,7 +69,6 @@ export default function NotificationsScreen() {
     cursorRef.current = undefined;
     hasNextRef.current = true;
     readIdsRef.current = new Set();
-    isAllReadRef.current = false;
     pendingReadIdsRef.current = new Set();
 
     // 화면 상태(loading/에러 초기화)는 최초 mount의 초기값과 retry() 이벤트
@@ -122,15 +119,11 @@ export default function NotificationsScreen() {
         setMessages((previous) =>
           appendUniqueMessages(
             previous,
-            page.items.map((message) => {
-              if (
-                message.read ||
-                !(isAllReadRef.current || readIdsRef.current.has(message.id))
-              ) {
-                return message;
-              }
-              return { ...message, read: true };
-            }),
+            page.items.map((message) =>
+              message.read || !readIdsRef.current.has(message.id)
+                ? message
+                : { ...message, read: true },
+            ),
           ),
         );
         cursorRef.current = page.nextCursor;
@@ -171,8 +164,7 @@ export default function NotificationsScreen() {
               item.id === message.id ? { ...item, read: true } : item,
             ),
           );
-          // 전체 읽음이 먼저 성공했다면 개수는 이미 0이다.
-          if (!isAllReadRef.current) decrementUnreadCount();
+          decrementUnreadCount();
         })
         .catch(() => {
           // 실패하면 읽은 것으로 확정하지 않는다 — 행은 안 읽음으로 남는다.
@@ -184,37 +176,10 @@ export default function NotificationsScreen() {
     [decrementUnreadCount],
   );
 
-  async function handleMarkAllRead() {
-    if (isMarkingAllRead) return;
-    const generation = generationRef.current;
-    setIsMarkingAllRead(true);
-
-    try {
-      await markAllPushMessagesRead();
-      if (!isMountedRef.current || generation !== generationRef.current) return;
-      // 성공한 뒤에만 읽음으로 확정한다 — optimistic 처리를 하지 않으므로
-      // 되돌릴 상태도 없다.
-      isAllReadRef.current = true;
-      setMessages((previous) =>
-        previous.map((item) => (item.read ? item : { ...item, read: true })),
-      );
-      setUnreadCount(0);
-    } catch {
-      if (!isMountedRef.current) return;
-      Alert.alert(
-        "오류",
-        "알림을 모두 읽음 처리하지 못했습니다. 다시 시도해주세요.",
-      );
-    } finally {
-      if (isMountedRef.current) setIsMarkingAllRead(false);
-    }
-  }
-
   function retry() {
     setStatus("loading");
     setMessages([]);
     setIsLoadingMore(false);
-    setIsMarkingAllRead(false);
     setReloadKey((key) => key + 1);
   }
 
@@ -256,12 +221,7 @@ export default function NotificationsScreen() {
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
-      <NotificationHeader
-        isMarkAllReadPending={isMarkingAllRead}
-        onBack={handleBack}
-        onMarkAllRead={handleMarkAllRead}
-        showMarkAllRead={status === "ready" && messages.length > 0}
-      />
+      <NotificationHeader onBack={handleBack} />
 
       {status === "loading" ? (
         <View style={styles.centerContent}>
@@ -317,7 +277,7 @@ export default function NotificationsScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["background-normal"],
+    backgroundColor: SURFACE_BACKGROUND,
     flex: 1,
   },
   listContent: {
@@ -330,7 +290,7 @@ const styles = StyleSheet.create({
   },
   // 제목 아래 10px 간격은 첫 행 entry의 spacingTop이 담당한다.
   sectionTitle: {
-    color: semanticColors["label-subtle"],
+    color: primitiveColors.charcoal[5],
   },
   centerContent: {
     alignItems: "center",

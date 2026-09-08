@@ -24,7 +24,7 @@ import { scheduleOnRN } from "react-native-worklets";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
@@ -66,7 +66,6 @@ import { RecordMethodModal } from "@/features/upload/components/record-method-mo
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
-import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 // Figma node 3502:36518 요일 헤더: 일=red/5, 토=blue/7, 나머지 charcoal/5.
@@ -268,7 +267,6 @@ function DayRecordCard({
 }
 
 export default function HomeScreen() {
-  const theme = useTheme();
   // Native tabs render every tab's screen eagerly, so without this guard the
   // workout plan detail bottom sheet's Modal could stay visible over the
   // chat/mypage tabs after switching away without closing it first.
@@ -1149,70 +1147,89 @@ export default function HomeScreen() {
         <ScrollView
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
-            // Figma 2674:14628 "스크롤 영역" — px 20 / pt 12 / section gap 20.
-            paddingHorizontal: 20,
-            paddingTop: 12,
+            paddingHorizontal: Spacing.three,
             paddingBottom: Spacing.four,
-            gap: 20,
+            gap: Spacing.four,
           }}
         >
-          {/* 1행 Header (Figma 2674:14629) — LOGO와 알림이 같은 row에 온다. */}
+          {/* Figma 3502:65456 — 월 선택과 우측 액션(스트릭·알림)이 한 줄. */}
           <View className="w-full flex-row items-center justify-between">
-            {/* Figma에도 아직 실제 로고 asset 없이 "LOGO" 텍스트 placeholder만
-                정의돼 있다 — BrandMark(스플래시/로그인용 박스형 placeholder)를
-                끌어오지 않고 같은 의도의 텍스트만 헤더 규격으로 렌더한다. */}
-            <ThemedText typography="title-2-bold">LOGO</ThemedText>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={
-                unreadPushCount > 0
-                  ? `알림, 읽지 않은 알림 ${unreadPushCount}개`
-                  : "알림"
-              }
-              onPress={() => router.push("/notifications")}
-              className="h-12 w-12 items-center justify-center"
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color={theme.text}
-              />
-            </Pressable>
-          </View>
-
-          {/* 2행 (Figma 2674:14635) — 월 선택과 연속 스트릭이 같은 row에 온다. */}
-          <View className="w-full flex-row items-center justify-between">
-            <View className="h-[47px] flex-row items-center gap-1">
+            <View className="flex-row items-center">
               <Pressable
-                hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="이전 달"
                 onPress={goToPreviousMonth}
+                className="h-12 w-7 items-start justify-center"
               >
-                <Ionicons name="caret-back" size={10} color={theme.text} />
+                <Ionicons
+                  name="caret-back"
+                  size={20}
+                  color={primitiveColors.charcoal[12]}
+                />
               </Pressable>
-              <ThemedText typography="title-3-bold">{monthLabel}</ThemedText>
+              <ThemedText
+                typography="title-3-bold"
+                style={{ color: primitiveColors.charcoal[12] }}
+              >
+                {monthLabel}
+              </ThemedText>
               <Pressable
-                hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="다음 달"
                 onPress={goToNextMonth}
+                className="h-12 w-7 items-start justify-center pl-2"
               >
-                <Ionicons name="caret-forward" size={10} color={theme.text} />
+                <Ionicons
+                  name="caret-forward"
+                  size={20}
+                  color={primitiveColors.charcoal[12]}
+                />
               </Pressable>
             </View>
 
-            <Pressable
-              className="flex-row items-center gap-[5px] rounded-full bg-fill-subtle py-1.5 pl-2.5 pr-3"
-              accessibilityRole="button"
-              accessibilityLabel="연속 스트릭"
-              onPress={() => console.log("streak badge pressed")}
-            >
-              <Ionicons name="flame" size={16} color={theme.text} />
-              <ThemedText typography="caption-1-bold">
-                {streakDays}일
-              </ThemedText>
-            </Pressable>
+            <View className="flex-row items-center gap-1.5">
+              <Pressable
+                className="flex-row items-center gap-0.5 rounded-full bg-charcoal-1 py-1.5 pl-2.5 pr-3"
+                accessibilityRole="button"
+                accessibilityLabel="연속 스트릭"
+                onPress={() => console.log("streak badge pressed")}
+              >
+                <Ionicons
+                  name="flame"
+                  size={24}
+                  color={primitiveColors.orange[500]}
+                />
+                <ThemedText
+                  typography="caption-1-bold"
+                  style={{ color: primitiveColors.charcoal[11] }}
+                >
+                  {streakDays}일
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  unreadPushCount > 0 ? "알림, 읽지 않은 알림 있음" : "알림"
+                }
+                onPress={() => router.push("/notifications")}
+                className="h-12 w-12 items-center justify-center"
+              >
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-charcoal-1">
+                  <Ionicons
+                    name="notifications"
+                    size={20}
+                    color={primitiveColors.charcoal[12]}
+                  />
+                  {/* 읽지 않은 알림 표시 — 개수는 노출하지 않고 점만 찍는다.
+                      Figma 1375:16126: 11x11 원, brand fill에 버튼 배경색
+                      2px 링(right 4 / top 5). */}
+                  {unreadPushCount > 0 && (
+                    <View className="absolute right-1 top-[5px] h-[11px] w-[11px] rounded-full border-2 border-charcoal-1 bg-orange-500" />
+                  )}
+                </View>
+              </Pressable>
+            </View>
           </View>
 
           {calendarError ? (

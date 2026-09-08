@@ -2,15 +2,18 @@ import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors } from "@/constants/tokens";
 
+// Figma 3502:47616 "종" — 사선이 그어진 muted bell. Ionicons에 같은 글리프가
+// 없어 Figma export를 PNG로 저장해 쓴다(사선 여백이 surface/background 색으로
+// 그려져 있어 화면 배경과 같은 #fafafa 위에서만 정확히 맞는다).
 const EMPTY_BELL = require("@/assets/notifications/empty-bell.png");
 
 type NotificationEmptyStateProps = {
   onOpenSettings: () => void;
 };
 
-// Figma 3452:37123 — 받은 알림이 하나도 없을 때의 화면.
+// Figma 3502:47615 — 받은 알림이 하나도 없을 때의 화면.
 export function NotificationEmptyState({
   onOpenSettings,
 }: NotificationEmptyStateProps) {
@@ -22,7 +25,7 @@ export function NotificationEmptyState({
         <ThemedText style={styles.title} typography="body-1-bold">
           받은 알림이 없어요
         </ThemedText>
-        <ThemedText style={styles.description} typography="body-3-regular">
+        <ThemedText style={styles.description} typography="body-2-regular">
           {"운동 계획 리마인드와 주간 요약을\n여기로 보내드려요"}
         </ThemedText>
       </View>
@@ -50,7 +53,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   bell: {
-    height: 58,
+    height: 56.7,
     width: 56,
   },
   copy: {
@@ -59,23 +62,22 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   title: {
-    color: semanticColors["label-subtle"],
+    color: primitiveColors.charcoal[11],
     textAlign: "center",
   },
   description: {
-    color: semanticColors["label-disabled"],
+    color: primitiveColors.charcoal[5],
     textAlign: "center",
   },
   settingsButton: {
     alignItems: "center",
-    borderColor: semanticColors["line-strong"],
-    borderRadius: 14,
-    borderWidth: 1,
+    backgroundColor: primitiveColors.orange[50],
+    borderRadius: 999,
     justifyContent: "center",
     paddingHorizontal: 18,
     paddingVertical: 13,
   },
   settingsButtonText: {
-    color: semanticColors["label-normal"],
+    color: primitiveColors.orange[500],
   },
 });
