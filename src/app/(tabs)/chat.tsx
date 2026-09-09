@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -16,16 +17,59 @@ import { ChatInputBar } from "@/features/chat/components/chat-input-bar";
 import { ChatOptionsBar } from "@/features/chat/components/chat-options-bar";
 import { TypingIndicator } from "@/features/chat/components/typing-indicator";
 import { useChatStore } from "@/features/chat/chat-store";
+import type { ChatMessage } from "@/features/chat/types";
 
-// 오늘 오후 3:27 형태의 AppBar 부제목 — 대화는 항상 오늘 하루 단위이므로 날짜는
-// 별도로 비교하지 않고 시각만 포맷한다.
+// 날짜 구분선/부제목에 쓰는 라벨 — 오늘/어제는 고정 문구, 그 전은 실제 날짜.
+function getDayLabel(date: Date) {
+  const startOfDay = (d: Date) =>
+    new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const diffDays = Math.round(
+    (startOfDay(new Date()) - startOfDay(date)) / 86_400_000,
+  );
+  if (diffDays === 0) return "오늘";
+  if (diffDays === 1) return "어제";
+  return new Intl.DateTimeFormat("ko-KR", {
+    year:
+      date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    month: "long",
+    day: "numeric",
+  }).format(date);
+}
+
 function formatSubtitle(iso: string) {
+  const date = new Date(iso);
   const time = new Intl.DateTimeFormat("ko-KR", {
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-  }).format(new Date(iso));
-  return `오늘 ${time}`;
+  }).format(date);
+  return `${getDayLabel(date)} ${time}`;
+}
+
+type ChatRow =
+  | { key: string; type: "divider"; label: string }
+  | { key: string; type: "message"; message: ChatMessage };
+
+// 메시지를 날짜(로컬 자정 기준)별로 묶어, 날짜가 바뀔 때마다 구분선을 끼워 넣는다.
+function toRows(messages: ChatMessage[]): ChatRow[] {
+  const rows: ChatRow[] = [];
+  let lastDayKey: string | null = null;
+
+  for (const message of messages) {
+    const date = new Date(message.createdAt);
+    const dayKey = date.toDateString();
+    if (dayKey !== lastDayKey) {
+      rows.push({
+        key: `divider-${dayKey}`,
+        type: "divider",
+        label: getDayLabel(date),
+      });
+      lastDayKey = dayKey;
+    }
+    rows.push({ key: message.id, type: "message", message });
+  }
+
+  return rows;
 }
 
 export default function ChatScreen() {
@@ -37,10 +81,13 @@ export default function ChatScreen() {
   const sendMessage = useChatStore((state) => state.sendMessage);
   const listRef = useRef<FlatList>(null);
   const lastMessage = messages[messages.length - 1];
+  const rows = useMemo(() => toRows(messages), [messages]);
 
-  useEffect(() => {
-    loadConversation();
-  }, [loadConversation]);
+  useFocusEffect(
+    useCallback(() => {
+      loadConversation();
+    }, [loadConversation]),
+  );
 
   useEffect(() => {
     listRef.current?.scrollToEnd({ animated: true });
@@ -72,16 +119,19 @@ export default function ChatScreen() {
             <FlatList
               ref={listRef}
               contentContainerStyle={{ gap: 8, paddingVertical: 12 }}
-              data={messages}
-              keyExtractor={(item) => item.id}
+              data={rows}
+              keyExtractor={(row) => row.key}
               ListFooterComponent={isTyping ? <TypingIndicator /> : null}
-              ListHeaderComponent={
-                messages.length > 0 ? <ChatDateDivider label="오늘" /> : null
-              }
               onContentSizeChange={() =>
                 listRef.current?.scrollToEnd({ animated: true })
               }
-              renderItem={({ item }) => <ChatBubble message={item} />}
+              renderItem={({ item }) =>
+                item.type === "divider" ? (
+                  <ChatDateDivider label={item.label} />
+                ) : (
+                  <ChatBubble message={item.message} />
+                )
+              }
               style={{ flex: 1 }}
             />
           )}
