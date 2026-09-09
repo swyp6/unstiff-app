@@ -176,7 +176,7 @@ export function MissionCard({
   );
 }
 
-function MissionActionButton({
+export function MissionActionButton({
   label,
   onPress,
   soft = false,
@@ -224,7 +224,6 @@ type TodayWorkoutCardProps = {
   // 있어서, 상세/수정도 그 사본을 직접 연다 — onOpenSavedPlan과 달리
   // savedWorkoutPlans 목록을 조회하지 않는다.
   onOpenWorkoutDetail: (instanceId: string) => void;
-  onAddNewPlan: () => void;
   // 오늘이 아닌 미래 날짜를 보고 있을 때(Figma node 2910-4774/2918-4983):
   // 제목·빈 상태 문구가 바뀌고, 아직 안 지난 날이라 완료 체크는 없앤다 —
   // 수정(⋮)은 미래 날짜에도 그대로 가능해야 한다.
@@ -243,7 +242,6 @@ export function TodayWorkoutCard({
   onAddSavedPlan,
   onOpenSavedPlan,
   onOpenWorkoutDetail,
-  onAddNewPlan,
   title = "오늘의 운동",
   emptyStateLabel = "오늘 담은 운동이 없어요",
   readOnly = false,
@@ -320,23 +318,6 @@ export function TodayWorkoutCard({
                 onOpenDetail={() => onOpenSavedPlan(plan.id)}
               />
             ))}
-
-            <Pressable
-              accessibilityRole="button"
-              className="flex-row items-center gap-3 py-3"
-              onPress={onAddNewPlan}
-            >
-              <View className="h-[34px] w-[34px] items-center justify-center rounded-full border border-dashed border-line-strong bg-fill-subtle">
-                <Ionicons
-                  color={semanticColors["label-subtle"]}
-                  name="add"
-                  size={16}
-                />
-              </View>
-              <ThemedText typography="body-3-bold" themeColor="textSecondary">
-                신규 운동 계획 추가
-              </ThemedText>
-            </Pressable>
           </>
         )}
       </View>

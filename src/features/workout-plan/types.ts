@@ -2,8 +2,8 @@
 // (see swagger: PlanPresetCreateRequest/Response, DailyPlanCreateRequest/Response).
 
 export type ExerciseMeasuresDto = {
-  duration?: number; // 분
-  distance?: number; // km
+  duration?: number; // 초
+  distance?: number; // m
   count?: number; // 회
   sets?: number; // 세트
 };
@@ -11,10 +11,13 @@ export type ExerciseMeasuresDto = {
 export type IntensityDto = "LIGHT" | "MODERATE" | "HARD";
 
 // POST /api/v1/plan-presets
+// stopwatchEnabled는 스웨거 문서상 선택이지만, 실제로는 빠지면 요청 자체가
+// 파싱 실패(400 "Failed to read request")한다 — 항상 보내야 한다.
 export type PlanPresetCreateRequest = {
   name: string;
   exerciseType: string;
   targets: ExerciseMeasuresDto;
+  stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
   memo?: string;
@@ -24,12 +27,13 @@ export type PlanPresetCreateResponse = {
   id: number;
 };
 
-// POST /api/v1/daily-plans
+// POST /api/v1/daily-plans — stopwatchEnabled 필수인 이유는 위 PlanPresetCreateRequest 참고.
 export type DailyPlanCreateRequest = {
   name: string;
   exerciseType: string;
   planDate: string; // "YYYY-MM-DD"
   targets: ExerciseMeasuresDto;
+  stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
   memo?: string;

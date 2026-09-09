@@ -157,6 +157,26 @@ const GOAL_TYPE_TO_MEASURE_KEY: Record<
   sets: "sets",
 };
 
+// UI는 시간을 분, 거리를 km 단위로 다루지만 API(ExerciseMeasuresDto)는 각각
+// 초/m 단위다 — 여기서만 변환해서 API 호출부는 단위를 신경 쓰지 않게 한다.
+function toApiMeasureValue(
+  measureKey: "duration" | "distance" | "count" | "sets",
+  value: number,
+): number {
+  if (measureKey === "duration") return Math.round(value * 60);
+  if (measureKey === "distance") return Math.round(value * 1000);
+  return value;
+}
+
+function fromApiMeasureValue(
+  measureKey: "duration" | "distance" | "count" | "sets",
+  value: number,
+): number {
+  if (measureKey === "duration") return value / 60;
+  if (measureKey === "distance") return value / 1000;
+  return value;
+}
+
 // 등록 API(루틴/오늘의 운동 생성)가 공통으로 쓰는 필드 변환 — targets는 켠
 // 항목만 담아야 하므로 selectedGoalTypes만 순회한다.
 export function toExerciseMeasuresDto(plan: WorkoutPlanDraft) {
@@ -164,7 +184,8 @@ export function toExerciseMeasuresDto(plan: WorkoutPlanDraft) {
     Record<"duration" | "distance" | "count" | "sets", number>
   > = {};
   for (const type of plan.selectedGoalTypes) {
-    targets[GOAL_TYPE_TO_MEASURE_KEY[type]] = plan.goalValues[type];
+    const measureKey = GOAL_TYPE_TO_MEASURE_KEY[type];
+    targets[measureKey] = toApiMeasureValue(measureKey, plan.goalValues[type]);
   }
   return targets;
 }
@@ -188,6 +209,10 @@ export function toPlanRequestFields(plan: WorkoutPlanDraft) {
     name: plan.title,
     exerciseType: plan.exerciseType,
     targets: toExerciseMeasuresDto(plan),
+    // 스펙엔 선택 필드로 나와 있지만 실제로는 생략(undefined)이나 null을
+    // 보내면 요청 자체가 파싱 실패(400)한다 — UI에 스톱워치 토글이 아직
+    // 없어 항상 꺼진 값으로 보낸다.
+    stopwatchEnabled: false,
     startTime: toApiStartTime(plan.startTime),
     intensity: toApiIntensity(plan.intensity),
     memo: plan.memo || undefined,
@@ -238,7 +263,7 @@ function fromPlanResponseFields(
   ) as [keyof typeof MEASURE_KEY_TO_GOAL_TYPE, GoalType][]) {
     const value = response.targets[measureKey];
     if (value == null) continue;
-    goalValues[goalType] = value;
+    goalValues[goalType] = fromApiMeasureValue(measureKey, value);
     selectedGoalTypes.push(goalType);
   }
 

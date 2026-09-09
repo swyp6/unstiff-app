@@ -47,6 +47,7 @@ import {
   updatePlanPreset,
 } from "@/features/workout-plan/api";
 import {
+  MissionActionButton,
   MissionCard,
   type MissionStatus,
   TodayWorkoutCard,
@@ -411,7 +412,7 @@ export default function HomeScreen() {
     | { kind: "instance"; instanceId: string }
     | null
   >(null);
-  // "신규 운동 계획 추가"로 연 빈 계획 초안. null이면 시트가 안 보인다.
+  // "운동 추가하기"로 연 빈 계획 초안. null이면 시트가 안 보인다.
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
     null,
   );
@@ -919,7 +920,8 @@ export default function HomeScreen() {
         ...workouts,
         createTodayWorkoutInstance(plan, String(id)),
       ]);
-    } catch {
+    } catch (error) {
+      console.error("Failed to create daily plan", error);
       Alert.alert(
         "오류",
         "오늘의 운동을 등록하지 못했습니다. 다시 시도해주세요.",
@@ -931,12 +933,12 @@ export default function HomeScreen() {
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
 
-  async function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
-    // "오늘만 할래요"(addToToday)가 켜져 있으면 1회성 운동이므로 저장된
-    // 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시 실제
-    // 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
-    // 꺼져 있으면 재사용할 루틴이므로 POST /api/v1/plan-presets로 등록한다.
-    if (addToToday) {
+  async function saveNewPlan(plan: WorkoutPlanDraft, saveAsRoutine: boolean) {
+    // "루틴으로 할래요"(saveAsRoutine)가 꺼져 있으면(기본값) 1회성 운동이므로
+    // 저장된 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시
+    // 실제 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
+    // 켜져 있으면 재사용할 루틴이므로 POST /api/v1/plan-presets로 등록한다.
+    if (!saveAsRoutine) {
       await addSavedPlanToDate(plan, selectedCalendarDate);
       setNewPlanDraft(null);
       return;
@@ -1324,7 +1326,6 @@ export default function HomeScreen() {
                   : "담은 운동이 없어요"
               }
               expanded={isTodayCardExpanded}
-              onAddNewPlan={openNewPlanSheet}
               onAddSavedPlan={(plan) =>
                 addSavedPlanToDate(plan, selectedCalendarDate)
               }
@@ -1354,6 +1355,13 @@ export default function HomeScreen() {
               }
             />
           )}
+
+          {(isSelectedDateToday || isSelectedDateFuture) && (
+            <MissionActionButton
+              label="운동 추가하기"
+              onPress={openNewPlanSheet}
+            />
+          )}
         </ScrollView>
       </SafeAreaView>
 
@@ -1381,10 +1389,10 @@ export default function HomeScreen() {
           onClose={() => setNewPlanDraft(null)}
           onDelete={() => setNewPlanDraft(null)}
           onSave={saveNewPlan}
-          saveLabel="루틴 추가하기"
+          saveLabel="운동 추가하기"
           showDelete={false}
           showAddToTodayToggle
-          title="루틴 추가"
+          title="운동 추가하기"
           value={newPlanDraft}
           visible
         />
