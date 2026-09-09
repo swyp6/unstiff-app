@@ -448,12 +448,6 @@ export default function HomeScreen() {
   const calendarError =
     calendarErrorMonth?.year === viewedYear &&
     calendarErrorMonth?.month === viewedMonthNumber;
-  // 로딩 중인지도 별도 setState 없이 파생한다 — 지금 보고 있는 달의 응답도
-  // 에러도 아직 없으면(=요청이 진행 중이면) loading이다.
-  const isCalendarDataForViewedMonth =
-    calendarMonthData?.year === viewedYear &&
-    calendarMonthData?.month === viewedMonthNumber;
-  const isCalendarLoading = !isCalendarDataForViewedMonth && !calendarError;
 
   useEffect(() => {
     let cancelled = false;
@@ -1244,22 +1238,13 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          {calendarError ? (
+          {calendarError && (
             <ThemedText
               typography="caption-1-medium"
               themeColor="textSecondary"
             >
               캘린더 정보를 불러오지 못했어요
             </ThemedText>
-          ) : (
-            isCalendarLoading && (
-              <ThemedText
-                typography="caption-1-medium"
-                themeColor="textSecondary"
-              >
-                캘린더 정보를 불러오는 중이에요
-              </ThemedText>
-            )
           )}
 
           <GestureDetector gesture={monthSwipeGesture}>
