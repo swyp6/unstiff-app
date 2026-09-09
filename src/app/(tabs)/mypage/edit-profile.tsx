@@ -19,7 +19,6 @@ import {
 import {
   NICKNAME_FORMAT_PATTERN,
   NICKNAME_MAX_LENGTH,
-  sanitizeNickname,
 } from "@/features/auth/nickname-validation";
 import type { UpdateProfileRequest } from "@/features/auth/types";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
@@ -74,11 +73,27 @@ export default function EditProfileScreen() {
   const availability = useNicknameAvailability(draftNickname, {
     skipValue: storedNickname || undefined,
   });
-  const nicknameReady = !nicknameChanged || availability === "available";
-  const canSave = isNicknameValid && nicknameReady && !isSaving;
+  // Neither the format check nor the duplicate check blocks 저장 itself
+  // anymore — pressing it is what tells the user what's wrong (via the
+  // alerts below), rather than silently disabling the button with no
+  // explanation.
+  const canSave = !isSaving;
 
   async function handleSave() {
     if (!canSave) return;
+
+    if (nicknameChanged && !isNicknameValid) {
+      Alert.alert(
+        "다시 입력해주세요.",
+        "영어·숫자 및 특수기호(.,_)만 사용하여 2~10자로 입력해주세요.",
+      );
+      return;
+    }
+
+    if (nicknameChanged && availability !== "available") {
+      Alert.alert("중복된 닉네임이에요", "다른 닉네임을 입력해주세요.");
+      return;
+    }
 
     if (!nicknameChanged && !avatarChanged) {
       router.back();
@@ -181,7 +196,7 @@ export default function EditProfileScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               maxLength={NICKNAME_MAX_LENGTH}
-              onChangeText={(text) => setDraftNickname(sanitizeNickname(text))}
+              onChangeText={setDraftNickname}
               placeholder="닉네임을 입력해주세요"
               placeholderTextColor={semanticColors["label-disabled"]}
               style={{
