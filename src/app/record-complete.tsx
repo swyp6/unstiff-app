@@ -9,15 +9,30 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
+import {
+  apiMetersToKm,
+  apiSecondsToMinutes,
+} from "@/features/workout-plan/measure-units";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
+// confirmed.measures는 서버로 보낸 그대로의 API 단위(duration=초, distance=m)다.
+// 사용자에게는 앱의 UI 단위(분/km)로 되돌려 보여준다 — 변환을 빠뜨리면 20분이
+// 1200분, 3km가 3000km로 보인다.
 const MEASURE_DISPLAY: {
   key: "duration" | "distance" | "count" | "sets";
   label: string;
-  format: (value: number) => string;
+  format: (apiValue: number) => string;
 }[] = [
-  { key: "duration", label: "시간", format: (v) => `${v}분` },
-  { key: "distance", label: "거리", format: (v) => `${v.toFixed(1)}km` },
+  {
+    key: "duration",
+    label: "시간",
+    format: (v) => `${apiSecondsToMinutes(v)}분`,
+  },
+  {
+    key: "distance",
+    label: "거리",
+    format: (v) => `${apiMetersToKm(v).toFixed(1)}km`,
+  },
   { key: "count", label: "횟수", format: (v) => `${v}회` },
   { key: "sets", label: "세트", format: (v) => `${v}세트` },
 ];

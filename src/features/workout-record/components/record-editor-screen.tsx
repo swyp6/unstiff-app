@@ -27,6 +27,7 @@ import {
   GOAL_TYPES,
   type GoalType,
   type Intensity,
+  toApiIntensity,
 } from "@/features/workout-plan/model";
 
 import { saveWorkoutRecord } from "../api";
@@ -97,30 +98,33 @@ export function RecordEditorScreen() {
     setIsSubmitting(true);
     setError(null);
     try {
+      const apiIntensity = toApiIntensity(intensity);
       const measures = toActualMeasuresDto(selectedTypes, values);
       const trimmedMemo = memo.trim();
-      // 강도(intensity)는 화면에서 고를 수 있지만 요청에 넣지 않는다 — 계획
-      // (daily-plan/plan-preset)에는 intensity 필드가 있으나 기록 저장
-      // (POST /api/v1/workouts)에도 있는지 Swagger로 확인하지 못했고, 확인되지
-      // 않은 필드명을 지어내 보내지 않는다. 계약 확인되면 여기에 추가한다.
+      // 여기서 고른 강도는 "실제로 이렇게 수행했다"는 기록값이라 이 요청에만
+      // 싣는다 — 연결된 daily-plan의 계획 강도는 건드리지 않는다(PUT 없음).
+      // UI에서 강도는 선택 사항이라 고르지 않았으면 필드를 생략한다.
       await saveWorkoutRecord({
         refType: target.refType,
         refId: target.refId,
         measures,
+        ...(apiIntensity ? { intensity: apiIntensity } : null),
         ...(photo ? { imageUrl: photo.secureUrl } : null),
         ...(trimmedMemo ? { memo: trimmedMemo } : null),
       });
 
       // 실제 수행 기록 저장이 성공한 뒤에만 미션 자체를 완료 처리한다 —
       // 두 API는 별개 entity/event라 workout record 저장 실패 시에는
-      // 호출하지 않는다. 이 부수 호출이 실패해도(예: 이미 완료 처리된
-      // 미션) 사용자가 방금 실제로 남긴 기록 자체는 이미 저장됐으므로
-      // 완료 화면 진입을 막지 않고, 로그만 남긴다 — 홈으로 돌아가면
-      // getDailyMission() 재조회가 실제 상태를 다시 맞춰준다.
+      // 호출하지 않는다. 이 부수 호출이 실패해도(예: 이미 완료 처리된 미션)
+      // 사용자가 방금 실제로 남긴 기록 자체는 이미 저장됐으므로 완료 화면 진입을
+      // 막지 않는다. 다만 완료 요청이 끝나기 전에 홈 갱신 신호를 보내면 ACCEPTED
+      // 상태를 다시 읽는 경쟁이 생기므로 성공/실패가 결정될 때까지는 기다린다.
       if (target.refType === "MISSION") {
-        completeMission(target.refId).catch((completeError) => {
+        try {
+          await completeMission(target.refId);
+        } catch (completeError) {
           console.error("Failed to complete mission", completeError);
-        });
+        }
       }
 
       setConfirmed({
@@ -130,6 +134,8 @@ export function RecordEditorScreen() {
         memo: trimmedMemo || undefined,
         date: new Date(),
       });
+      // 홈이 오늘의 운동/미션/캘린더를 서버에서 다시 읽도록 알린다.
+      useRecordFlowStore.getState().markRecordSaved();
       router.replace("/record-complete");
     } catch {
       setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");

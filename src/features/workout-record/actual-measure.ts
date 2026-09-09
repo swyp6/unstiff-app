@@ -1,4 +1,5 @@
 import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
+import { toApiMeasureValue } from "@/features/workout-plan/measure-units";
 import type { GoalType } from "@/features/workout-plan/model";
 
 // 실제 수행값(measures) 입력 전용 설정 — 계획/루틴 목표값 편집에 쓰이는
@@ -47,15 +48,19 @@ export function formatActualMeasureValue(type: GoalType, value: number) {
   return `${displayValue}${ACTUAL_MEASURE_CONFIG[type].unit}`;
 }
 
-// 선택된 measure type + 입력값을 POST /api/v1/workouts의 measures 형태로
-// 변환한다. 선택되지 않은 항목은 아예 필드를 만들지 않는다.
+// 선택된 measure type + 입력값(UI 단위: 분/km/회/세트)을
+// POST /api/v1/workouts의 measures(API 단위: 초/m/회/세트)로 변환한다.
+// 선택되지 않은 항목은 아예 필드를 만들지 않는다.
 export function toActualMeasuresDto(
   selectedTypes: GoalType[],
   values: Record<GoalType, number>,
 ): ExerciseMeasuresDto {
   const measures: ExerciseMeasuresDto = {};
   for (const type of selectedTypes) {
-    measures[GOAL_TYPE_TO_MEASURE_KEY[type]] = values[type];
+    measures[GOAL_TYPE_TO_MEASURE_KEY[type]] = toApiMeasureValue(
+      type,
+      values[type],
+    );
   }
   return measures;
 }

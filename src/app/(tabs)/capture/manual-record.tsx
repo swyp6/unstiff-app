@@ -1,8 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { Stack, useNavigation } from "expo-router";
-import { useState } from "react";
-import { Alert, Pressable, ScrollView, TextInput, View } from "react-native";
+import { router, Stack, useNavigation } from "expo-router";
+import { useRef, useState } from "react";
+import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ReanimatedAnimated, {
   FadeIn,
@@ -15,17 +15,39 @@ import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
+import { IntensityBottomSheet } from "@/features/workout-plan/components/intensity-bottom-sheet";
 import { WorkoutTypeBottomSheet } from "@/features/workout-plan/components/workout-type-bottom-sheet";
 import {
   PrimaryActionButton,
   SectionLabel,
   SelectionRow,
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
-import { GOAL_TYPES, type GoalType } from "@/features/workout-plan/model";
+import { createDailyPlan } from "@/features/workout-plan/api";
+import {
+  getIntensityLabel,
+  GOAL_TYPES,
+  type GoalType,
+  type Intensity,
+  toApiIntensity,
+  toPlanDateKey,
+} from "@/features/workout-plan/model";
+import { toActualMeasuresDto } from "@/features/workout-record/actual-measure";
+import { saveWorkoutRecord } from "@/features/workout-record/api";
 import { ActualMeasureStepper } from "@/features/workout-record/components/actual-measure-stepper";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
 const TITLE_MAX_LENGTH = 20;
+const MEMO_MAX_LENGTH = 40;
+
+type ManualSubmission = {
+  title: string;
+  exerciseType: string;
+  measures: ReturnType<typeof toActualMeasuresDto>;
+  apiIntensity: ReturnType<typeof toApiIntensity>;
+  memo?: string;
+  imageUrl?: string;
+  submittedAt: Date;
+};
 
 // Figma 4173:30739 "2.2.2.1 신규 운동 기록 입력 -> 운동종류 선택시" — 기존
 // 오늘의 운동/미션에 연결하지 않고 사용자가 직접 운동명·종류·수행값을 적는
@@ -47,11 +69,22 @@ export default function ManualRecordScreen() {
     reps: 1,
     sets: 1,
   });
+  const [intensity, setIntensity] = useState<Intensity>(null);
+  const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
+  const [memo, setMemo] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // STEP 1(daily-plan 생성)이 성공한 뒤 STEP 2(workout 생성)가 실패했을 때를
+  // 위한 값 — 재시도에서 daily-plan을 다시 만들지 않고, 이미 그 plan에 사용한
+  // 입력 스냅샷 그대로 workout만 다시 보내도록 id와 요청값을 함께 들고 있는다.
+  const createdDailyPlanIdRef = useRef<number | null>(null);
+  const pendingSubmissionRef = useRef<ManualSubmission | null>(null);
 
   const canSubmit =
     title.trim().length > 0 &&
     exerciseType.length > 0 &&
-    selectedTypes.length > 0;
+    selectedTypes.length > 0 &&
+    !isSubmitting;
 
   function toggleType(type: GoalType) {
     setSelectedTypes((current) =>
@@ -63,17 +96,92 @@ export default function ManualRecordScreen() {
     );
   }
 
-  // 저장 API가 아직 없다. POST /api/v1/workouts는 refType/refId(PLAN|MISSION)를
-  // 필수로 요구해서 기존 항목에 연결되지 않은 기록을 만들 수 없고, 운동명·운동
-  // 종류를 받을 필드도 확인된 바 없다(Swagger 접근 불가). 계약을 지어내
-  // 보내는 대신 여기서 멈추고 안내만 한다 — 서버 계약이 확정되면 이 핸들러가
-  // 입력값(title/exerciseType/selectedTypes/values/photo)을 그대로 실어
-  // 보내도록 바꾸면 된다.
-  function handleSubmit() {
-    Alert.alert(
-      "아직 지원되지 않는 기능이에요",
-      "직접 입력한 운동 기록 저장은 준비 중이에요. 오늘의 운동이나 미션에 연결해 기록해 주세요.",
-    );
+  // MANUAL 저장은 요청 두 번이다:
+  //   1) POST /api/v1/daily-plans — 방금 한 운동을 오늘의 운동으로 만든다
+  //   2) POST /api/v1/workouts    — 그 daily-plan(refType "PLAN")에 실제 기록
+  // refType에 MANUAL 같은 값을 지어내지 않고, 기존 PLAN 경로를 그대로 쓴다.
+  //
+  // 1)의 targets와 2)의 measures에 같은 값이 들어간다. 일반적으로 targets는
+  // "목표", measures는 "실제 수행값"이라 다를 수 있지만, MANUAL은 미리 계획을
+  // 세우는 흐름이 아니라 "이미 한 운동을 지금 기록하는" 즉시 기록 흐름이고
+  // 화면에도 목표/실제를 따로 받는 입력이 없다(Figma 4173:30739). 그래서 이
+  // 화면에 한해 의도적으로 같은 값을 쓴다 — "목표와 실제는 늘 같다"는 일반
+  // 규칙으로 일반화하면 안 된다.
+  async function handleSubmit() {
+    if (!canSubmit || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const trimmedMemo = memo.trim();
+      const currentSubmission: ManualSubmission = {
+        title: title.trim(),
+        exerciseType,
+        measures: toActualMeasuresDto(selectedTypes, values),
+        apiIntensity: toApiIntensity(intensity),
+        ...(trimmedMemo ? { memo: trimmedMemo } : null),
+        ...(photo ? { imageUrl: photo.secureUrl } : null),
+        submittedAt: new Date(),
+      };
+      // STEP 1까지 성공한 재시도라면 사용자가 화면에서 값을 바꿨어도 기존 plan과
+      // 다른 workout을 연결하지 않고 첫 시도 때 확정한 입력을 그대로 재사용한다.
+      const submission = pendingSubmissionRef.current ?? currentSubmission;
+
+      // STEP 2가 실패해 사용자가 다시 누르는 경우, 이미 만들어진 daily-plan을
+      // 재사용한다 — 재시도마다 오늘의 운동이 하나씩 늘어나면 안 된다.
+      // (실패했다고 방금 만든 daily-plan을 지우는 보상 삭제는 하지 않는다.)
+      let dailyPlanId = createdDailyPlanIdRef.current;
+      if (dailyPlanId == null) {
+        // startTime은 이 화면에 입력이 없어 보내지 않는다(현재 시각을 임의로
+        // 넣지 않는다). memo도 여기가 아니라 workout 쪽에만 저장한다.
+        const created = await createDailyPlan({
+          name: submission.title,
+          exerciseType: submission.exerciseType,
+          planDate: toPlanDateKey(submission.submittedAt),
+          targets: submission.measures,
+          // 서버 필수 필드 — 이 화면에 스톱워치 UI가 없어 false로 보낸다.
+          stopwatchEnabled: false,
+          ...(submission.apiIntensity
+            ? { intensity: submission.apiIntensity }
+            : null),
+        });
+        dailyPlanId = created.id;
+        createdDailyPlanIdRef.current = dailyPlanId;
+        pendingSubmissionRef.current = submission;
+      }
+
+      // 한 줄 기록은 "실제 수행 후 남기는 기록"이라 daily-plan이 아니라 이쪽에
+      // 저장한다(같은 memo를 두 API에 중복 저장하지 않는다).
+      await saveWorkoutRecord({
+        refType: "PLAN",
+        refId: dailyPlanId,
+        measures: submission.measures,
+        ...(submission.apiIntensity
+          ? { intensity: submission.apiIntensity }
+          : null),
+        ...(submission.imageUrl ? { imageUrl: submission.imageUrl } : null),
+        ...(submission.memo ? { memo: submission.memo } : null),
+      });
+
+      useRecordFlowStore.getState().setConfirmed({
+        target: {
+          mode: "MANUAL",
+          title: submission.title,
+          exerciseType: submission.exerciseType,
+        },
+        secureUrl: submission.imageUrl,
+        measures: submission.measures,
+        memo: submission.memo,
+        date: submission.submittedAt,
+      });
+      // 홈이 오늘의 운동/캘린더를 서버에서 다시 읽도록 알린다.
+      useRecordFlowStore.getState().markRecordSaved();
+      router.replace("/record-complete");
+    } catch {
+      setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -209,6 +317,67 @@ export default function ManualRecordScreen() {
                 ))}
               </View>
             </View>
+
+            {/* 강도·한 줄 기록은 LINKED 기록 입력(record-editor-screen.tsx)과
+                같은 컴포넌트/문구를 쓴다 — 두 화면이 같은 기록을 남기는 입력이라
+                따로 만들지 않는다. 둘 다 선택 사항이다. */}
+            <View style={{ gap: 4 }}>
+              <SectionLabel>강도</SectionLabel>
+              <SelectionRow
+                accessibilityLabel="강도 선택"
+                onPress={() => setIsIntensitySheetVisible(true)}
+                placeholder="선택해주세요"
+                value={getIntensityLabel(intensity)}
+              />
+            </View>
+
+            <View style={{ gap: 6 }}>
+              <SectionLabel>한 줄 기록 (선택)</SectionLabel>
+              <View
+                style={{
+                  backgroundColor: semanticColors["fill-subtle"],
+                  borderRadius: 12,
+                  height: 52,
+                  paddingHorizontal: 16,
+                  justifyContent: "center",
+                }}
+              >
+                <TextInput
+                  accessibilityLabel="한 줄 기록"
+                  maxLength={MEMO_MAX_LENGTH}
+                  onChangeText={setMemo}
+                  placeholder="기록을 남겨보세요"
+                  placeholderTextColor={semanticColors["label-disabled"]}
+                  returnKeyType="done"
+                  style={{
+                    color: semanticColors["label-normal"],
+                    fontFamily: "Pretendard-Bold",
+                    fontSize: 13,
+                    paddingRight: 48,
+                  }}
+                  value={memo}
+                />
+                <ThemedText
+                  typography="caption-2-regular"
+                  style={{
+                    position: "absolute",
+                    right: 16,
+                    color: semanticColors["label-disabled"],
+                  }}
+                >
+                  {memo.length} / {MEMO_MAX_LENGTH}
+                </ThemedText>
+              </View>
+            </View>
+
+            {error && (
+              <ThemedText
+                typography="caption-1-regular"
+                style={{ color: "#ff6b6b", textAlign: "center" }}
+              >
+                {error}
+              </ThemedText>
+            )}
           </ReanimatedAnimated.View>
         </ScrollView>
 
@@ -220,7 +389,7 @@ export default function ManualRecordScreen() {
         >
           <PrimaryActionButton
             disabled={!canSubmit}
-            label="운동 완료하기"
+            label={isSubmitting ? "저장 중..." : "운동 완료하기"}
             onPress={handleSubmit}
           />
         </ReanimatedAnimated.View>
@@ -237,6 +406,19 @@ export default function ManualRecordScreen() {
             setIsTypeSheetVisible(false);
           }}
           value={exerciseType}
+          visible
+        />
+      )}
+
+      {isIntensitySheetVisible && (
+        <IntensityBottomSheet
+          embedded
+          onClose={() => setIsIntensitySheetVisible(false)}
+          onConfirm={(value) => {
+            setIntensity(value);
+            setIsIntensitySheetVisible(false);
+          }}
+          value={intensity}
           visible
         />
       )}

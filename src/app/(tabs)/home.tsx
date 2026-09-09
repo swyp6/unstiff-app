@@ -278,13 +278,7 @@ export default function HomeScreen() {
   // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
   useEffect(() => {
     getDailyMission()
-      .then((response) => {
-        // offerTime이 빈 문자열/undefined로 오면 도착 문구만 조용히
-        // 비어버리는 문제가 있어(포맷 함수는 방어했지만 원인 확인용),
-        // 실제 응답 값을 남겨서 기기 로그에서 확인할 수 있게 한다.
-        console.log("[mission] daily mission response", response);
-        applyMissionResponse(response);
-      })
+      .then(applyMissionResponse)
       .catch((error) => console.error("Failed to load daily mission", error));
   }, []);
 
@@ -360,6 +354,10 @@ export default function HomeScreen() {
   // 않는다 — ref라 값이 바뀌어도 리렌더를 트리거하지 않고, 이미 로드된
   // 날짜에 로컬로 추가한 항목(addSavedPlanToDate 등)이 재조회로 덮어써지지
   // 않게 막아준다.
+  // 카메라 탭에서 시작한 기록(LINKED/MANUAL)은 이 화면을 거치지 않아
+  // pendingRecordPlanItemId 기반 resync가 걸리지 않는다. 저장 성공 시각을
+  // 구독해 그때만 오늘의 운동/미션/캘린더를 서버에서 다시 읽는다.
+  const savedRecordAt = useRecordFlowStore((state) => state.savedRecordAt);
   const loadedWorkoutDateKeysRef = useRef(new Set<string>());
 
   function loadWorkoutsForDate(date: Date) {
@@ -390,6 +388,23 @@ export default function HomeScreen() {
         loadedWorkoutDateKeysRef.current.delete(key);
       });
   }
+
+  // 기록 저장이 성공하면(카메라 탭에서 시작한 LINKED/MANUAL 포함) 오늘 데이터를
+  // 서버 기준으로 다시 맞춘다 — MANUAL은 오늘의 운동이 새로 하나 생기고,
+  // LINKED는 해당 항목이 완료로 바뀐다. loadWorkoutsForDate는 날짜당 한 번만
+  // 받아오는 캐시가 있어 오늘 키를 먼저 지운다. 캘린더는 위 effect가
+  // savedRecordAt을 dep으로 함께 다시 읽는다.
+  useEffect(() => {
+    if (savedRecordAt == null) return;
+    const now = new Date();
+    loadedWorkoutDateKeysRef.current.delete(now.toDateString());
+    loadWorkoutsForDate(now);
+    getDailyMission()
+      .then(applyMissionResponse)
+      .catch((error) => {
+        console.error("Failed to refresh daily mission", error);
+      });
+  }, [savedRecordAt]);
   // 상세/수정 시트가 지금 "저장된 운동 계획" 하나를 편집 중인지, 아니면
   // 어떤 날짜의 독립적인 운동 인스턴스(workout.plan)를 편집 중인지 구분한다
   // — 시트 자체(WorkoutPlanDetailBottomSheet)는 그대로 재사용하고, 저장만
@@ -468,7 +483,10 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [viewedYear, viewedMonthNumber]);
+    // savedRecordAt: 기록 저장이 실제로 성공했을 때만 바뀌는 신호라, 이 달을
+    // 다시 읽어 recordCount/imageUrl을 최신 서버 값으로 맞춘다(화면 포커스마다
+    // 무조건 재조회하지는 않는다).
+  }, [viewedYear, viewedMonthNumber, savedRecordAt]);
 
   // date(YYYY-MM-DD) 기준 lookup — days는 기록/예정 운동이 있는 날짜만 내려오는
   // sparse 배열이라 index로 캘린더 셀과 매칭하면 안 되고 반드시 date로 찾아야

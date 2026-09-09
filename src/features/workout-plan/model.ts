@@ -1,10 +1,17 @@
+import {
+  fromApiMeasureValue,
+  type GoalType,
+  toApiMeasureValue,
+} from "./measure-units";
 import type {
   DailyPlanResponse,
   ExerciseMeasuresDto,
   PlanPresetResponse,
 } from "./types";
 
-export type GoalType = "time" | "distance" | "reps" | "sets";
+// GoalType의 정의는 measure-units.ts에 있다(순환 import 방지) — 기존 호출부가
+// 계속 이 모듈에서 가져다 쓸 수 있도록 여기서 다시 내보낸다.
+export type { GoalType };
 
 export type Intensity = "light" | "moderate" | "hard" | null;
 
@@ -158,13 +165,17 @@ const GOAL_TYPE_TO_MEASURE_KEY: Record<
 };
 
 // 등록 API(루틴/오늘의 운동 생성)가 공통으로 쓰는 필드 변환 — targets는 켠
-// 항목만 담아야 하므로 selectedGoalTypes만 순회한다.
+// 항목만 담아야 하므로 selectedGoalTypes만 순회한다. goalValues는 UI 단위
+// (분/km)라 API 단위(초/m)로 바꿔 보낸다(measure-units.ts).
 export function toExerciseMeasuresDto(plan: WorkoutPlanDraft) {
   const targets: Partial<
     Record<"duration" | "distance" | "count" | "sets", number>
   > = {};
   for (const type of plan.selectedGoalTypes) {
-    targets[GOAL_TYPE_TO_MEASURE_KEY[type]] = plan.goalValues[type];
+    targets[GOAL_TYPE_TO_MEASURE_KEY[type]] = toApiMeasureValue(
+      type,
+      plan.goalValues[type],
+    );
   }
   return targets;
 }
@@ -173,6 +184,14 @@ export function toApiStartTime(value: StartTime) {
   if (!value) return undefined;
   const hour24 = (value.hour % 12) + (value.period === "PM" ? 12 : 0);
   return `${String(hour24).padStart(2, "0")}:${String(value.minute).padStart(2, "0")}:00`;
+}
+
+// planDate/캘린더 키로 쓰는 "YYYY-MM-DD" — 반드시 로컬 날짜 기준이다.
+// toISOString()은 UTC로 바꿔버려서 한국 시간 오전 9시 이전이면 전날이 된다.
+export function toPlanDateKey(date: Date): string {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }
 
 export function toApiIntensity(value: Intensity) {
@@ -188,6 +207,10 @@ export function toPlanRequestFields(plan: WorkoutPlanDraft) {
     name: plan.title,
     exerciseType: plan.exerciseType,
     targets: toExerciseMeasuresDto(plan),
+    // 서버가 요구하는 필수 필드다(없으면 400 "Failed to read request").
+    // 앱에는 스톱워치를 켜고 끄는 UI가 없어 항상 false로 보낸다 — 값이 생기면
+    // WorkoutPlanDraft에 상태를 추가해 여기에 실으면 된다.
+    stopwatchEnabled: false,
     startTime: toApiStartTime(plan.startTime),
     intensity: toApiIntensity(plan.intensity),
     memo: plan.memo || undefined,
@@ -238,7 +261,9 @@ function fromPlanResponseFields(
   ) as [keyof typeof MEASURE_KEY_TO_GOAL_TYPE, GoalType][]) {
     const value = response.targets[measureKey];
     if (value == null) continue;
-    goalValues[goalType] = value;
+    // 응답은 API 단위(초/m)라 UI 단위(분/km)로 되돌린다 —
+    // toExerciseMeasuresDto의 정확한 역연산이어야 한다.
+    goalValues[goalType] = fromApiMeasureValue(goalType, value);
     selectedGoalTypes.push(goalType);
   }
 
