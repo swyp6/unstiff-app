@@ -547,6 +547,31 @@ export default function HomeScreen() {
     loadWorkoutsForDate(now);
   }
 
+  // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 포커스
+  // 재획득 시 pending rollback(바로 아래 effect), 그리고 앨범에서 선택하다
+  // 취소/거부됐을 때 공통으로 쓴다. 카메라로 넘어가거나 "사진 없이
+  // 기록하기"를 고르는 경우는 기록이 확정되므로 여기로 오지 않는다.
+  // (아래 effect보다 먼저 선언해야 한다 — 함수 선언이라 런타임 호이스팅은
+  // 되지만, 그 상태로 두면 "선언 전에 참조" 린트 경고가 난다.)
+  function revertPendingRecord() {
+    if (!pendingRecordPlanItemId) return;
+    if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
+      setMissionStatus("accepted");
+    } else {
+      // 여기서 쓰는 today는 날짜 키(toDateString)로만 쓰여서 컴포넌트
+      // 상단의 today와 같은 날짜를 가리킨다 — 굳이 그 선언을 이 effect보다
+      // 앞으로 옮기지 않고 그때그때 새로 만든다.
+      updateWorkoutsForDate(new Date(), (workouts) =>
+        workouts.map((workout) =>
+          workout.id === pendingRecordPlanItemId
+            ? { ...workout, isDone: false }
+            : workout,
+        ),
+      );
+    }
+    setPendingRecordPlanItemId(null);
+  }
+
   // 카메라 close, 앨범 선택 취소 후 이탈 등으로 기록 흐름을 아예 시작하지
   // 못한 채(=pendingRecordPlanItemId가 여전히 남은 채) 홈 탭으로 다시
   // 포커스가 돌아오면 위 재조회로 실제 상태를 맞춘다. isFocused가 마운트
@@ -559,8 +584,15 @@ export default function HomeScreen() {
       !wasFocused && isFocused && pendingRecordPlanItemId !== null;
 
     if (regainedFocusWithPending) {
-      resyncPendingRecordWithServer(pendingRecordPlanItemId);
-      setPendingRecordPlanItemId(null);
+      // 먼저 낙관적으로 켰던 완료 표시를 되돌린 뒤에 서버를 재조회한다 —
+      // 재조회가 실패해도(네트워크 오류 등) rollback된 미완료 상태가 그대로
+      // 남는다. 성공하면 그 응답이 실제 서버 상태(완료/미완료 어느 쪽이든)로
+      // 다시 덮어써서 자연스럽게 맞춰진다. revertPendingRecord()가 이미
+      // pendingRecordPlanItemId를 null로 지우므로, resync에 넘길 id를 먼저
+      // 로컬 변수로 붙잡아 둔다.
+      const planItemId = pendingRecordPlanItemId;
+      revertPendingRecord();
+      resyncPendingRecordWithServer(planItemId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused, pendingRecordPlanItemId]);
@@ -1046,25 +1078,6 @@ export default function HomeScreen() {
     }
     setMissionStatus("completed");
     openRecordMethodModal(MISSION_PLAN_ITEM_ID, missionTitle);
-  }
-
-  // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 그리고
-  // 앨범에서 선택하다 취소/거부됐을 때 공통으로 쓴다. 카메라로 넘어가거나
-  // "사진 없이 기록하기"를 고르는 경우는 기록이 확정되므로 여기로 오지 않는다.
-  function revertPendingRecord() {
-    if (!pendingRecordPlanItemId) return;
-    if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
-      setMissionStatus("accepted");
-    } else {
-      updateWorkoutsForDate(today, (workouts) =>
-        workouts.map((workout) =>
-          workout.id === pendingRecordPlanItemId
-            ? { ...workout, isDone: false }
-            : workout,
-        ),
-      );
-    }
-    setPendingRecordPlanItemId(null);
   }
 
   function dismissRecordMethodModal() {

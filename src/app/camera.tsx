@@ -21,6 +21,35 @@ import { useRecordFlowStore } from "@/features/workout-record/record-flow-store"
 // Figma 1917:24863/1917:24879 배경색과 동일한 값 — 하드코딩 대신 토큰을 쓴다.
 const CAMERA_BG = semanticColors["label-normal"];
 
+// useLocalSearchParams의 제네릭 타입은 컴파일 타임 단언일 뿐이다 — 실제 URL
+// 쿼리값은 타입과 무관하게 임의 문자열이거나(예: /camera?refType=PLAN&refId=abc)
+// 같은 키가 반복되면 배열로 온다. 여기서 실제 값을 검증한다.
+function firstParamValue(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : undefined;
+  }
+  return typeof value === "string" ? value : undefined;
+}
+
+// refType/refId가 있어야 LINKED(PLAN/MISSION에서 진입) 흐름으로 인정한다 —
+// refId가 숫자로 파싱되지 않거나(예: "abc") 0/음수/실수면 유효하지 않다고
+// 보고, sentinel(0, -1 등)을 지어내 만들지 않는다. 유효하지 않으면 standalone
+// 카메라 흐름(target 화면)으로 그대로 흘려보낸다.
+function parseLinkedTarget(
+  rawRefType: unknown,
+  rawRefId: unknown,
+): { refType: "PLAN" | "MISSION"; refId: number } | null {
+  const refType = firstParamValue(rawRefType);
+  const refId = firstParamValue(rawRefId);
+  if (refType !== "PLAN" && refType !== "MISSION") return null;
+  if (refId == null) return null;
+
+  const parsedRefId = Number(refId);
+  if (!Number.isSafeInteger(parsedRefId) || parsedRefId <= 0) return null;
+
+  return { refType, refId: parsedRefId };
+}
+
 type CapturedPhoto = {
   uri: string;
   width: number;
@@ -203,27 +232,32 @@ export default function CameraScreen() {
         photo.height,
         "DAILY_PHOTO",
       );
+
+      // 화면을 이미 벗어났으면(뒤로가기 등) 업로드 자체는 끝까지 흘러가게
+      // 두되, 그 결과로 전역 record-flow-store를 건드리지 않는다 — 그 사이
+      // 사용자가 새 기록을 시작했다면 store에는 이미 새 photo/target이 들어가
+      // 있고, 여기서 setPhoto를 부르면 뒤늦게 도착한 이전 기록의 사진이 그
+      // 새 기록의 사진을 덮어써 버린다. 다음 화면으로 밀어넣지 않는 것도
+      // 마찬가지 이유(예상 밖의 화면 전환)로 그대로 유지한다.
+      if (hasLeftRef.current) return;
+
       useRecordFlowStore.getState().setPhoto({ secureUrl });
 
-      // 화면을 이미 벗어났으면(뒤로가기 등) 업로드 결과는 store에 남기되
-      // 강제로 다음 화면을 밀어넣지 않는다 — 사용자가 이미 다른 곳으로
-      // 이동한 뒤라 예상 밖의 화면 전환이 된다.
-      if (!hasLeftRef.current) {
-        if (refType && refId) {
-          useRecordFlowStore.getState().setTarget({
-            mode: "LINKED",
-            refType,
-            refId: Number(refId),
-            title: title ?? "",
-          });
-          router.push("/record-editor");
-        } else {
-          // 하단 카메라 탭(capture/index)에서 진입한 경우만 여기로 온다
-          // — 대상 선택 화면은 그 탭의 nested route(capture/target)라
-          // Native TabBar가 계속 보인다(camera 탭 자체가 root fullScreenModal
-          // 이 아니라 탭 콘텐츠라서 이 분기는 항상 그 안에서만 실행된다).
-          router.push("/capture/target");
-        }
+      const linkedTarget = parseLinkedTarget(refType, refId);
+      if (linkedTarget) {
+        useRecordFlowStore.getState().setTarget({
+          mode: "LINKED",
+          refType: linkedTarget.refType,
+          refId: linkedTarget.refId,
+          title: title ?? "",
+        });
+        router.push("/record-editor");
+      } else {
+        // 하단 카메라 탭(capture/index)에서 진입한 경우만 여기로 온다
+        // — 대상 선택 화면은 그 탭의 nested route(capture/target)라
+        // Native TabBar가 계속 보인다(camera 탭 자체가 root fullScreenModal
+        // 이 아니라 탭 콘텐츠라서 이 분기는 항상 그 안에서만 실행된다).
+        router.push("/capture/target");
       }
     } catch (uploadError) {
       logImageUploadError("daily photo upload failed", uploadError);

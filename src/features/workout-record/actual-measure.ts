@@ -30,7 +30,10 @@ export const ACTUAL_MEASURE_CONFIG: Record<
     unit: "km",
     step: 0.1,
     minimum: 0,
-    maximum: 999.99,
+    // step(0.1)과 정확히 맞아떨어지지 않는 max(999.99)를 쓰면 스테퍼가
+    // 999.9에서 한 번 더 눌렀을 때 999.99로 clamp된 뒤 toFixed(1)에서
+    // "1000.0"으로 반올림돼 max를 넘는 값이 만들어진다. step 배수로 맞춘다.
+    maximum: 999.9,
   },
   reps: { label: "횟수", unit: "회", step: 1, minimum: 1, maximum: 9999 },
   sets: { label: "세트", unit: "세트", step: 1, minimum: 1, maximum: 999 },
