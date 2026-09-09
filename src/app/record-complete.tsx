@@ -1,10 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import ReanimatedAnimated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -37,6 +38,26 @@ const MEASURE_DISPLAY: {
   { key: "sets", label: "세트", format: (v) => `${v}세트` },
 ];
 
+// Figma 4173:30847 기준(375x812) 사진 영역의 top/height와, 그 안에서 각
+// 요소가 차지하는 상대 위치 — 사진 영역 자체는 flex:1(디바이스마다 실제
+// 높이가 다르다)이라, 절대 px 대신 이 비율로 앵커링해 같은 시각적 위치가
+// 나오게 한다.
+const PHOTO_TOP_FIGMA = 60;
+const PHOTO_HEIGHT_FIGMA = 620;
+// 그라데이션: top 380 ~ 사진 하단(680)까지, 즉 사진 높이의 아래쪽 48.4%.
+const GRADIENT_HEIGHT_PERCENT = `${((PHOTO_TOP_FIGMA + PHOTO_HEIGHT_FIGMA - 380) / PHOTO_HEIGHT_FIGMA) * 100}%`;
+const DATE_TOP_PERCENT = `${((470 - PHOTO_TOP_FIGMA) / PHOTO_HEIGHT_FIGMA) * 100}%`;
+const TITLE_TOP_PERCENT = `${((490 - PHOTO_TOP_FIGMA) / PHOTO_HEIGHT_FIGMA) * 100}%`;
+const MEASURES_TOP_PERCENT = `${((526 - PHOTO_TOP_FIGMA) / PHOTO_HEIGHT_FIGMA) * 100}%`;
+// 토스트는 사진 하단에서 17px 위(사진 bottom 680 - 토스트 bottom 663)에
+// 뜬다 — 디바이스별 사진 높이가 달라도 "사진이 끝나기 직전" 위치가
+// 유지되도록 사진 영역의 bottom 기준으로 고정 오프셋을 준다.
+const TOAST_BOTTOM_OFFSET = 17;
+
+const TOAST_ENTER_MS = 220;
+const TOAST_HOLD_MS = 1500;
+const TOAST_EXIT_MS = 190;
+
 function formatDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -44,7 +65,7 @@ function formatDate(date: Date) {
   return `${year}. ${month}. ${day}`;
 }
 
-// Figma 2117:11386 "[완료] -> 홈으로" — POST /api/v1/workouts 성공 직후에만
+// Figma 4173:30847 "[완료] -> 홈으로" — POST /api/v1/workouts 성공 직후에만
 // 진입한다(record-editor.tsx 참고). confirmed는 저장에 실제 사용한 값의
 // 스냅샷이라, 이 화면이 떠 있는 동안 draft(photo/target)가 초기화돼도
 // 표시값에는 영향이 없다.
@@ -52,6 +73,16 @@ export default function RecordCompleteScreen() {
   const insets = useSafeAreaInsets();
   const confirmed = useRecordFlowStore((state) => state.confirmed);
   const reset = useRecordFlowStore((state) => state.reset);
+
+  // 토스트는 등장 → 일정 시간 유지 → 사라짐을 한 번만 재생한다. absolute라
+  // 사라져도 아래 "오늘 기록에 담았어요"/확인 버튼 레이아웃은 전혀 영향받지
+  // 않는다 — 조건부 렌더(false가 되면 exiting 애니메이션 후 실제로
+  // unmount)만으로 전체 lifecycle을 표현한다.
+  const [isToastVisible, setIsToastVisible] = useState(true);
+  useEffect(() => {
+    const timer = setTimeout(() => setIsToastVisible(false), TOAST_HOLD_MS);
+    return () => clearTimeout(timer);
+  }, []);
 
   // 이 화면으로 잘못 진입한 경우(confirmed 없음) 저장 성공 화면을 지어내지
   // 않고 바로 홈으로 보낸다. dismissTo로 이 화면(및 그 위에 쌓인 게 있다면
@@ -94,90 +125,126 @@ export default function RecordCompleteScreen() {
           ) : (
             <View style={{ flex: 1 }} />
           )}
-          <View
+
+          <LinearGradient
+            colors={["rgba(13,15,20,0)", "rgba(13,15,20,0.9)"]}
+            end={{ x: 0, y: 1 }}
             pointerEvents="none"
+            start={{ x: 0, y: 0 }}
             style={{
               position: "absolute",
               left: 0,
               right: 0,
               bottom: 0,
-              height: "55%",
-              backgroundColor: "rgba(13,15,20,0.55)",
+              height: GRADIENT_HEIGHT_PERCENT,
             }}
           />
-          <View
-            style={{ position: "absolute", left: 24, right: 24, bottom: 24 }}
+
+          <ThemedText
+            typography="caption-2-bold"
+            style={{
+              position: "absolute",
+              left: 24,
+              top: DATE_TOP_PERCENT,
+              color: "rgba(255,255,255,0.7)",
+            }}
           >
-            <ThemedText
-              typography="caption-2-bold"
-              style={{ color: "rgba(255,255,255,0.7)", marginBottom: 6 }}
-            >
-              {formatDate(confirmed.date)}
-            </ThemedText>
-            <ThemedText
-              typography="title-3-bold"
-              style={{ color: "#ffffff", marginBottom: 12 }}
-            >
-              {confirmed.target.title}
-            </ThemedText>
-            <View style={{ flexDirection: "row", gap: 24 }}>
-              {measureEntries.map(({ key, label, format }) => (
-                <View key={key}>
-                  <ThemedText
-                    typography="title-2-bold"
-                    style={{ color: "#ffffff" }}
-                  >
-                    {format(confirmed.measures[key]!)}
-                  </ThemedText>
-                  <ThemedText
-                    typography="caption-2-regular"
-                    style={{ color: "rgba(255,255,255,0.7)" }}
-                  >
-                    {label}
-                  </ThemedText>
-                </View>
-              ))}
-            </View>
+            {formatDate(confirmed.date)}
+          </ThemedText>
+          <ThemedText
+            typography="title-3-bold"
+            style={{
+              position: "absolute",
+              left: 24,
+              top: TITLE_TOP_PERCENT,
+              color: "#ffffff",
+            }}
+          >
+            {confirmed.target.title}
+          </ThemedText>
+          <View
+            style={{
+              position: "absolute",
+              left: 24,
+              top: MEASURES_TOP_PERCENT,
+              flexDirection: "row",
+              gap: 24,
+            }}
+          >
+            {measureEntries.map(({ key, label, format }) => (
+              <View key={key}>
+                <ThemedText
+                  typography="title-2-bold"
+                  style={{ color: "#ffffff" }}
+                >
+                  {format(confirmed.measures[key]!)}
+                </ThemedText>
+                <ThemedText
+                  typography="caption-2-regular"
+                  style={{ color: "rgba(255,255,255,0.7)" }}
+                >
+                  {label}
+                </ThemedText>
+              </View>
+            ))}
           </View>
+
+          {isToastVisible && (
+            <ReanimatedAnimated.View
+              entering={FadeIn.duration(TOAST_ENTER_MS)}
+              exiting={FadeOut.duration(TOAST_EXIT_MS)}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: TOAST_BOTTOM_OFFSET,
+                alignItems: "center",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  height: 48,
+                  paddingHorizontal: 16,
+                  borderRadius: 999,
+                  backgroundColor: semanticColors["label-normal"],
+                  shadowColor: "#000000",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.24,
+                  shadowRadius: 20,
+                  elevation: 6,
+                }}
+              >
+                <View
+                  style={{
+                    width: 27,
+                    height: 27,
+                    borderRadius: 999,
+                    backgroundColor: "#ffffff",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <Ionicons
+                    name="checkmark"
+                    size={13}
+                    color={semanticColors["label-normal"]}
+                  />
+                </View>
+                <ThemedText
+                  typography="body-3-bold"
+                  style={{ color: "#ffffff" }}
+                >
+                  운동 기록을 등록했어요!
+                </ThemedText>
+              </View>
+            </ReanimatedAnimated.View>
+          )}
         </View>
 
         <View style={{ paddingHorizontal: 24, paddingTop: 16 }}>
-          <Animated.View
-            entering={FadeInDown.duration(300)}
-            style={{
-              alignSelf: "center",
-              flexDirection: "row",
-              alignItems: "center",
-              gap: 8,
-              height: 48,
-              paddingHorizontal: 16,
-              borderRadius: 999,
-              backgroundColor: semanticColors["label-normal"],
-              shadowColor: "#000000",
-              shadowOffset: { width: 0, height: 6 },
-              shadowOpacity: 0.24,
-              shadowRadius: 20,
-              elevation: 6,
-              marginBottom: 16,
-            }}
-          >
-            <View
-              style={{
-                width: 20,
-                height: 20,
-                borderRadius: 999,
-                backgroundColor: "rgba(255,255,255,0.16)",
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Ionicons name="checkmark" size={13} color="#ffffff" />
-            </View>
-            <ThemedText typography="body-3-bold" style={{ color: "#ffffff" }}>
-              운동 기록을 등록했어요!
-            </ThemedText>
-          </Animated.View>
-
           <ThemedText
             typography="body-3-medium"
             style={{
