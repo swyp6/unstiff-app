@@ -37,6 +37,9 @@ import {
 import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
 import type { DailyMissionResponse } from "@/features/missions/types";
 import { useUnreadPushCount } from "@/features/notifications/use-unread-push-count";
+import { getWorkoutHistory } from "@/features/workout-history/api";
+import { summarizeWorkoutHistoryEntry } from "@/features/workout-history/model";
+import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 import {
   createDailyPlan,
   createPlanPreset,
@@ -60,7 +63,6 @@ import {
   createBlankWorkoutPlanDraft,
   fromDailyPlanResponse,
   fromPlanPresetResponse,
-  getWorkoutPlanSummary,
   toPlanRequestFields,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
@@ -104,12 +106,11 @@ const DAILY_MISSION_STATUS_MAP: Record<
 // generates.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
 
-// calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
-// 상세 정보가 없다 — 그래서 미션 항목은 아예 만들 수 없고, "지난 운동"
-// 목록은 이 세션에서 사용자가 실제로 완료 처리한 로컬 운동(workoutsByDate)만
-// 보여준다. 상세 기록 조회 API가 생기면 이 타입을 확장한다.
+// GET /api/v1/workouts?date=(운동 기록 조회) 응답을 그대로 매핑한다 — 미션인지
+// (refType === "MISSION") 여부까지 서버가 내려주므로 로컬에서 따로 추적할
+// 필요가 없다.
 type DayRecord = {
-  workouts: { title: string; subtitle: string }[];
+  workouts: { title: string; subtitle: string; isMission: boolean }[];
 };
 
 function createTodayWorkoutInstance(
@@ -247,13 +248,25 @@ function DayRecordCard({
                     />
                   </View>
                   <View className="flex-1 gap-0.5">
-                    <ThemedText
-                      typography="body-3-bold"
-                      themeColor="textSecondary"
-                      style={{ textDecorationLine: "line-through" }}
-                    >
-                      {entry.title}
-                    </ThemedText>
+                    <View className="flex-row items-center gap-1.5">
+                      <ThemedText
+                        typography="body-3-bold"
+                        themeColor="textSecondary"
+                        style={{ textDecorationLine: "line-through" }}
+                      >
+                        {entry.title}
+                      </ThemedText>
+                      {entry.isMission && (
+                        <View className="rounded-full bg-orange-50 px-2 py-0.5">
+                          <ThemedText
+                            typography="caption-2-bold"
+                            style={{ color: primitiveColors.orange["500"] }}
+                          >
+                            미션
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
                     <ThemedText
                       typography="caption-1-regular"
                       style={{ color: semanticColors["label-disabled"] }}
@@ -413,6 +426,29 @@ export default function HomeScreen() {
       .catch((error) => {
         console.error("Failed to load daily plans", error);
         loadedWorkoutDateKeysRef.current.delete(key);
+      });
+  }
+
+  // "지난 운동"(오늘/미래가 아닌 날짜)에 쓰는 실제 서버 기록 — GET
+  // /api/v1/workouts?date=는 그 날 남긴 운동/미션 기록을 refType까지 포함해
+  // 그대로 내려주므로, 로컬에서 미션 여부를 따로 추적할 필요가 없다.
+  const [workoutHistoryByDate, setWorkoutHistoryByDate] = useState<
+    Record<string, WorkoutHistoryResponse[]>
+  >({});
+  const loadedWorkoutHistoryDateKeysRef = useRef(new Set<string>());
+
+  function loadWorkoutHistoryForDate(date: Date) {
+    const key = date.toDateString();
+    if (loadedWorkoutHistoryDateKeysRef.current.has(key)) return;
+    loadedWorkoutHistoryDateKeysRef.current.add(key);
+
+    getWorkoutHistory(toDateKey(date))
+      .then(({ workouts }) => {
+        setWorkoutHistoryByDate((current) => ({ ...current, [key]: workouts }));
+      })
+      .catch((error) => {
+        console.error("Failed to load workout history", error);
+        loadedWorkoutHistoryDateKeysRef.current.delete(key);
       });
   }
   // 상세/수정 시트가 지금 "저장된 운동 계획" 하나를 편집 중인지, 아니면
@@ -646,26 +682,28 @@ export default function HomeScreen() {
   useEffect(() => {
     loadWorkoutsForDate(today);
     loadWorkoutsForDate(selectedCalendarDate);
+    // 지난 날짜만 DayRecordCard("지난 운동")를 보여주므로, 그 실제 기록도
+    // 그 경우에만 불러온다.
+    if (!isSelectedDateToday && !isSelectedDateFuture) {
+      loadWorkoutHistoryForDate(selectedCalendarDate);
+    }
     // today는 매 렌더 새로 만들어지는 Date라 deps에 넣으면 매번 재실행된다.
-    // 실제 재조회 여부는 loadWorkoutsForDate 내부의 날짜별 캐시(ref)가 결정한다.
+    // 실제 재조회 여부는 각 loadXForDate 내부의 날짜별 캐시(ref)가 결정한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCalendarDate]);
+  }, [selectedCalendarDate, isSelectedDateToday, isSelectedDateFuture]);
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
-  // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
-  // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
-  // 완료 처리한 로컬 기록(workoutsByDate)만 "지난 운동" 목록으로 보여준다.
-  const completedSelectedDateWorkouts = selectedDateWorkouts.filter(
-    (workout) => workout.isDone,
-  );
+  const selectedDateWorkoutHistory =
+    workoutHistoryByDate[selectedCalendarDate.toDateString()] ?? [];
   const selectedDayRecord: DayRecord | null =
     isSelectedDateToday ||
     isSelectedDateFuture ||
-    completedSelectedDateWorkouts.length === 0
+    selectedDateWorkoutHistory.length === 0
       ? null
       : {
-          workouts: completedSelectedDateWorkouts.map((workout) => ({
-            title: workout.plan.title,
-            subtitle: getWorkoutPlanSummary(workout.plan),
+          workouts: selectedDateWorkoutHistory.map((entry) => ({
+            title: entry.name,
+            subtitle: summarizeWorkoutHistoryEntry(entry),
+            isMission: entry.refType === "MISSION",
           })),
         };
   // 로컬에 상세가 없어도 서버 recordCount가 0보다 크면 "기록이 없다"고 하면
