@@ -7,9 +7,15 @@ const withKakaoMap = (config) => {
   const appKey = process.env.KAKAO_NATIVE_APP_KEY?.trim();
 
   if (!appKey) {
-    throw new Error(
-      `${ENVIRONMENT_VARIABLE_NAME} must be set to a non-empty value before generating the iOS project.`,
+    // eas-cli re-evaluates this config locally in several unrelated code
+    // paths (project-id lookup, env resolution, fingerprinting, metro
+    // config) that don't consistently expose EAS-stored env vars. Warn
+    // instead of throwing so those don't break — the real cloud build
+    // worker does have the real key.
+    console.warn(
+      `[kakao-map] ${ENVIRONMENT_VARIABLE_NAME} not set — skipping Kakao map config.`,
     );
+    return config;
   }
 
   return withInfoPlist(config, (infoPlistConfig) => {

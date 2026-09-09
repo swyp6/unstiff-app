@@ -11,6 +11,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   useWindowDimensions,
   View,
@@ -28,8 +29,9 @@ import ReanimatedAnimated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
+  canUseStopwatch,
   formatStartTime,
   getIntensityLabel,
   type GoalType,
@@ -53,19 +55,19 @@ type WorkoutPlanEditSheetProps = {
   value: WorkoutPlanDraft;
   onClose: () => void;
   onDelete: () => void;
-  // 신규 추가 흐름에서만 addToToday가 의미 있다(아래 토글) — 편집 흐름은
+  // 신규 추가 흐름에서만 saveAsRoutine이 의미 있다(아래 토글) — 편집 흐름은
   // 이미 저장된 계획을 고치는 것뿐이라 두 번째 인자를 그냥 무시하면 된다.
-  onSave: (value: WorkoutPlanDraft, addToToday: boolean) => void;
+  onSave: (value: WorkoutPlanDraft, saveAsRoutine: boolean) => void;
   // 기존 계획 편집("운동 계획 편집"/"변경 저장"/삭제 링크 있음)과 신규 계획
-  // 추가("루틴 추가"/"루틴 추가하기"/삭제 링크 없음, Figma node
-  // 2929-5701)가 필드 구성이 완전히 같아서 하나의 시트를 재사용한다.
+  // 추가("운동 추가하기"/삭제 링크 없음, Figma node 2929-5701)가 필드 구성이
+  // 완전히 같아서 하나의 시트를 재사용한다.
   title?: string;
   saveLabel?: string;
   showDelete?: boolean;
-  // 신규 추가 흐름에서만 "오늘만 할래요" on/off 토글을 보여준다 — 편집
+  // 신규 추가 흐름에서만 "루틴으로 할래요" on/off 토글을 보여준다 — 편집
   // 흐름의 계획은 이미 저장돼 있으니 토글이 필요 없다. 토글이 꺼져 있으면
-  // 재사용할 루틴이라 저장된 운동 계획에만 들어가고, 켜져 있으면 1회성
-  // 운동이라 저장된 운동 계획에는 안 들어가고 그날의 운동에만 추가된다.
+  // (기본값) 1회성 운동이라 저장된 운동 계획에는 안 들어가고 그날의 운동에만
+  // 추가되고, 켜져 있으면 재사용할 루틴이라 저장된 운동 계획에 들어간다.
   showAddToTodayToggle?: boolean;
   // "modal"(기본값)은 기존 그대로 RN <Modal>로 전체 화면 위에 띄운다.
   // "inline"은 Modal 없이 현재 화면(호출부) 트리 안에 절대위치로만
@@ -91,12 +93,12 @@ export function WorkoutPlanEditSheet({
   const { height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const [draft, setDraft] = useState<WorkoutPlanDraft>(value);
-  const [addToToday, setAddToToday] = useState(false);
-  // "오늘만 할래요"를 체크하면 버튼도 그 의미(오늘의 운동에 바로 추가)에
+  const [saveAsRoutine, setSaveAsRoutine] = useState(false);
+  // "루틴으로 할래요"를 체크하면 버튼도 그 의미(저장된 운동 계획에 등록)에
   // 맞춰 바뀐다 — 편집 흐름(showAddToTodayToggle=false)은 항상 전달받은
   // saveLabel 그대로 쓴다.
   const displayedSaveLabel =
-    showAddToTodayToggle && addToToday ? "오늘의 운동 추가하기" : saveLabel;
+    showAddToTodayToggle && saveAsRoutine ? "루틴 추가하기" : saveLabel;
   // 운동명·운동 종류·기록할 항목(4개 중 하나 이상) 셋 다 있어야 저장 가능.
   const canSubmit =
     draft.title.trim().length > 0 &&
@@ -343,6 +345,33 @@ export function WorkoutPlanEditSheet({
                     ))}
                   </View>
 
+                  {canUseStopwatch(draft) && (
+                    <View style={styles.stopwatchRow}>
+                      <ThemedText
+                        style={styles.stopwatchLabel}
+                        typography="body-2-regular"
+                      >
+                        스톱워치
+                      </ThemedText>
+                      <Switch
+                        accessibilityLabel="스톱워치"
+                        ios_backgroundColor={semanticColors["fill-strong"]}
+                        onValueChange={(stopwatchEnabled) =>
+                          setDraft((current) => ({
+                            ...current,
+                            stopwatchEnabled,
+                          }))
+                        }
+                        thumbColor={semanticColors["control-thumb"]}
+                        trackColor={{
+                          false: semanticColors["fill-strong"],
+                          true: primitiveColors.orange["500"],
+                        }}
+                        value={draft.stopwatchEnabled}
+                      />
+                    </View>
+                  )}
+
                   <View>
                     <SectionLabel>예상 시작 시간</SectionLabel>
                     <SelectionRow
@@ -392,22 +421,22 @@ export function WorkoutPlanEditSheet({
 
                   {showAddToTodayToggle && (
                     <Pressable
-                      accessibilityLabel="오늘만 할래요"
+                      accessibilityLabel="루틴으로 할래요"
                       accessibilityRole="checkbox"
-                      accessibilityState={{ checked: addToToday }}
+                      accessibilityState={{ checked: saveAsRoutine }}
                       hitSlop={8}
-                      onPress={() => setAddToToday((checked) => !checked)}
+                      onPress={() => setSaveAsRoutine((checked) => !checked)}
                       style={styles.toggleRow}
                     >
                       <View
                         style={[
                           styles.checkbox,
-                          addToToday
+                          saveAsRoutine
                             ? styles.checkboxChecked
                             : styles.checkboxUnchecked,
                         ]}
                       >
-                        {addToToday && (
+                        {saveAsRoutine && (
                           <Ionicons
                             color={semanticColors["label-inverse"]}
                             name="checkmark"
@@ -416,7 +445,7 @@ export function WorkoutPlanEditSheet({
                         )}
                       </View>
                       <ThemedText typography="body-2-regular">
-                        오늘만 할래요
+                        루틴으로 할래요
                       </ThemedText>
                     </Pressable>
                   )}
@@ -426,7 +455,7 @@ export function WorkoutPlanEditSheet({
                       disabled={!canSubmit}
                       label={displayedSaveLabel}
                       onPress={() =>
-                        closeSheet(() => onSave(draft, addToToday))
+                        closeSheet(() => onSave(draft, saveAsRoutine))
                       }
                     />
                     {showDelete && (
@@ -600,6 +629,16 @@ const styles = StyleSheet.create({
   },
   steppers: {
     gap: 8,
+  },
+  stopwatchRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+  },
+  stopwatchLabel: {
+    color: semanticColors["label-subtle"],
   },
   toggleRow: {
     alignItems: "center",

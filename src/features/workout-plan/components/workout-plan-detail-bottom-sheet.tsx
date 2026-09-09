@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from "react-native";
@@ -18,8 +19,9 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
+  canUseStopwatch,
   formatStartTime,
   getIntensityLabel,
   type GoalType,
@@ -381,6 +383,33 @@ export function WorkoutPlanDetailBottomSheet({
           )}
         </View>
 
+        {canUseStopwatch(detailDraft) && (
+          <View style={styles.stopwatchRow}>
+            <ThemedText
+              style={styles.stopwatchLabel}
+              typography="body-2-regular"
+            >
+              스톱워치
+            </ThemedText>
+            <Switch
+              accessibilityLabel="스톱워치"
+              ios_backgroundColor={semanticColors["fill-strong"]}
+              onValueChange={(stopwatchEnabled) =>
+                setDetailDraft((current) => ({
+                  ...current,
+                  stopwatchEnabled,
+                }))
+              }
+              thumbColor={semanticColors["control-thumb"]}
+              trackColor={{
+                false: semanticColors["fill-strong"],
+                true: primitiveColors.orange["500"],
+              }}
+              value={detailDraft.stopwatchEnabled}
+            />
+          </View>
+        )}
+
         <View>
           <SectionLabel>예상 시작 시간</SectionLabel>
           <SelectionRow
@@ -492,6 +521,16 @@ const styles = StyleSheet.create({
   },
   goals: {
     gap: 8,
+  },
+  stopwatchRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 12,
+    paddingVertical: 2,
+  },
+  stopwatchLabel: {
+    color: semanticColors["label-subtle"],
   },
   memoInput: {
     backgroundColor: semanticColors["fill-subtle"],

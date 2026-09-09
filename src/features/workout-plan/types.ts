@@ -11,12 +11,12 @@ export type ExerciseMeasuresDto = {
 export type IntensityDto = "LIGHT" | "MODERATE" | "HARD";
 
 // POST /api/v1/plan-presets
+// stopwatchEnabled는 스웨거 문서상 선택이지만, 실제로는 빠지면 요청 자체가
+// 파싱 실패(400 "Failed to read request")한다 — 항상 보내야 한다.
 export type PlanPresetCreateRequest = {
   name: string;
   exerciseType: string;
   targets: ExerciseMeasuresDto;
-  // 서버 필수 필드 — 빠지면 400 "Failed to read request"로 거절된다.
-  // 앱에는 아직 스톱워치 UI가 없어 항상 false를 보낸다(model.ts 참고).
   stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
@@ -27,13 +27,12 @@ export type PlanPresetCreateResponse = {
   id: number;
 };
 
-// POST /api/v1/daily-plans
+// POST /api/v1/daily-plans — stopwatchEnabled 필수인 이유는 위 PlanPresetCreateRequest 참고.
 export type DailyPlanCreateRequest = {
   name: string;
   exerciseType: string;
   planDate: string; // "YYYY-MM-DD"
   targets: ExerciseMeasuresDto;
-  // plan-preset과 동일하게 서버 필수 필드다.
   stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
@@ -54,7 +53,7 @@ export type DailyPlanResponse = {
   planDate: string; // "YYYY-MM-DD"
   status: DailyPlanStatus;
   targets: ExerciseMeasuresDto;
-  stopwatchEnabled?: boolean;
+  stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
   memo?: string;
@@ -76,7 +75,7 @@ export type PlanPresetResponse = {
   name: string;
   exerciseType: string;
   targets: ExerciseMeasuresDto;
-  stopwatchEnabled?: boolean;
+  stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
   memo?: string;

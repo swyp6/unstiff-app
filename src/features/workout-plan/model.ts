@@ -1,8 +1,4 @@
-import {
-  fromApiMeasureValue,
-  type GoalType,
-  toApiMeasureValue,
-} from "./measure-units";
+import type { GoalType } from "./measure-units";
 import type {
   DailyPlanResponse,
   ExerciseMeasuresDto,
@@ -30,7 +26,14 @@ export type WorkoutPlanDraft = {
   startTime: StartTime;
   intensity: Intensity;
   memo: string;
+  // "시간" 목표가 선택됐을 때만 켤 수 있다 — UI는 이 규칙을 canUseStopwatch로
+  // 강제하고, 요청 직전에도 toPlanRequestFields에서 한 번 더 방어한다.
+  stopwatchEnabled: boolean;
 };
+
+export function canUseStopwatch(plan: WorkoutPlanDraft) {
+  return plan.selectedGoalTypes.includes("time");
+}
 
 export const GOAL_TYPES: GoalType[] = ["time", "distance", "reps", "sets"];
 
@@ -99,6 +102,7 @@ export function createMockWorkoutPlan(
     startTime: { period: "PM", hour: 7, minute: 0 },
     intensity: "light",
     memo: "오늘은 천천히",
+    stopwatchEnabled: false,
   };
 }
 
@@ -119,12 +123,21 @@ export function createBlankWorkoutPlanDraft(id: string): WorkoutPlanDraft {
     startTime: null,
     intensity: null,
     memo: "",
+    stopwatchEnabled: false,
   };
 }
 
 export function formatGoalValue(type: GoalType, value: number) {
   const displayValue = type === "distance" ? value.toFixed(1) : String(value);
   return `${displayValue}${GOAL_CONFIG[type].unit}`;
+}
+
+// Figma 4331:25004의 운동 타이머 표시(MM:SS) — 시간 단위는 없다.
+export function formatStopwatchTime(totalSeconds: number) {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 // null이면 빈 문자열을 돌려줘서 SelectionRow의 placeholder("선택해주세요",
@@ -164,6 +177,26 @@ const GOAL_TYPE_TO_MEASURE_KEY: Record<
   sets: "sets",
 };
 
+// UI는 시간을 분, 거리를 km 단위로 다루지만 API(ExerciseMeasuresDto)는 각각
+// 초/m 단위다 — 여기서만 변환해서 API 호출부는 단위를 신경 쓰지 않게 한다.
+function toApiMeasureValue(
+  measureKey: "duration" | "distance" | "count" | "sets",
+  value: number,
+): number {
+  if (measureKey === "duration") return Math.round(value * 60);
+  if (measureKey === "distance") return Math.round(value * 1000);
+  return value;
+}
+
+function fromApiMeasureValue(
+  measureKey: "duration" | "distance" | "count" | "sets",
+  value: number,
+): number {
+  if (measureKey === "duration") return value / 60;
+  if (measureKey === "distance") return value / 1000;
+  return value;
+}
+
 // 등록 API(루틴/오늘의 운동 생성)가 공통으로 쓰는 필드 변환 — targets는 켠
 // 항목만 담아야 하므로 selectedGoalTypes만 순회한다. goalValues는 UI 단위
 // (분/km)라 API 단위(초/m)로 바꿔 보낸다(measure-units.ts).
@@ -172,10 +205,8 @@ export function toExerciseMeasuresDto(plan: WorkoutPlanDraft) {
     Record<"duration" | "distance" | "count" | "sets", number>
   > = {};
   for (const type of plan.selectedGoalTypes) {
-    targets[GOAL_TYPE_TO_MEASURE_KEY[type]] = toApiMeasureValue(
-      type,
-      plan.goalValues[type],
-    );
+    const measureKey = GOAL_TYPE_TO_MEASURE_KEY[type];
+    targets[measureKey] = toApiMeasureValue(measureKey, plan.goalValues[type]);
   }
   return targets;
 }
@@ -207,10 +238,10 @@ export function toPlanRequestFields(plan: WorkoutPlanDraft) {
     name: plan.title,
     exerciseType: plan.exerciseType,
     targets: toExerciseMeasuresDto(plan),
-    // 서버가 요구하는 필수 필드다(없으면 400 "Failed to read request").
-    // 앱에는 스톱워치를 켜고 끄는 UI가 없어 항상 false로 보낸다 — 값이 생기면
-    // WorkoutPlanDraft에 상태를 추가해 여기에 실으면 된다.
-    stopwatchEnabled: false,
+    // 스펙엔 선택 필드로 나와 있지만 실제로는 생략(undefined)이나 null을
+    // 보내면 요청 자체가 파싱 실패(400)한다 — 항상 값을 보내되, "시간" 목표가
+    // 없는데 켜진 값이 남아있을 경우를 대비해 여기서 한 번 더 강제한다.
+    stopwatchEnabled: canUseStopwatch(plan) && plan.stopwatchEnabled,
     startTime: toApiStartTime(plan.startTime),
     intensity: toApiIntensity(plan.intensity),
     memo: plan.memo || undefined,
@@ -245,6 +276,7 @@ type PlanResponseFields = {
   name: string;
   exerciseType: string;
   targets: ExerciseMeasuresDto;
+  stopwatchEnabled: boolean;
   startTime?: string;
   intensity?: "LIGHT" | "MODERATE" | "HARD";
   memo?: string;
@@ -263,7 +295,7 @@ function fromPlanResponseFields(
     if (value == null) continue;
     // 응답은 API 단위(초/m)라 UI 단위(분/km)로 되돌린다 —
     // toExerciseMeasuresDto의 정확한 역연산이어야 한다.
-    goalValues[goalType] = fromApiMeasureValue(goalType, value);
+    goalValues[goalType] = fromApiMeasureValue(measureKey, value);
     selectedGoalTypes.push(goalType);
   }
 
@@ -278,6 +310,7 @@ function fromPlanResponseFields(
     startTime: fromApiStartTime(response.startTime),
     intensity: fromApiIntensity(response.intensity),
     memo: response.memo ?? "",
+    stopwatchEnabled: response.stopwatchEnabled,
   };
 }
 

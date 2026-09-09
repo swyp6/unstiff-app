@@ -134,15 +134,59 @@ function TermRow({
   );
 }
 
-// The server's Term list has no "만 14세 이상" entry — it's a signup
-// eligibility check, not a legal document, so it's tracked as local-only
-// state and excluded from the agreeToTerms payload.
-const AGE_REQUIREMENT_TITLE = "만 14세 이상 가입 동의";
+// 화면에 그려지는 약관은 전부 GET /api/v1/terms 응답이고, 로컬에서 만들어내는
+// 약관은 없다. 이 배열은 Figma(AC-01-04)가 정의하는 표시 계층 — 노출 순서, 문구,
+// chevron(상세 진입) 노출 여부 — 만 담당한다. id·type·required·contentUrl·agreed
+// 같은 실제 약관 상태는 서버 응답이 source of truth다.
+//
+// SERVICE 타입 약관이 둘(만 14세 / 이용약관)이라 type만으로는 구분되지 않아
+// 그 둘은 title로, 타입이 유일한 MARKETING은 title 변경에 흔들리지 않도록
+// type으로 매칭한다. title 매칭은 서버가 "동의" 접미사를 붙여 내려주든 아니든
+// 걸리도록 접미사를 떼고 비교한다.
+type TermDisplaySpec = {
+  match: (term: Term) => boolean;
+  title: string;
+  hasDetail: boolean;
+};
+
+function byTitle(title: string) {
+  return (term: Term) => term.title.replace(/\s*동의$/, "") === title;
+}
+
+const TERM_DISPLAY: TermDisplaySpec[] = [
+  {
+    match: byTitle("만 14세 이상 가입"),
+    title: "만 14세 이상 가입 동의",
+    // 법적 고지 문서가 아니라 가입 자격 확인이라 Figma에 상세 진입이 없다.
+    hasDetail: false,
+  },
+  {
+    match: byTitle("찌뿌두둥 이용약관"),
+    title: "찌뿌두둥 이용약관 동의",
+    hasDetail: true,
+  },
+  {
+    match: byTitle("개인정보 수집 및 이용"),
+    title: "개인정보 수집 및 이용 동의",
+    hasDetail: true,
+  },
+  {
+    match: (term) => term.type === "MARKETING",
+    title: "Push 알림 동의",
+    // 서버가 contentUrl을 내려주더라도 Figma에는 chevron이 없다.
+    hasDetail: false,
+  },
+];
+
+function termOrderIndex(term: Term) {
+  const index = TERM_DISPLAY.findIndex((spec) => spec.match(term));
+  // Figma에 없는 약관이 서버에 추가되면 알려진 항목 뒤에 서버 순서대로 붙는다.
+  return index === -1 ? TERM_DISPLAY.length : index;
+}
 
 export default function TermsAgreementScreen() {
   const [terms, setTerms] = useState<Term[] | null>(null);
   const [agreements, setAgreements] = useState<Record<number, boolean>>({});
-  const [ageRequirementAgreed, setAgeRequirementAgreed] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
@@ -172,27 +216,36 @@ export default function TermsAgreementScreen() {
     setReloadKey((key) => key + 1);
   }
 
-  const allAgreed = useMemo(
+  const orderedTerms = useMemo(
     () =>
-      terms !== null &&
-      ageRequirementAgreed &&
-      terms.every((term) => agreements[term.id]),
-    [terms, agreements, ageRequirementAgreed],
+      terms === null
+        ? null
+        : // sort는 stable이라 TERM_DISPLAY에 없는 약관끼리는 서버 순서를 유지한다.
+          [...terms].sort((a, b) => termOrderIndex(a) - termOrderIndex(b)),
+    [terms],
   );
 
-  const requiredAgreed = useMemo(
-    () =>
-      terms !== null &&
-      ageRequirementAgreed &&
-      terms
-        .filter((term) => term.required)
-        .every((term) => agreements[term.id]),
-    [terms, agreements, ageRequirementAgreed],
+  // 선택 약관(MARKETING)까지 포함한다.
+  const allAgreed = useMemo(
+    () => terms !== null && terms.every((term) => agreements[term.id]),
+    [terms, agreements],
   );
+
+  // required 약관만 본다 — MARKETING은 required=false라 미동의여도 다음 단계로
+  // 진행할 수 있다.
+  const requiredAgreed = useMemo(() => {
+    if (terms === null) return false;
+    const requiredTerms = terms.filter((term) => term.required);
+    // 빈 배열의 every()는 true라 length 확인이 필요하다 — 서버가 필수 약관을
+    // 하나도 내려주지 않으면 아무것도 동의하지 않은 채로 다음 버튼이 열린다.
+    return (
+      requiredTerms.length > 0 &&
+      requiredTerms.every((term) => agreements[term.id])
+    );
+  }, [terms, agreements]);
 
   function toggleAll(value: boolean) {
     if (!terms) return;
-    setAgeRequirementAgreed(value);
     setAgreements(Object.fromEntries(terms.map((term) => [term.id, value])));
   }
 
@@ -257,7 +310,7 @@ export default function TermsAgreementScreen() {
     );
   }
 
-  if (!terms) {
+  if (!terms || !orderedTerms) {
     return (
       <SafeAreaView
         edges={["top", "left", "right", "bottom"]}
@@ -303,15 +356,13 @@ export default function TermsAgreementScreen() {
         </ThemedText>
 
         <View style={styles.termsList}>
-          <TermRow
-            checked={ageRequirementAgreed}
-            hasDetail={false}
-            onToggle={() => setAgeRequirementAgreed((value) => !value)}
-            required
-            title={AGE_REQUIREMENT_TITLE}
-          />
-          {terms.map((term) => {
-            const hasDetail = isValidHttpUrl(term.contentUrl);
+          {orderedTerms.map((term) => {
+            const display = TERM_DISPLAY.find((spec) => spec.match(term));
+            const title = display?.title ?? term.title;
+            // chevron 노출은 Figma 정책이 먼저고, 서버 contentUrl은 실제로 열
+            // 페이지가 있는지 확인하는 용도로만 쓴다.
+            const hasDetail =
+              (display?.hasDetail ?? true) && isValidHttpUrl(term.contentUrl);
             return (
               <TermRow
                 checked={agreements[term.id] ?? false}
@@ -319,7 +370,7 @@ export default function TermsAgreementScreen() {
                 key={term.id}
                 onPressDetail={
                   hasDetail
-                    ? () => openTermContent(term.title, term.contentUrl)
+                    ? () => openTermContent(title, term.contentUrl)
                     : undefined
                 }
                 onToggle={() =>
@@ -329,7 +380,7 @@ export default function TermsAgreementScreen() {
                   }))
                 }
                 required={term.required}
-                title={term.title}
+                title={title}
               />
             );
           })}

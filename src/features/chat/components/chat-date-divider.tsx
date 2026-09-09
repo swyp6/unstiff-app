@@ -1,7 +1,7 @@
 import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 
 type ChatDateDividerProps = {
   label: string;
@@ -23,7 +23,7 @@ const styles = StyleSheet.create({
   row: {
     alignItems: "center",
     flexDirection: "row",
-    gap: 16,
+    gap: 12,
     height: 49,
     paddingHorizontal: 20,
   },
@@ -33,6 +33,6 @@ const styles = StyleSheet.create({
     height: 1,
   },
   label: {
-    color: semanticColors["label-disabled"],
+    color: primitiveColors.charcoal["4"],
   },
 });

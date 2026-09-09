@@ -31,3 +31,12 @@ export const useAuthStore = create<AuthState>()(
     },
   ),
 );
+
+// 매번 DevTools 콘솔에 쳐서 꺼낼 필요 없이, 토큰이 바뀔 때마다(로그인/로그아웃/
+// 리하이드레이션/재발급) Metro 로그에 찍는다 — __DEV__ 가드로 프로덕션 빌드에는
+// 안 남는다.
+if (__DEV__) {
+  useAuthStore.subscribe((state) =>
+    console.log("[auth] accessToken", state.accessToken),
+  );
+}

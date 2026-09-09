@@ -24,8 +24,9 @@ import { scheduleOnRN } from "react-native-worklets";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
+import { MonthPickerSheet } from "@/features/calendar/components/month-picker-sheet";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   acceptMission,
@@ -35,6 +36,10 @@ import {
 } from "@/features/missions/api";
 import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
 import type { DailyMissionResponse } from "@/features/missions/types";
+import { useUnreadPushCount } from "@/features/notifications/use-unread-push-count";
+import { getWorkoutHistory } from "@/features/workout-history/api";
+import { summarizeWorkoutHistoryEntry } from "@/features/workout-history/model";
+import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 import {
   createDailyPlan,
   createPlanPreset,
@@ -46,6 +51,7 @@ import {
   updatePlanPreset,
 } from "@/features/workout-plan/api";
 import {
+  MissionActionButton,
   MissionCard,
   type MissionStatus,
   TodayWorkoutCard,
@@ -57,7 +63,6 @@ import {
   createBlankWorkoutPlanDraft,
   fromDailyPlanResponse,
   fromPlanPresetResponse,
-  getWorkoutPlanSummary,
   toPlanRequestFields,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
@@ -65,9 +70,19 @@ import { RecordMethodModal } from "@/features/upload/components/record-method-mo
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
-import { useTheme } from "@/hooks/use-theme";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+// Figma node 3502:36518 요일 헤더: 일=red/5, 토=blue/7, 나머지 charcoal/5.
+// tokens.ts의 label-subtle과 값이 달라(#4e5968 vs #8c8c92) 여기서만 직접 지정한다.
+const WEEKDAY_TEXT_COLORS = [
+  "#ff2e5d",
+  "#8c8c92",
+  "#8c8c92",
+  "#8c8c92",
+  "#8c8c92",
+  "#8c8c92",
+  "#008dd8",
+];
 const MONTH_SWIPE_THRESHOLD = 60;
 
 // 캘린더 날짜 셀(43x60pt) 표시 크기의 2배(레티나 기준)로 요청 — 프리셋
@@ -92,12 +107,11 @@ const DAILY_MISSION_STATUS_MAP: Record<
 // loadWorkoutsForDate). Never sent as a PLAN refId — see buildRecordTarget.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
 
-// calendar API에는 날짜별 recordCount만 있고 개별 기록의 제목/미션 여부 같은
-// 상세 정보가 없다 — 그래서 미션 항목은 아예 만들 수 없고, "지난 운동"
-// 목록은 이 세션에서 사용자가 실제로 완료 처리한 로컬 운동(workoutsByDate)만
-// 보여준다. 상세 기록 조회 API가 생기면 이 타입을 확장한다.
+// GET /api/v1/workouts?date=(운동 기록 조회) 응답을 그대로 매핑한다 — 미션인지
+// (refType === "MISSION") 여부까지 서버가 내려주므로 로컬에서 따로 추적할
+// 필요가 없다.
 type DayRecord = {
-  workouts: { title: string; subtitle: string }[];
+  workouts: { title: string; subtitle: string; isMission: boolean }[];
 };
 
 function createTodayWorkoutInstance(
@@ -112,6 +126,9 @@ function createTodayWorkoutInstance(
     id: instanceId,
     isDone: false,
     plan: { ...plan, id: instanceId },
+    stopwatch: plan.stopwatchEnabled
+      ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
+      : undefined,
   };
 }
 
@@ -147,9 +164,12 @@ function toDateKey(date: Date): string {
 function WeekdayHeaderRow() {
   return (
     <View className="flex-row items-center justify-between">
-      {WEEKDAY_LABELS.map((label) => (
+      {WEEKDAY_LABELS.map((label, index) => (
         <View key={label} className="w-[43px] items-center">
-          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+          <ThemedText
+            typography="caption-1-bold"
+            style={{ color: WEEKDAY_TEXT_COLORS[index] }}
+          >
             {label}
           </ThemedText>
         </View>
@@ -221,7 +241,7 @@ function DayRecordCard({
                   key={index}
                   className="flex-row items-center gap-3 border-b border-line-subtle py-3"
                 >
-                  <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal">
+                  <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500">
                     <Ionicons
                       color={semanticColors["label-inverse"]}
                       name="checkmark"
@@ -229,13 +249,25 @@ function DayRecordCard({
                     />
                   </View>
                   <View className="flex-1 gap-0.5">
-                    <ThemedText
-                      typography="body-3-bold"
-                      themeColor="textSecondary"
-                      style={{ textDecorationLine: "line-through" }}
-                    >
-                      {entry.title}
-                    </ThemedText>
+                    <View className="flex-row items-center gap-1.5">
+                      <ThemedText
+                        typography="body-3-bold"
+                        themeColor="textSecondary"
+                        style={{ textDecorationLine: "line-through" }}
+                      >
+                        {entry.title}
+                      </ThemedText>
+                      {entry.isMission && (
+                        <View className="rounded-full bg-orange-50 px-2 py-0.5">
+                          <ThemedText
+                            typography="caption-2-bold"
+                            style={{ color: primitiveColors.orange["500"] }}
+                          >
+                            미션
+                          </ThemedText>
+                        </View>
+                      )}
+                    </View>
                     <ThemedText
                       typography="caption-1-regular"
                       style={{ color: semanticColors["label-disabled"] }}
@@ -254,7 +286,6 @@ function DayRecordCard({
 }
 
 export default function HomeScreen() {
-  const theme = useTheme();
   // Native tabs render every tab's screen eagerly, so without this guard the
   // workout plan detail bottom sheet's Modal could stay visible over the
   // chat/mypage tabs after switching away without closing it first.
@@ -367,11 +398,19 @@ export default function HomeScreen() {
 
     getDailyPlans(toDateKey(date))
       .then(({ dailyPlans }) => {
-        const fetched = dailyPlans.map((dailyPlan) => ({
-          id: String(dailyPlan.id),
-          plan: fromDailyPlanResponse(dailyPlan),
-          isDone: dailyPlan.status === "COMPLETED",
-        }));
+        const fetched = dailyPlans.map((dailyPlan) => {
+          const plan = fromDailyPlanResponse(dailyPlan);
+          return {
+            id: String(dailyPlan.id),
+            plan,
+            isDone: dailyPlan.status === "COMPLETED",
+            // 서버는 경과 시간을 들고 있지 않으니(스톱워치 진행 상태는
+            // 로컬 전용) 항상 00:00부터 다시 시작한다.
+            stopwatch: plan.stopwatchEnabled
+              ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
+              : undefined,
+          };
+        });
         setWorkoutsByDate((current) => {
           // 이 요청이 떠 있는 동안 addSavedPlanToDate 등으로 로컬에 먼저
           // 추가된 항목은 이 스냅샷에 없을 수 있다 — 통째로 덮어쓰면
@@ -405,6 +444,29 @@ export default function HomeScreen() {
         console.error("Failed to refresh daily mission", error);
       });
   }, [savedRecordAt]);
+
+  // "지난 운동"(오늘/미래가 아닌 날짜)에 쓰는 실제 서버 기록 — GET
+  // /api/v1/workouts?date=는 그 날 남긴 운동/미션 기록을 refType까지 포함해
+  // 그대로 내려주므로, 로컬에서 미션 여부를 따로 추적할 필요가 없다.
+  const [workoutHistoryByDate, setWorkoutHistoryByDate] = useState<
+    Record<string, WorkoutHistoryResponse[]>
+  >({});
+  const loadedWorkoutHistoryDateKeysRef = useRef(new Set<string>());
+
+  function loadWorkoutHistoryForDate(date: Date) {
+    const key = date.toDateString();
+    if (loadedWorkoutHistoryDateKeysRef.current.has(key)) return;
+    loadedWorkoutHistoryDateKeysRef.current.add(key);
+
+    getWorkoutHistory(toDateKey(date))
+      .then(({ workouts }) => {
+        setWorkoutHistoryByDate((current) => ({ ...current, [key]: workouts }));
+      })
+      .catch((error) => {
+        console.error("Failed to load workout history", error);
+        loadedWorkoutHistoryDateKeysRef.current.delete(key);
+      });
+  }
   // 상세/수정 시트가 지금 "저장된 운동 계획" 하나를 편집 중인지, 아니면
   // 어떤 날짜의 독립적인 운동 인스턴스(workout.plan)를 편집 중인지 구분한다
   // — 시트 자체(WorkoutPlanDetailBottomSheet)는 그대로 재사용하고, 저장만
@@ -414,11 +476,15 @@ export default function HomeScreen() {
     | { kind: "instance"; instanceId: string }
     | null
   >(null);
-  // "신규 운동 계획 추가"로 연 빈 계획 초안. null이면 시트가 안 보인다.
+  // "운동 추가하기"로 연 빈 계획 초안. null이면 시트가 안 보인다.
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
     null,
   );
+  // 헤더 알림 아이콘이 가리키는 안 읽은 알림 개수 — 화면이 포커스를 받을
+  // 때마다 다시 조회되므로 알림함에서 읽고 돌아오면 바로 반영된다.
+  const unreadPushCount = useUnreadPushCount();
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  const [isMonthPickerVisible, setIsMonthPickerVisible] = useState(false);
   // 조회 중인 달의 캘린더 API 응답. year/month를 응답과 함께 묶어 보관해서,
   // 달을 빠르게 연속으로 넘길 때 아직 도착 안 한 이전 요청의 응답이 섞이지
   // 않게 하고(cancelled 플래그) daysByDate도 지금 보고 있는 달의 응답일 때만
@@ -447,12 +513,6 @@ export default function HomeScreen() {
   const calendarError =
     calendarErrorMonth?.year === viewedYear &&
     calendarErrorMonth?.month === viewedMonthNumber;
-  // 로딩 중인지도 별도 setState 없이 파생한다 — 지금 보고 있는 달의 응답도
-  // 에러도 아직 없으면(=요청이 진행 중이면) loading이다.
-  const isCalendarDataForViewedMonth =
-    calendarMonthData?.year === viewedYear &&
-    calendarMonthData?.month === viewedMonthNumber;
-  const isCalendarLoading = !isCalendarDataForViewedMonth && !calendarError;
 
   useEffect(() => {
     let cancelled = false;
@@ -658,29 +718,29 @@ export default function HomeScreen() {
   // 보여주므로 이 목록이 필요 없다.
   useEffect(() => {
     loadWorkoutsForDate(today);
-    if (isSelectedDateToday || isSelectedDateFuture) {
-      loadWorkoutsForDate(selectedCalendarDate);
+    loadWorkoutsForDate(selectedCalendarDate);
+    // 지난 날짜만 DayRecordCard("지난 운동")를 보여주므로, 그 실제 기록도
+    // 그 경우에만 불러온다.
+    if (!isSelectedDateToday && !isSelectedDateFuture) {
+      loadWorkoutHistoryForDate(selectedCalendarDate);
     }
     // today는 매 렌더 새로 만들어지는 Date라 deps에 넣으면 매번 재실행된다.
-    // 실제 재조회 여부는 loadWorkoutsForDate 내부의 날짜별 캐시(ref)가 결정한다.
+    // 실제 재조회 여부는 각 loadXForDate 내부의 날짜별 캐시(ref)가 결정한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCalendarDate, isSelectedDateToday, isSelectedDateFuture]);
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
-  // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
-  // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
-  // 완료 처리한 로컬 기록(workoutsByDate)만 "지난 운동" 목록으로 보여준다.
-  const completedSelectedDateWorkouts = selectedDateWorkouts.filter(
-    (workout) => workout.isDone,
-  );
+  const selectedDateWorkoutHistory =
+    workoutHistoryByDate[selectedCalendarDate.toDateString()] ?? [];
   const selectedDayRecord: DayRecord | null =
     isSelectedDateToday ||
     isSelectedDateFuture ||
-    completedSelectedDateWorkouts.length === 0
+    selectedDateWorkoutHistory.length === 0
       ? null
       : {
-          workouts: completedSelectedDateWorkouts.map((workout) => ({
-            title: workout.plan.title,
-            subtitle: getWorkoutPlanSummary(workout.plan),
+          workouts: selectedDateWorkoutHistory.map((entry) => ({
+            title: entry.name,
+            subtitle: summarizeWorkoutHistoryEntry(entry),
+            isMission: entry.refType === "MISSION",
           })),
         };
   // 로컬에 상세가 없어도 서버 recordCount가 0보다 크면 "기록이 없다"고 하면
@@ -701,11 +761,14 @@ export default function HomeScreen() {
   // (날짜 셀 탭, 아래쪽 setSelectedCalendarDate)은 별개다 — 그냥 달만
   // 둘러보는 중에는 하단 미션/운동 패널이 계속 마지막으로 선택했던 날짜를
   // 그대로 보여준다. 여기서 selectedCalendarDate를 건드리지 않는다.
-  const commitMonthChange = useCallback((delta: 1 | -1) => {
-    setViewedMonth(
-      (month) => new Date(month.getFullYear(), month.getMonth() + delta, 1),
-    );
-  }, []);
+  const commitMonthChange = useCallback(
+    (delta: 1 | -1) => {
+      setViewedMonth(
+        (month) => new Date(month.getFullYear(), month.getMonth() + delta, 1),
+      );
+    },
+    [setViewedMonth],
+  );
 
   // dragX를 여기서 바로 0으로 되돌리면 패널 내용(previousMonthWeeks 등)이 새
   // viewedMonth로 다시 그려지기 전에 위치부터 가운데로 스냅돼 한 프레임 깜빡인다.
@@ -889,6 +952,30 @@ export default function HomeScreen() {
                     />
                   </>
                 )}
+                {!isToday && hasPhoto && (
+                  <Image
+                    source={{
+                      uri: getOptimizedImageUrl(dayEntry!.imageUrl!, {
+                        ...CALENDAR_DAY_THUMBNAIL_SIZE,
+                        crop: "fill",
+                      }),
+                    }}
+                    style={{ position: "absolute", inset: 0 }}
+                    contentFit="cover"
+                  />
+                )}
+                {/* Figma 4305:34469 "장수 배지" — 그 날 기록이 여러 건일 때만
+                    개수를 보여준다(1건이면 굳이 셀 필요가 없다). */}
+                {!isToday && hasPhoto && (dayEntry?.recordCount ?? 0) > 1 && (
+                  <View className="absolute bottom-1 right-1 h-4 w-4 items-center justify-center rounded-full bg-charcoal-12">
+                    <ThemedText
+                      style={{ color: semanticColors["label-inverse"] }}
+                      typography="caption-2-bold"
+                    >
+                      {dayEntry!.recordCount}
+                    </ThemedText>
+                  </View>
+                )}
                 <ThemedText
                   typography={isToday ? "caption-1-bold" : "caption-1-regular"}
                   style={{ color: textColor }}
@@ -930,7 +1017,8 @@ export default function HomeScreen() {
         ...workouts,
         createTodayWorkoutInstance(plan, String(id)),
       ]);
-    } catch {
+    } catch (error) {
+      console.error("Failed to create daily plan", error);
       Alert.alert(
         "오류",
         "오늘의 운동을 등록하지 못했습니다. 다시 시도해주세요.",
@@ -942,12 +1030,12 @@ export default function HomeScreen() {
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
 
-  async function saveNewPlan(plan: WorkoutPlanDraft, addToToday: boolean) {
-    // "오늘만 할래요"(addToToday)가 켜져 있으면 1회성 운동이므로 저장된
-    // 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시 실제
-    // 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
-    // 꺼져 있으면 재사용할 루틴이므로 POST /api/v1/plan-presets로 등록한다.
-    if (addToToday) {
+  async function saveNewPlan(plan: WorkoutPlanDraft, saveAsRoutine: boolean) {
+    // "루틴으로 할래요"(saveAsRoutine)가 꺼져 있으면(기본값) 1회성 운동이므로
+    // 저장된 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시
+    // 실제 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
+    // 켜져 있으면 재사용할 루틴이므로 POST /api/v1/plan-presets로 등록한다.
+    if (!saveAsRoutine) {
       await addSavedPlanToDate(plan, selectedCalendarDate);
       setNewPlanDraft(null);
       return;
@@ -972,11 +1060,84 @@ export default function HomeScreen() {
     if (workout.isDone) {
       updateWorkoutsForDate(today, (workouts) =>
         workouts.map((item) =>
-          item.id === instanceId ? { ...item, isDone: false } : item,
+          item.id === instanceId
+            ? {
+                ...item,
+                isDone: false,
+                // 완료 취소는 스톱워치 항목도 깨끗한 상태(00:00)로 되돌린다 —
+                // 중간값이 남아있으면 다시 완료 처리할 때 뭘 기록한 건지
+                // 헷갈린다.
+                stopwatch: item.stopwatch
+                  ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
+                  : undefined,
+              }
+            : item,
         ),
       );
       return;
     }
+
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId ? { ...item, isDone: true } : item,
+      ),
+    );
+    openRecordMethodModal(instanceId, workout.plan.title);
+  }
+
+  // 스톱워치 시작/일시정지 — 확인창은 StopwatchBar가 띄우고, 여기선 상태만
+  // 바꾼다. startedAt(벽시계 기준 시각)로 경과시간을 계산하므로 이 함수는
+  // 그 기준점만 세팅/정산한다.
+  function toggleStopwatchRun(instanceId: string) {
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) => {
+        if (item.id !== instanceId || !item.stopwatch) return item;
+        if (item.stopwatch.isRunning) {
+          const elapsedSeconds =
+            item.stopwatch.elapsedSeconds +
+            (item.stopwatch.startedAt
+              ? (Date.now() - item.stopwatch.startedAt) / 1000
+              : 0);
+          return {
+            ...item,
+            stopwatch: { elapsedSeconds, isRunning: false, startedAt: null },
+          };
+        }
+        return {
+          ...item,
+          stopwatch: {
+            ...item.stopwatch,
+            isRunning: true,
+            startedAt: Date.now(),
+          },
+        };
+      }),
+    );
+  }
+
+  function resetStopwatch(instanceId: string) {
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId && item.stopwatch
+          ? {
+              ...item,
+              stopwatch: {
+                elapsedSeconds: 0,
+                isRunning: false,
+                startedAt: null,
+              },
+            }
+          : item,
+      ),
+    );
+  }
+
+  // "저장하기" 확인 후 호출 — 다른 완료 처리와 동일하게 사진 기록 방식 선택
+  // 모달로 이어진다. 스톱워치 값 자체는 toggleStopwatchRun이 이미 멈춰서
+  // 정산해뒀다.
+  function finishStopwatch(instanceId: string) {
+    const workout = todayWorkouts.find((item) => item.id === instanceId);
+    if (!workout) return;
 
     updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) =>
@@ -1197,72 +1358,99 @@ export default function HomeScreen() {
             gap: Spacing.four,
           }}
         >
-          <View className="h-10 flex-row items-center justify-between">
-            <ThemedText typography="title-2-bold">LOGO</ThemedText>
-            <Pressable
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="알림"
-              onPress={() => console.log("notifications pressed")}
-            >
-              <Ionicons
-                name="notifications-outline"
-                size={24}
-                color={theme.text}
-              />
-            </Pressable>
-          </View>
-
-          <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center gap-1">
+          {/* Figma 3502:65456 — 월 선택과 우측 액션(스트릭·알림)이 한 줄. */}
+          <View className="w-full flex-row items-center justify-between">
+            <View className="flex-row items-center">
               <Pressable
-                hitSlop={8}
                 accessibilityRole="button"
                 accessibilityLabel="이전 달"
                 onPress={goToPreviousMonth}
+                className="h-12 w-7 items-start justify-center"
               >
-                <Ionicons name="caret-back" size={10} color={theme.text} />
+                <Ionicons
+                  name="caret-back"
+                  size={20}
+                  color={primitiveColors.charcoal[12]}
+                />
               </Pressable>
-              <ThemedText typography="title-3-bold">{monthLabel}</ThemedText>
               <Pressable
-                hitSlop={8}
+                accessibilityRole="button"
+                accessibilityLabel="연월 직접 선택"
+                onPress={() => setIsMonthPickerVisible(true)}
+              >
+                <ThemedText
+                  typography="title-3-bold"
+                  style={{ color: primitiveColors.charcoal[12] }}
+                >
+                  {monthLabel}
+                </ThemedText>
+              </Pressable>
+              <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="다음 달"
                 onPress={goToNextMonth}
+                className="h-12 w-7 items-start justify-center pl-2"
               >
-                <Ionicons name="caret-forward" size={10} color={theme.text} />
+                <Ionicons
+                  name="caret-forward"
+                  size={20}
+                  color={primitiveColors.charcoal[12]}
+                />
               </Pressable>
             </View>
 
-            <Pressable
-              className="flex-row items-center gap-1 rounded-full bg-fill-subtle px-3 py-1.5"
-              accessibilityRole="button"
-              accessibilityLabel="연속 스트릭"
-              onPress={() => console.log("streak badge pressed")}
-            >
-              <Ionicons name="flame" size={16} color={theme.text} />
-              <ThemedText typography="caption-1-medium">
-                {streakDays}일
-              </ThemedText>
-            </Pressable>
+            <View className="flex-row items-center gap-1.5">
+              <Pressable
+                className="flex-row items-center gap-0.5 rounded-full bg-charcoal-1 py-1.5 pl-2.5 pr-3"
+                accessibilityRole="button"
+                accessibilityLabel="연속 스트릭"
+                onPress={() => console.log("streak badge pressed")}
+              >
+                <Ionicons
+                  name="flame"
+                  size={24}
+                  color={primitiveColors.orange[500]}
+                />
+                <ThemedText
+                  typography="caption-1-bold"
+                  style={{ color: primitiveColors.charcoal[11] }}
+                >
+                  {streakDays}일
+                </ThemedText>
+              </Pressable>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={
+                  unreadPushCount > 0 ? "알림, 읽지 않은 알림 있음" : "알림"
+                }
+                onPress={() => router.push("/notifications")}
+                className="h-12 w-12 items-center justify-center"
+              >
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-charcoal-1">
+                  <Ionicons
+                    name="notifications"
+                    size={20}
+                    color={primitiveColors.charcoal[12]}
+                  />
+                  {/* 읽지 않은 알림 표시 — 개수는 노출하지 않고 점만 찍는다.
+                      Figma 1375:16126: 11x11 원, brand fill에 버튼 배경색
+                      2px 링(right 4 / top 5). */}
+                  {unreadPushCount > 0 && (
+                    <View className="absolute right-1 top-[5px] h-[11px] w-[11px] rounded-full border-2 border-charcoal-1 bg-orange-500" />
+                  )}
+                </View>
+              </Pressable>
+            </View>
           </View>
 
-          {calendarError ? (
+          {calendarError && (
             <ThemedText
               typography="caption-1-medium"
               themeColor="textSecondary"
             >
               캘린더 정보를 불러오지 못했어요
             </ThemedText>
-          ) : (
-            isCalendarLoading && (
-              <ThemedText
-                typography="caption-1-medium"
-                themeColor="textSecondary"
-              >
-                캘린더 정보를 불러오는 중이에요
-              </ThemedText>
-            )
           )}
 
           <GestureDetector gesture={monthSwipeGesture}>
@@ -1329,7 +1517,6 @@ export default function HomeScreen() {
                   : "담은 운동이 없어요"
               }
               expanded={isTodayCardExpanded}
-              onAddNewPlan={openNewPlanSheet}
               onAddSavedPlan={(plan) =>
                 addSavedPlanToDate(plan, selectedCalendarDate)
               }
@@ -1342,6 +1529,9 @@ export default function HomeScreen() {
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
               }
+              onStopwatchFinish={finishStopwatch}
+              onStopwatchReset={resetStopwatch}
+              onStopwatchToggleRun={toggleStopwatchRun}
               onToggleTodayWorkout={toggleTodayWorkoutDone}
               readOnly={!isSelectedDateToday}
               savedWorkoutPlans={savedWorkoutPlans}
@@ -1357,6 +1547,13 @@ export default function HomeScreen() {
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
               }
+            />
+          )}
+
+          {(isSelectedDateToday || isSelectedDateFuture) && (
+            <MissionActionButton
+              label="운동 추가하기"
+              onPress={openNewPlanSheet}
             />
           )}
         </ScrollView>
@@ -1386,14 +1583,25 @@ export default function HomeScreen() {
           onClose={() => setNewPlanDraft(null)}
           onDelete={() => setNewPlanDraft(null)}
           onSave={saveNewPlan}
-          saveLabel="루틴 추가하기"
+          saveLabel="운동 추가하기"
           showDelete={false}
           showAddToTodayToggle
-          title="루틴 추가"
+          title="운동 추가하기"
           value={newPlanDraft}
           visible
         />
       )}
+
+      <MonthPickerSheet
+        month={viewedMonthNumber}
+        onClose={() => setIsMonthPickerVisible(false)}
+        onSelect={(year, month) => {
+          setViewedMonth(new Date(year, month - 1, 1));
+          setIsMonthPickerVisible(false);
+        }}
+        visible={isMonthPickerVisible}
+        year={viewedYear}
+      />
     </ThemedView>
   );
 }
