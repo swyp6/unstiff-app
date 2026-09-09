@@ -927,6 +927,18 @@ export default function HomeScreen() {
                     contentFit="cover"
                   />
                 )}
+                {/* Figma 4305:34469 "장수 배지" — 그 날 기록이 여러 건일 때만
+                    개수를 보여준다(1건이면 굳이 셀 필요가 없다). */}
+                {!isToday && hasPhoto && (dayEntry?.recordCount ?? 0) > 1 && (
+                  <View className="absolute bottom-1 right-1 h-4 w-4 items-center justify-center rounded-full bg-charcoal-12">
+                    <ThemedText
+                      style={{ color: semanticColors["label-inverse"] }}
+                      typography="caption-2-bold"
+                    >
+                      {dayEntry!.recordCount}
+                    </ThemedText>
+                  </View>
+                )}
                 <ThemedText
                   typography={isToday ? "caption-1-bold" : "caption-1-regular"}
                   style={{ color: textColor }}
