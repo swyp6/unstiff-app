@@ -8,12 +8,24 @@ import type { WorkoutRefType } from "./types";
 // 완료 화면까지 이어지는 여러 라우트 사이에서 사진/대상을 주고받는 용도.
 // route param에 JSON을 실어 보내는 대신(기존 프로젝트에서도 피하는
 // 패턴 — daily-photo-store 참고) 이 store를 거친다.
-export type RecordFlowTarget = {
-  refType: WorkoutRefType;
-  refId: number;
-  // 기록 입력/완료 화면 헤더에 보여줄 표시용 제목 — 서버에 보내지 않는다.
-  title: string;
-};
+//
+// LINKED(기존 PLAN/MISSION에 연결)와 MANUAL(신규 직접 입력)을 명확히
+// 구분한다 — MANUAL은 서버로 보낼 refType/refId가 없다(POST /api/v1/workouts가
+// 아직 refType/refId를 필수로 요구해 MANUAL 기록을 저장할 서버 계약 자체가
+// 없다. 절대 0/-1 같은 sentinel refId를 만들어 보내지 않는다).
+export type RecordFlowTarget =
+  | {
+      mode: "LINKED";
+      refType: WorkoutRefType;
+      refId: number;
+      // 기록 입력/완료 화면 헤더에 보여줄 표시용 제목 — 서버에 보내지 않는다.
+      title: string;
+    }
+  | {
+      mode: "MANUAL";
+      title: string;
+      exerciseType: string;
+    };
 
 type RecordFlowPhoto = {
   secureUrl: string;

@@ -1062,12 +1062,14 @@ export default function HomeScreen() {
     if (planItemId === MISSION_PLAN_ITEM_ID) {
       if (missionId == null) return null;
       return {
+        mode: "LINKED" as const,
         refType: "MISSION" as const,
         refId: missionId,
         title: recordModalTitle,
       };
     }
     return {
+      mode: "LINKED" as const,
       refType: "PLAN" as const,
       refId: Number(planItemId),
       title: recordModalTitle,

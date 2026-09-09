@@ -211,6 +211,7 @@ export default function CameraScreen() {
       if (!hasLeftRef.current) {
         if (refType && refId) {
           useRecordFlowStore.getState().setTarget({
+            mode: "LINKED",
             refType,
             refId: Number(refId),
             title: title ?? "",
