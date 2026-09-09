@@ -127,6 +127,9 @@ export default function RecordTargetScreen() {
   }
 
   function selectTodayWorkout(workout: DailyPlanResponse) {
+    // Pressable의 disabled만 믿지 않는다 — 이미 완료된 오늘의 운동은 다시
+    // 기록 대상으로 삼을 수 없으므로 핸들러에서도 한 번 더 막는다.
+    if (workout.status === "COMPLETED") return;
     goToRecordEditor(`plan-${workout.id}`, {
       refType: "PLAN",
       refId: workout.id,
@@ -210,11 +213,14 @@ export default function RecordTargetScreen() {
             )}
 
             <View style={{ gap: 6 }}>
+              {/* COMPLETED도 목록에는 그대로 남는다 — count는 완료 여부와
+                  무관하게 오늘의 운동 전체 개수를 보여준다. */}
               <SectionHeader count={todayWorkouts.length} title="오늘의 운동" />
               <View style={{ paddingHorizontal: 20 }}>
                 {todayWorkouts.map((workout) => (
                   <TargetRow
                     key={workout.id}
+                    completed={workout.status === "COMPLETED"}
                     onPress={() => selectTodayWorkout(workout)}
                     selected={selectedKey === `plan-${workout.id}`}
                     subtitle={workout.exerciseType}
@@ -285,23 +291,30 @@ function TargetRow({
   subtitle,
   variant,
   selected,
+  completed = false,
   onPress,
 }: {
   title: string;
   subtitle: string;
   variant: "mission" | "plan";
   selected: boolean;
+  // 서버에서 이미 완료 처리된(DailyPlanResponse.status === "COMPLETED") 오늘의
+  // 운동 — selected(방금 선택해 잠깐 표시)와 달리 화면이 뜨는 동안 계속
+  // 유지되는 영구 상태라 누를 수 없고, 애니메이션을 반복 재생하지 않는다.
+  completed?: boolean;
   onPress: () => void;
 }) {
   // 미션 행은 Figma상 기본이 이미 채워진 원 + 체크다(4173:31187) — 선택했을
   // 때도 같은 모양이라 그대로 두고, 오늘의 운동 행만 빈 원 → 채워진 원 +
-  // 체크로 바뀐다.
-  const isFilled = variant === "mission" || selected;
+  // 체크로 바뀐다. completed는 selected와 별개로 항상 채워진 상태다.
+  const isFilled = completed || variant === "mission" || selected;
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled: completed }}
+      disabled={completed}
       onPress={onPress}
-      style={({ pressed }) => pressed && { opacity: 0.7 }}
+      style={({ pressed }) => pressed && !completed && { opacity: 0.7 }}
     >
       <View
         style={{
@@ -327,18 +340,36 @@ function TargetRow({
                 }),
           }}
         >
-          {isFilled && (
-            <ReanimatedAnimated.View entering={FadeIn.duration(140)}>
+          {isFilled &&
+            (completed ? (
+              // 완료 상태는 화면 진입마다 반복 재생할 필요가 없는 영구
+              // 상태라 정적으로 그린다 — FadeIn은 방금 선택한 순간에만 쓴다.
               <Ionicons
                 name="checkmark"
                 size={16}
                 color={semanticColors["label-inverse"]}
               />
-            </ReanimatedAnimated.View>
-          )}
+            ) : (
+              <ReanimatedAnimated.View entering={FadeIn.duration(140)}>
+                <Ionicons
+                  name="checkmark"
+                  size={16}
+                  color={semanticColors["label-inverse"]}
+                />
+              </ReanimatedAnimated.View>
+            ))}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <ThemedText typography="body-2-bold">{title}</ThemedText>
+          <ThemedText
+            typography="body-2-bold"
+            style={
+              completed
+                ? { color: semanticColors["label-disabled"] }
+                : undefined
+            }
+          >
+            {title}
+          </ThemedText>
           <ThemedText
             typography="caption-1-regular"
             style={{ color: semanticColors["label-disabled"] }}
