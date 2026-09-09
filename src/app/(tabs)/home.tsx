@@ -239,7 +239,7 @@ function DayRecordCard({
                   key={index}
                   className="flex-row items-center gap-3 border-b border-line-subtle py-3"
                 >
-                  <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal">
+                  <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500">
                     <Ionicons
                       color={semanticColors["label-inverse"]}
                       name="checkmark"

@@ -147,7 +147,7 @@ export function MissionCard({
             accessibilityState={{ checked: isCompleted }}
             className={
               isCompleted
-                ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal"
+                ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500"
                 : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
             }
             hitSlop={8}
@@ -594,7 +594,7 @@ function TodayWorkoutRow({
           <View
             className={
               workout.isDone
-                ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-label-normal"
+                ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500"
                 : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
             }
           >
