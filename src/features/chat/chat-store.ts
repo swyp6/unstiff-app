@@ -83,10 +83,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const historyMessages = history.items.map(fromHistoryItem);
 
         if (historyMessages.length > 0) {
-          const lastMessage = historyMessages[historyMessages.length - 1];
           set({
             messages: historyMessages,
-            canSend: available && !lastMessage.stop,
+            canSend: available,
             isLoading: false,
           });
           return;

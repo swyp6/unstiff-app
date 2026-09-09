@@ -1,4 +1,5 @@
-import { useEffect, useRef } from "react";
+import { useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -38,9 +39,11 @@ export default function ChatScreen() {
   const listRef = useRef<FlatList>(null);
   const lastMessage = messages[messages.length - 1];
 
-  useEffect(() => {
-    loadConversation();
-  }, [loadConversation]);
+  useFocusEffect(
+    useCallback(() => {
+      loadConversation();
+    }, [loadConversation]),
+  );
 
   useEffect(() => {
     listRef.current?.scrollToEnd({ animated: true });
