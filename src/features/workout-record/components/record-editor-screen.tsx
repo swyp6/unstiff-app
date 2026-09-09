@@ -1,7 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useNavigation } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ReanimatedAnimated, {
@@ -79,6 +79,14 @@ export function RecordEditorScreen() {
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // MISSION은 workout record 저장과 미션 완료 처리가 별개 API라, 후자가
+  // 실패했을 때 재시도가 POST /workouts를 다시 보내 기록을 중복 생성하면 안
+  // 된다. 첫 시도에서 저장에 성공한 payload를 보관해두고, 재시도는 이 값이
+  // 있으면 저장을 건너뛰고 completeMission만 다시 호출한다.
+  const savedWorkoutRef = useRef<{
+    measures: ReturnType<typeof toActualMeasuresDto>;
+    memo: string;
+  } | null>(null);
 
   const canSubmit = selectedTypes.length > 0 && !isSubmitting;
 
@@ -98,32 +106,49 @@ export function RecordEditorScreen() {
     setIsSubmitting(true);
     setError(null);
     try {
-      const apiIntensity = toApiIntensity(intensity);
-      const measures = toActualMeasuresDto(selectedTypes, values);
-      const trimmedMemo = memo.trim();
-      // 여기서 고른 강도는 "실제로 이렇게 수행했다"는 기록값이라 이 요청에만
-      // 싣는다 — 연결된 daily-plan의 계획 강도는 건드리지 않는다(PUT 없음).
-      // UI에서 강도는 선택 사항이라 고르지 않았으면 필드를 생략한다.
-      await saveWorkoutRecord({
-        refType: target.refType,
-        refId: target.refId,
-        measures,
-        ...(apiIntensity ? { intensity: apiIntensity } : null),
-        ...(photo ? { imageUrl: photo.secureUrl } : null),
-        ...(trimmedMemo ? { memo: trimmedMemo } : null),
-      });
+      let measures: ReturnType<typeof toActualMeasuresDto>;
+      let trimmedMemo: string;
+
+      if (savedWorkoutRef.current) {
+        // 이전 시도에서 workout record는 이미 저장됐다(MISSION의
+        // completeMission만 실패했던 경우) — POST /workouts를 다시 보내면
+        // 기록이 중복 생성되므로 그 저장은 건너뛰고 그때 저장한 값을 그대로
+        // 쓴다.
+        measures = savedWorkoutRef.current.measures;
+        trimmedMemo = savedWorkoutRef.current.memo;
+      } else {
+        const apiIntensity = toApiIntensity(intensity);
+        measures = toActualMeasuresDto(selectedTypes, values);
+        trimmedMemo = memo.trim();
+        // 여기서 고른 강도는 "실제로 이렇게 수행했다"는 기록값이라 이 요청에만
+        // 싣는다 — 연결된 daily-plan의 계획 강도는 건드리지 않는다(PUT 없음).
+        // UI에서 강도는 선택 사항이라 고르지 않았으면 필드를 생략한다.
+        await saveWorkoutRecord({
+          refType: target.refType,
+          refId: target.refId,
+          measures,
+          ...(apiIntensity ? { intensity: apiIntensity } : null),
+          ...(photo ? { imageUrl: photo.secureUrl } : null),
+          ...(trimmedMemo ? { memo: trimmedMemo } : null),
+        });
+        savedWorkoutRef.current = { measures, memo: trimmedMemo };
+      }
 
       // 실제 수행 기록 저장이 성공한 뒤에만 미션 자체를 완료 처리한다 —
-      // 두 API는 별개 entity/event라 workout record 저장 실패 시에는
-      // 호출하지 않는다. 이 부수 호출이 실패해도(예: 이미 완료 처리된 미션)
-      // 사용자가 방금 실제로 남긴 기록 자체는 이미 저장됐으므로 완료 화면 진입을
-      // 막지 않는다. 다만 완료 요청이 끝나기 전에 홈 갱신 신호를 보내면 ACCEPTED
-      // 상태를 다시 읽는 경쟁이 생기므로 성공/실패가 결정될 때까지는 기다린다.
+      // 두 API는 별개 entity/event다. MISSION은 completeMission까지 성공해야
+      // "등록 완료"로 본다 — 실패하면 서버 미션이 ACCEPTED로 남아 다시 기록
+      // 대상으로 노출될 수 있으므로, 성공 화면으로 보내지 않고 이 화면에
+      // 남겨 재시도할 수 있게 한다(위 savedWorkoutRef가 있어 재시도는
+      // completeMission만 다시 부른다).
       if (target.refType === "MISSION") {
         try {
           await completeMission(target.refId);
         } catch (completeError) {
           console.error("Failed to complete mission", completeError);
+          setError(
+            "운동 기록은 저장됐지만 미션 완료 처리에 실패했어요. 다시 시도해 주세요.",
+          );
+          return;
         }
       }
 
