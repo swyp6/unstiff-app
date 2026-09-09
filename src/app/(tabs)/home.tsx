@@ -637,13 +637,11 @@ export default function HomeScreen() {
   // 보여주므로 이 목록이 필요 없다.
   useEffect(() => {
     loadWorkoutsForDate(today);
-    if (isSelectedDateToday || isSelectedDateFuture) {
-      loadWorkoutsForDate(selectedCalendarDate);
-    }
+    loadWorkoutsForDate(selectedCalendarDate);
     // today는 매 렌더 새로 만들어지는 Date라 deps에 넣으면 매번 재실행된다.
     // 실제 재조회 여부는 loadWorkoutsForDate 내부의 날짜별 캐시(ref)가 결정한다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCalendarDate, isSelectedDateToday, isSelectedDateFuture]);
+  }, [selectedCalendarDate]);
   const selectedDateLabel = `${selectedCalendarDate.getMonth() + 1}월 ${selectedCalendarDate.getDate()}일`;
   // calendar API는 그 날의 recordCount만 알려줄 뿐 어떤 운동/미션이었는지는
   // 내려주지 않는다 — 그 내용을 지어내지 않고, 이 세션에서 사용자가 실제로
@@ -867,6 +865,18 @@ export default function HomeScreen() {
                       style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
                     />
                   </>
+                )}
+                {!isToday && hasPhoto && (
+                  <Image
+                    source={{
+                      uri: getOptimizedImageUrl(dayEntry!.imageUrl!, {
+                        ...CALENDAR_DAY_THUMBNAIL_SIZE,
+                        crop: "fill",
+                      }),
+                    }}
+                    style={{ position: "absolute", inset: 0 }}
+                    contentFit="cover"
+                  />
                 )}
                 <ThemedText
                   typography={isToday ? "caption-1-bold" : "caption-1-regular"}
