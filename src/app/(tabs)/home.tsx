@@ -26,6 +26,7 @@ import { ThemedView } from "@/components/themed-view";
 import { Spacing } from "@/constants/theme";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
+import { MonthPickerSheet } from "@/features/calendar/components/month-picker-sheet";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   acceptMission,
@@ -420,6 +421,7 @@ export default function HomeScreen() {
   // 때마다 다시 조회되므로 알림함에서 읽고 돌아오면 바로 반영된다.
   const unreadPushCount = useUnreadPushCount();
   const [viewedMonth, setViewedMonth] = useState(() => new Date());
+  const [isMonthPickerVisible, setIsMonthPickerVisible] = useState(false);
   // 조회 중인 달의 캘린더 API 응답. year/month를 응답과 함께 묶어 보관해서,
   // 달을 빠르게 연속으로 넘길 때 아직 도착 안 한 이전 요청의 응답이 섞이지
   // 않게 하고(cancelled 플래그) daysByDate도 지금 보고 있는 달의 응답일 때만
@@ -673,11 +675,14 @@ export default function HomeScreen() {
   // (날짜 셀 탭, 아래쪽 setSelectedCalendarDate)은 별개다 — 그냥 달만
   // 둘러보는 중에는 하단 미션/운동 패널이 계속 마지막으로 선택했던 날짜를
   // 그대로 보여준다. 여기서 selectedCalendarDate를 건드리지 않는다.
-  const commitMonthChange = useCallback((delta: 1 | -1) => {
-    setViewedMonth(
-      (month) => new Date(month.getFullYear(), month.getMonth() + delta, 1),
-    );
-  }, []);
+  const commitMonthChange = useCallback(
+    (delta: 1 | -1) => {
+      setViewedMonth(
+        (month) => new Date(month.getFullYear(), month.getMonth() + delta, 1),
+      );
+    },
+    [setViewedMonth],
+  );
 
   // dragX를 여기서 바로 0으로 되돌리면 패널 내용(previousMonthWeeks 등)이 새
   // viewedMonth로 다시 그려지기 전에 위치부터 가운데로 스냅돼 한 프레임 깜빡인다.
@@ -1173,12 +1178,18 @@ export default function HomeScreen() {
                   color={primitiveColors.charcoal[12]}
                 />
               </Pressable>
-              <ThemedText
-                typography="title-3-bold"
-                style={{ color: primitiveColors.charcoal[12] }}
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="연월 직접 선택"
+                onPress={() => setIsMonthPickerVisible(true)}
               >
-                {monthLabel}
-              </ThemedText>
+                <ThemedText
+                  typography="title-3-bold"
+                  style={{ color: primitiveColors.charcoal[12] }}
+                >
+                  {monthLabel}
+                </ThemedText>
+              </Pressable>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="다음 달"
@@ -1382,6 +1393,17 @@ export default function HomeScreen() {
           visible
         />
       )}
+
+      <MonthPickerSheet
+        month={viewedMonthNumber}
+        onClose={() => setIsMonthPickerVisible(false)}
+        onSelect={(year, month) => {
+          setViewedMonth(new Date(year, month - 1, 1));
+          setIsMonthPickerVisible(false);
+        }}
+        visible={isMonthPickerVisible}
+        year={viewedYear}
+      />
     </ThemedView>
   );
 }
