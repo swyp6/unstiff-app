@@ -124,6 +124,9 @@ function createTodayWorkoutInstance(
     id: instanceId,
     isDone: false,
     plan: { ...plan, id: instanceId },
+    stopwatch: plan.stopwatchEnabled
+      ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
+      : undefined,
   };
 }
 
@@ -383,11 +386,19 @@ export default function HomeScreen() {
 
     getDailyPlans(toDateKey(date))
       .then(({ dailyPlans }) => {
-        const fetched = dailyPlans.map((dailyPlan) => ({
-          id: String(dailyPlan.id),
-          plan: fromDailyPlanResponse(dailyPlan),
-          isDone: dailyPlan.status === "COMPLETED",
-        }));
+        const fetched = dailyPlans.map((dailyPlan) => {
+          const plan = fromDailyPlanResponse(dailyPlan);
+          return {
+            id: String(dailyPlan.id),
+            plan,
+            isDone: dailyPlan.status === "COMPLETED",
+            // 서버는 경과 시간을 들고 있지 않으니(스톱워치 진행 상태는
+            // 로컬 전용) 항상 00:00부터 다시 시작한다.
+            stopwatch: plan.stopwatchEnabled
+              ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
+              : undefined,
+          };
+        });
         setWorkoutsByDate((current) => {
           // 이 요청이 떠 있는 동안 addSavedPlanToDate 등으로 로컬에 먼저
           // 추가된 항목은 이 스냅샷에 없을 수 있다 — 통째로 덮어쓰면
@@ -962,11 +973,84 @@ export default function HomeScreen() {
     if (workout.isDone) {
       updateWorkoutsForDate(today, (workouts) =>
         workouts.map((item) =>
-          item.id === instanceId ? { ...item, isDone: false } : item,
+          item.id === instanceId
+            ? {
+                ...item,
+                isDone: false,
+                // 완료 취소는 스톱워치 항목도 깨끗한 상태(00:00)로 되돌린다 —
+                // 중간값이 남아있으면 다시 완료 처리할 때 뭘 기록한 건지
+                // 헷갈린다.
+                stopwatch: item.stopwatch
+                  ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
+                  : undefined,
+              }
+            : item,
         ),
       );
       return;
     }
+
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId ? { ...item, isDone: true } : item,
+      ),
+    );
+    openRecordMethodModal(instanceId, workout.plan.title);
+  }
+
+  // 스톱워치 시작/일시정지 — 확인창은 StopwatchBar가 띄우고, 여기선 상태만
+  // 바꾼다. startedAt(벽시계 기준 시각)로 경과시간을 계산하므로 이 함수는
+  // 그 기준점만 세팅/정산한다.
+  function toggleStopwatchRun(instanceId: string) {
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) => {
+        if (item.id !== instanceId || !item.stopwatch) return item;
+        if (item.stopwatch.isRunning) {
+          const elapsedSeconds =
+            item.stopwatch.elapsedSeconds +
+            (item.stopwatch.startedAt
+              ? (Date.now() - item.stopwatch.startedAt) / 1000
+              : 0);
+          return {
+            ...item,
+            stopwatch: { elapsedSeconds, isRunning: false, startedAt: null },
+          };
+        }
+        return {
+          ...item,
+          stopwatch: {
+            ...item.stopwatch,
+            isRunning: true,
+            startedAt: Date.now(),
+          },
+        };
+      }),
+    );
+  }
+
+  function resetStopwatch(instanceId: string) {
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId && item.stopwatch
+          ? {
+              ...item,
+              stopwatch: {
+                elapsedSeconds: 0,
+                isRunning: false,
+                startedAt: null,
+              },
+            }
+          : item,
+      ),
+    );
+  }
+
+  // "저장하기" 확인 후 호출 — 다른 완료 처리와 동일하게 사진 기록 방식 선택
+  // 모달로 이어진다. 스톱워치 값 자체는 toggleStopwatchRun이 이미 멈춰서
+  // 정산해뒀다.
+  function finishStopwatch(instanceId: string) {
+    const workout = todayWorkouts.find((item) => item.id === instanceId);
+    if (!workout) return;
 
     updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) =>
@@ -1334,6 +1418,9 @@ export default function HomeScreen() {
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
               }
+              onStopwatchFinish={finishStopwatch}
+              onStopwatchReset={resetStopwatch}
+              onStopwatchToggleRun={toggleStopwatchRun}
               onToggleTodayWorkout={toggleTodayWorkoutDone}
               readOnly={!isSelectedDateToday}
               savedWorkoutPlans={savedWorkoutPlans}

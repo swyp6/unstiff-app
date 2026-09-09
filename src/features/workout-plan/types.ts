@@ -53,6 +53,7 @@ export type DailyPlanResponse = {
   planDate: string; // "YYYY-MM-DD"
   status: DailyPlanStatus;
   targets: ExerciseMeasuresDto;
+  stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
   memo?: string;
@@ -74,6 +75,7 @@ export type PlanPresetResponse = {
   name: string;
   exerciseType: string;
   targets: ExerciseMeasuresDto;
+  stopwatchEnabled: boolean;
   startTime?: string; // "HH:mm:ss"
   intensity?: IntensityDto;
   memo?: string;

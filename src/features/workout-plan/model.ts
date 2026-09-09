@@ -23,7 +23,14 @@ export type WorkoutPlanDraft = {
   startTime: StartTime;
   intensity: Intensity;
   memo: string;
+  // "시간" 목표가 선택됐을 때만 켤 수 있다 — UI는 이 규칙을 canUseStopwatch로
+  // 강제하고, 요청 직전에도 toPlanRequestFields에서 한 번 더 방어한다.
+  stopwatchEnabled: boolean;
 };
+
+export function canUseStopwatch(plan: WorkoutPlanDraft) {
+  return plan.selectedGoalTypes.includes("time");
+}
 
 export const GOAL_TYPES: GoalType[] = ["time", "distance", "reps", "sets"];
 
@@ -92,6 +99,7 @@ export function createMockWorkoutPlan(
     startTime: { period: "PM", hour: 7, minute: 0 },
     intensity: "light",
     memo: "오늘은 천천히",
+    stopwatchEnabled: false,
   };
 }
 
@@ -112,12 +120,21 @@ export function createBlankWorkoutPlanDraft(id: string): WorkoutPlanDraft {
     startTime: null,
     intensity: null,
     memo: "",
+    stopwatchEnabled: false,
   };
 }
 
 export function formatGoalValue(type: GoalType, value: number) {
   const displayValue = type === "distance" ? value.toFixed(1) : String(value);
   return `${displayValue}${GOAL_CONFIG[type].unit}`;
+}
+
+// Figma 4331:25004의 운동 타이머 표시(MM:SS) — 시간 단위는 없다.
+export function formatStopwatchTime(totalSeconds: number) {
+  const seconds = Math.max(0, Math.round(totalSeconds));
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`;
 }
 
 // null이면 빈 문자열을 돌려줘서 SelectionRow의 placeholder("선택해주세요",
@@ -210,9 +227,9 @@ export function toPlanRequestFields(plan: WorkoutPlanDraft) {
     exerciseType: plan.exerciseType,
     targets: toExerciseMeasuresDto(plan),
     // 스펙엔 선택 필드로 나와 있지만 실제로는 생략(undefined)이나 null을
-    // 보내면 요청 자체가 파싱 실패(400)한다 — UI에 스톱워치 토글이 아직
-    // 없어 항상 꺼진 값으로 보낸다.
-    stopwatchEnabled: false,
+    // 보내면 요청 자체가 파싱 실패(400)한다 — 항상 값을 보내되, "시간" 목표가
+    // 없는데 켜진 값이 남아있을 경우를 대비해 여기서 한 번 더 강제한다.
+    stopwatchEnabled: canUseStopwatch(plan) && plan.stopwatchEnabled,
     startTime: toApiStartTime(plan.startTime),
     intensity: toApiIntensity(plan.intensity),
     memo: plan.memo || undefined,
@@ -247,6 +264,7 @@ type PlanResponseFields = {
   name: string;
   exerciseType: string;
   targets: ExerciseMeasuresDto;
+  stopwatchEnabled: boolean;
   startTime?: string;
   intensity?: "LIGHT" | "MODERATE" | "HARD";
   memo?: string;
@@ -278,6 +296,7 @@ function fromPlanResponseFields(
     startTime: fromApiStartTime(response.startTime),
     intensity: fromApiIntensity(response.intensity),
     memo: response.memo ?? "",
+    stopwatchEnabled: response.stopwatchEnabled,
   };
 }
 
