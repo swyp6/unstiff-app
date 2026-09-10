@@ -2,7 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, useNavigation } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ReanimatedAnimated, {
   FadeIn,
@@ -212,143 +219,166 @@ export function RecordEditorScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingBottom: 20,
-            gap: 18,
-          }}
+        {/* "한 줄 기록" 등 하단부 입력이 키보드에 가려지는 실기기 문제 —
+            ScrollView와 CTA를 같은 KeyboardAvoidingView 안에 묶어 키보드가
+            뜨면 이 영역 전체가 그만큼 줄어들고, CTA가 키보드 바로 위로
+            따라온다. 이 View는 header 아래에서 시작해 자신의 실제 화면
+            위치를 스스로 측정하므로(위 header는 형제로 밖에 있다)
+            keyboardVerticalOffset 없이도 정확히 들어맞는다. 키보드가 닫혀
+            있으면 padding이 0이라 기존 레이아웃과 차이가 없다. */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
         >
-          {photo && (
-            <Image
-              source={{
-                uri: getOptimizedImageUrl(photo.secureUrl, {
-                  width: 670,
-                  height: 396,
-                  crop: "fill",
-                }),
-              }}
-              style={{ width: "100%", height: 198, borderRadius: 12 }}
-              contentFit="cover"
-            />
-          )}
+          <ScrollView
+            keyboardDismissMode={
+              Platform.OS === "ios" ? "interactive" : "on-drag"
+            }
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingBottom: 20,
+              gap: 18,
+            }}
+          >
+            {photo && (
+              <Image
+                source={{
+                  uri: getOptimizedImageUrl(photo.secureUrl, {
+                    width: 670,
+                    height: 396,
+                    crop: "fill",
+                  }),
+                }}
+                style={{ width: "100%", height: 198, borderRadius: 12 }}
+                contentFit="cover"
+              />
+            )}
 
-          {/* 사진 아래 입력 영역만 아래에서 살짝 올라오며 나타난다 — 카메라
+            {/* 사진 아래 입력 영역만 아래에서 살짝 올라오며 나타난다 — 카메라
               탭에서 들어온 경우 직전 화면(target)과 사진의 위치·크기가 같고
               그 전환에는 애니메이션이 없어(capture/_layout.tsx), 사진은 고정된
               채 이 영역만 목록과 교체되는 것처럼 보인다. */}
-          <ReanimatedAnimated.View
-            entering={FadeInDown.duration(220)}
-            style={{ gap: 18 }}
-          >
-            <View style={{ gap: 7 }}>
-              <ThemedText typography="title-3-bold">{target.title}</ThemedText>
-              <ThemedText
-                typography="caption-1-regular"
-                style={{ color: semanticColors["label-disabled"] }}
-              >
-                {todayLabel()} 기록
-              </ThemedText>
-            </View>
-
-            <View style={{ gap: 8 }}>
-              <SectionLabel>기록할 항목</SectionLabel>
-              <GoalTypeSelector value={selectedTypes} onToggle={toggleType} />
-              <View style={{ gap: 8 }}>
-                {selectedTypes.map((type) => (
-                  <ReanimatedAnimated.View
-                    entering={FadeIn}
-                    exiting={FadeOut}
-                    key={type}
-                    layout={LinearTransition}
-                  >
-                    <ActualMeasureStepper
-                      labelPrefix="실제 "
-                      type={type}
-                      value={values[type]}
-                      onChange={(value) =>
-                        setValues((current) => ({ ...current, [type]: value }))
-                      }
-                    />
-                  </ReanimatedAnimated.View>
-                ))}
-              </View>
-            </View>
-
-            <View style={{ gap: 4 }}>
-              <SectionLabel>강도</SectionLabel>
-              <SelectionRow
-                accessibilityLabel="강도 선택"
-                onPress={() => setIsIntensitySheetVisible(true)}
-                placeholder="선택해주세요"
-                value={getIntensityLabel(intensity)}
-              />
-            </View>
-
-            <View style={{ gap: 6 }}>
-              <SectionLabel>한 줄 기록 (선택)</SectionLabel>
-              <View
-                style={{
-                  backgroundColor: semanticColors["fill-subtle"],
-                  borderRadius: 12,
-                  height: 52,
-                  paddingHorizontal: 16,
-                  justifyContent: "center",
-                }}
-              >
-                <TextInput
-                  accessibilityLabel="한 줄 기록"
-                  maxLength={MEMO_MAX_LENGTH}
-                  onChangeText={setMemo}
-                  placeholder="기록을 남겨보세요"
-                  placeholderTextColor={semanticColors["label-disabled"]}
-                  returnKeyType="done"
-                  style={{
-                    color: semanticColors["label-normal"],
-                    fontFamily: "Pretendard-Bold",
-                    fontSize: 13,
-                    paddingRight: 48,
-                  }}
-                  value={memo}
-                />
+            <ReanimatedAnimated.View
+              entering={FadeInDown.duration(220)}
+              style={{ gap: 18 }}
+            >
+              <View style={{ gap: 7 }}>
+                <ThemedText typography="title-3-bold">
+                  {target.title}
+                </ThemedText>
                 <ThemedText
-                  typography="caption-2-regular"
-                  style={{
-                    position: "absolute",
-                    right: 16,
-                    color: semanticColors["label-disabled"],
-                  }}
+                  typography="caption-1-regular"
+                  style={{ color: semanticColors["label-disabled"] }}
                 >
-                  {memo.length} / {MEMO_MAX_LENGTH}
+                  {todayLabel()} 기록
                 </ThemedText>
               </View>
-            </View>
 
-            {error && (
-              <ThemedText
-                typography="caption-1-regular"
-                style={{ color: "#ff6b6b", textAlign: "center" }}
-              >
-                {error}
-              </ThemedText>
-            )}
+              <View style={{ gap: 8 }}>
+                <SectionLabel>기록할 항목</SectionLabel>
+                <GoalTypeSelector value={selectedTypes} onToggle={toggleType} />
+                <View style={{ gap: 8 }}>
+                  {selectedTypes.map((type) => (
+                    <ReanimatedAnimated.View
+                      entering={FadeIn}
+                      exiting={FadeOut}
+                      key={type}
+                      layout={LinearTransition}
+                    >
+                      <ActualMeasureStepper
+                        labelPrefix="실제 "
+                        type={type}
+                        value={values[type]}
+                        onChange={(value) =>
+                          setValues((current) => ({
+                            ...current,
+                            [type]: value,
+                          }))
+                        }
+                      />
+                    </ReanimatedAnimated.View>
+                  ))}
+                </View>
+              </View>
+
+              <View style={{ gap: 4 }}>
+                <SectionLabel>강도</SectionLabel>
+                <SelectionRow
+                  accessibilityLabel="강도 선택"
+                  onPress={() => setIsIntensitySheetVisible(true)}
+                  placeholder="선택해주세요"
+                  value={getIntensityLabel(intensity)}
+                />
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <SectionLabel>한 줄 기록 (선택)</SectionLabel>
+                <View
+                  style={{
+                    backgroundColor: semanticColors["fill-subtle"],
+                    borderRadius: 12,
+                    height: 52,
+                    paddingHorizontal: 16,
+                    justifyContent: "center",
+                  }}
+                >
+                  <TextInput
+                    accessibilityLabel="한 줄 기록"
+                    maxLength={MEMO_MAX_LENGTH}
+                    onChangeText={setMemo}
+                    placeholder="기록을 남겨보세요"
+                    placeholderTextColor={semanticColors["label-disabled"]}
+                    returnKeyType="done"
+                    style={{
+                      color: semanticColors["label-normal"],
+                      fontFamily: "Pretendard-Bold",
+                      fontSize: 13,
+                      paddingRight: 48,
+                    }}
+                    value={memo}
+                  />
+                  <ThemedText
+                    typography="caption-2-regular"
+                    style={{
+                      position: "absolute",
+                      right: 16,
+                      color: semanticColors["label-disabled"],
+                    }}
+                  >
+                    {memo.length} / {MEMO_MAX_LENGTH}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {error && (
+                <ThemedText
+                  typography="caption-1-regular"
+                  style={{ color: "#ff6b6b", textAlign: "center" }}
+                >
+                  {error}
+                </ThemedText>
+              )}
+            </ReanimatedAnimated.View>
+          </ScrollView>
+
+          {/* Figma 4173:31231에서 CTA는 스크롤과 함께 밀려 올라가지 않고 화면
+              하단(탭바 바로 위)에 고정돼 있다. 입력 영역과 함께 등장하도록 같은
+              entering을 준다 — 탭바는 이 애니메이션 밖이라 움직이지 않는다.
+              ScrollView와 같은 KeyboardAvoidingView 안에 있어 키보드가 뜨면
+              이 CTA도 함께 그 바로 위로 올라온다. */}
+          <ReanimatedAnimated.View
+            entering={FadeInDown.duration(220)}
+            style={{ paddingHorizontal: 20, paddingBottom: 16 }}
+          >
+            <PrimaryActionButton
+              disabled={!canSubmit}
+              label={isSubmitting ? "저장 중..." : "운동 완료하기"}
+              onPress={handleSubmit}
+            />
           </ReanimatedAnimated.View>
-        </ScrollView>
-
-        {/* Figma 4173:31231에서 CTA는 스크롤과 함께 밀려 올라가지 않고 화면
-            하단(탭바 바로 위)에 고정돼 있다. 입력 영역과 함께 등장하도록 같은
-            entering을 준다 — 탭바는 이 애니메이션 밖이라 움직이지 않는다. */}
-        <ReanimatedAnimated.View
-          entering={FadeInDown.duration(220)}
-          style={{ paddingHorizontal: 20, paddingBottom: 16 }}
-        >
-          <PrimaryActionButton
-            disabled={!canSubmit}
-            label={isSubmitting ? "저장 중..." : "운동 완료하기"}
-            onPress={handleSubmit}
-          />
-        </ReanimatedAnimated.View>
+        </KeyboardAvoidingView>
       </View>
 
       {isIntensitySheetVisible && (

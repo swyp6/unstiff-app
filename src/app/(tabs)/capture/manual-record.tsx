@@ -2,7 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { router, Stack, useNavigation } from "expo-router";
 import { useRef, useState } from "react";
-import { Pressable, ScrollView, TextInput, View } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  Pressable,
+  ScrollView,
+  TextInput,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import ReanimatedAnimated, {
   FadeIn,
@@ -225,174 +232,196 @@ export default function ManualRecordScreen() {
           </Pressable>
         </View>
 
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: 20,
-            paddingBottom: 20,
-            gap: 16,
-          }}
+        {/* record-editor-screen.tsx와 같은 이유·같은 처리 — 운동명/한 줄
+            기록이 실기기에서 키보드에 가려지지 않도록 ScrollView와 CTA를
+            같은 KeyboardAvoidingView로 묶는다. header는 형제로 밖에 있어
+            이 View는 자신의 실제 화면 위치를 스스로 측정하므로
+            keyboardVerticalOffset이 필요 없고, 키보드가 닫혀 있으면 padding
+            이 0이라 기존 레이아웃과 차이가 없다. */}
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={{ flex: 1 }}
         >
-          {photo && (
-            <Image
-              source={{
-                uri: getOptimizedImageUrl(photo.secureUrl, {
-                  width: 670,
-                  height: 396,
-                  crop: "fill",
-                }),
-              }}
-              style={{ width: "100%", height: 198, borderRadius: 12 }}
-              contentFit="cover"
-            />
-          )}
+          <ScrollView
+            keyboardDismissMode={
+              Platform.OS === "ios" ? "interactive" : "on-drag"
+            }
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              paddingHorizontal: 20,
+              paddingBottom: 20,
+              gap: 16,
+            }}
+          >
+            {photo && (
+              <Image
+                source={{
+                  uri: getOptimizedImageUrl(photo.secureUrl, {
+                    width: 670,
+                    height: 396,
+                    crop: "fill",
+                  }),
+                }}
+                style={{ width: "100%", height: 198, borderRadius: 12 }}
+                contentFit="cover"
+              />
+            )}
 
-          {/* 사진 아래 입력 영역만 아래에서 살짝 올라오며 나타난다 — 위
+            {/* 사진 아래 입력 영역만 아래에서 살짝 올라오며 나타난다 — 위
               <Image>는 이 애니메이션 밖이라 target에서 넘어와도 위치·크기가
               그대로다(record-editor-screen.tsx와 같은 처리). */}
-          <ReanimatedAnimated.View
-            entering={FadeInDown.duration(220)}
-            style={{ gap: 16 }}
-          >
-            <ThemedText typography="heading-1-bold">신규 운동 기록</ThemedText>
+            <ReanimatedAnimated.View
+              entering={FadeInDown.duration(220)}
+              style={{ gap: 16 }}
+            >
+              <ThemedText typography="heading-1-bold">
+                신규 운동 기록
+              </ThemedText>
 
-            <View style={{ gap: 4 }}>
-              <SectionLabel>운동명</SectionLabel>
-              <View
-                style={{
-                  backgroundColor: semanticColors["fill-subtle"],
-                  borderRadius: 12,
-                  height: 44,
-                  justifyContent: "center",
-                  paddingHorizontal: 14,
-                }}
-              >
-                <TextInput
-                  accessibilityLabel="운동명"
-                  maxLength={TITLE_MAX_LENGTH}
-                  onChangeText={setTitle}
-                  placeholder="운동명을 입력해주세요"
-                  placeholderTextColor={semanticColors["label-disabled"]}
-                  returnKeyType="done"
+              <View style={{ gap: 4 }}>
+                <SectionLabel>운동명</SectionLabel>
+                <View
                   style={{
-                    color: semanticColors["label-normal"],
-                    fontFamily: "Pretendard-Regular",
-                    fontSize: 12,
-                    paddingVertical: 0,
-                  }}
-                  value={title}
-                />
-              </View>
-            </View>
-
-            <View style={{ gap: 4 }}>
-              <SectionLabel>운동 종류</SectionLabel>
-              <SelectionRow
-                accessibilityLabel="운동 종류 선택"
-                onPress={() => setIsTypeSheetVisible(true)}
-                placeholder="선택해주세요"
-                value={exerciseType}
-              />
-            </View>
-
-            <View style={{ gap: 8 }}>
-              <SectionLabel>기록할 항목</SectionLabel>
-              <GoalTypeSelector value={selectedTypes} onToggle={toggleType} />
-              <View style={{ gap: 8 }}>
-                {selectedTypes.map((type) => (
-                  <ReanimatedAnimated.View
-                    entering={FadeIn}
-                    exiting={FadeOut}
-                    key={type}
-                    layout={LinearTransition}
-                  >
-                    <ActualMeasureStepper
-                      type={type}
-                      value={values[type]}
-                      onChange={(value) =>
-                        setValues((current) => ({ ...current, [type]: value }))
-                      }
-                    />
-                  </ReanimatedAnimated.View>
-                ))}
-              </View>
-            </View>
-
-            {/* 강도·한 줄 기록은 LINKED 기록 입력(record-editor-screen.tsx)과
-                같은 컴포넌트/문구를 쓴다 — 두 화면이 같은 기록을 남기는 입력이라
-                따로 만들지 않는다. 둘 다 선택 사항이다. */}
-            <View style={{ gap: 4 }}>
-              <SectionLabel>강도</SectionLabel>
-              <SelectionRow
-                accessibilityLabel="강도 선택"
-                onPress={() => setIsIntensitySheetVisible(true)}
-                placeholder="선택해주세요"
-                value={getIntensityLabel(intensity)}
-              />
-            </View>
-
-            <View style={{ gap: 6 }}>
-              <SectionLabel>한 줄 기록 (선택)</SectionLabel>
-              <View
-                style={{
-                  backgroundColor: semanticColors["fill-subtle"],
-                  borderRadius: 12,
-                  height: 52,
-                  paddingHorizontal: 16,
-                  justifyContent: "center",
-                }}
-              >
-                <TextInput
-                  accessibilityLabel="한 줄 기록"
-                  maxLength={MEMO_MAX_LENGTH}
-                  onChangeText={setMemo}
-                  placeholder="기록을 남겨보세요"
-                  placeholderTextColor={semanticColors["label-disabled"]}
-                  returnKeyType="done"
-                  style={{
-                    color: semanticColors["label-normal"],
-                    fontFamily: "Pretendard-Bold",
-                    fontSize: 13,
-                    paddingRight: 48,
-                  }}
-                  value={memo}
-                />
-                <ThemedText
-                  typography="caption-2-regular"
-                  style={{
-                    position: "absolute",
-                    right: 16,
-                    color: semanticColors["label-disabled"],
+                    backgroundColor: semanticColors["fill-subtle"],
+                    borderRadius: 12,
+                    height: 44,
+                    justifyContent: "center",
+                    paddingHorizontal: 14,
                   }}
                 >
-                  {memo.length} / {MEMO_MAX_LENGTH}
-                </ThemedText>
+                  <TextInput
+                    accessibilityLabel="운동명"
+                    maxLength={TITLE_MAX_LENGTH}
+                    onChangeText={setTitle}
+                    placeholder="운동명을 입력해주세요"
+                    placeholderTextColor={semanticColors["label-disabled"]}
+                    returnKeyType="done"
+                    style={{
+                      color: semanticColors["label-normal"],
+                      fontFamily: "Pretendard-Regular",
+                      fontSize: 12,
+                      paddingVertical: 0,
+                    }}
+                    value={title}
+                  />
+                </View>
               </View>
-            </View>
 
-            {error && (
-              <ThemedText
-                typography="caption-1-regular"
-                style={{ color: "#ff6b6b", textAlign: "center" }}
-              >
-                {error}
-              </ThemedText>
-            )}
+              <View style={{ gap: 4 }}>
+                <SectionLabel>운동 종류</SectionLabel>
+                <SelectionRow
+                  accessibilityLabel="운동 종류 선택"
+                  onPress={() => setIsTypeSheetVisible(true)}
+                  placeholder="선택해주세요"
+                  value={exerciseType}
+                />
+              </View>
+
+              <View style={{ gap: 8 }}>
+                <SectionLabel>기록할 항목</SectionLabel>
+                <GoalTypeSelector value={selectedTypes} onToggle={toggleType} />
+                <View style={{ gap: 8 }}>
+                  {selectedTypes.map((type) => (
+                    <ReanimatedAnimated.View
+                      entering={FadeIn}
+                      exiting={FadeOut}
+                      key={type}
+                      layout={LinearTransition}
+                    >
+                      <ActualMeasureStepper
+                        type={type}
+                        value={values[type]}
+                        onChange={(value) =>
+                          setValues((current) => ({
+                            ...current,
+                            [type]: value,
+                          }))
+                        }
+                      />
+                    </ReanimatedAnimated.View>
+                  ))}
+                </View>
+              </View>
+
+              {/* 강도·한 줄 기록은 LINKED 기록 입력(record-editor-screen.tsx)과
+                같은 컴포넌트/문구를 쓴다 — 두 화면이 같은 기록을 남기는 입력이라
+                따로 만들지 않는다. 둘 다 선택 사항이다. */}
+              <View style={{ gap: 4 }}>
+                <SectionLabel>강도</SectionLabel>
+                <SelectionRow
+                  accessibilityLabel="강도 선택"
+                  onPress={() => setIsIntensitySheetVisible(true)}
+                  placeholder="선택해주세요"
+                  value={getIntensityLabel(intensity)}
+                />
+              </View>
+
+              <View style={{ gap: 6 }}>
+                <SectionLabel>한 줄 기록 (선택)</SectionLabel>
+                <View
+                  style={{
+                    backgroundColor: semanticColors["fill-subtle"],
+                    borderRadius: 12,
+                    height: 52,
+                    paddingHorizontal: 16,
+                    justifyContent: "center",
+                  }}
+                >
+                  <TextInput
+                    accessibilityLabel="한 줄 기록"
+                    maxLength={MEMO_MAX_LENGTH}
+                    onChangeText={setMemo}
+                    placeholder="기록을 남겨보세요"
+                    placeholderTextColor={semanticColors["label-disabled"]}
+                    returnKeyType="done"
+                    style={{
+                      color: semanticColors["label-normal"],
+                      fontFamily: "Pretendard-Bold",
+                      fontSize: 13,
+                      paddingRight: 48,
+                    }}
+                    value={memo}
+                  />
+                  <ThemedText
+                    typography="caption-2-regular"
+                    style={{
+                      position: "absolute",
+                      right: 16,
+                      color: semanticColors["label-disabled"],
+                    }}
+                  >
+                    {memo.length} / {MEMO_MAX_LENGTH}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {error && (
+                <ThemedText
+                  typography="caption-1-regular"
+                  style={{ color: "#ff6b6b", textAlign: "center" }}
+                >
+                  {error}
+                </ThemedText>
+              )}
+            </ReanimatedAnimated.View>
+          </ScrollView>
+
+          {/* 입력 영역과 함께 등장한다 — 탭바는 이 애니메이션 밖이라 그 자리에
+              고정된 채 움직이지 않는다. ScrollView와 같은
+              KeyboardAvoidingView 안에 있어 키보드가 뜨면 이 CTA도 함께 그
+              바로 위로 올라온다. */}
+          <ReanimatedAnimated.View
+            entering={FadeInDown.duration(220)}
+            style={{ paddingHorizontal: 20, paddingBottom: 16 }}
+          >
+            <PrimaryActionButton
+              disabled={!canSubmit}
+              label={isSubmitting ? "저장 중..." : "운동 완료하기"}
+              onPress={handleSubmit}
+            />
           </ReanimatedAnimated.View>
-        </ScrollView>
-
-        {/* 입력 영역과 함께 등장한다 — 탭바는 이 애니메이션 밖이라 그 자리에
-            고정된 채 움직이지 않는다. */}
-        <ReanimatedAnimated.View
-          entering={FadeInDown.duration(220)}
-          style={{ paddingHorizontal: 20, paddingBottom: 16 }}
-        >
-          <PrimaryActionButton
-            disabled={!canSubmit}
-            label={isSubmitting ? "저장 중..." : "운동 완료하기"}
-            onPress={handleSubmit}
-          />
-        </ReanimatedAnimated.View>
+        </KeyboardAvoidingView>
       </SafeAreaView>
 
       {isTypeSheetVisible && (
