@@ -72,7 +72,7 @@ export default function ManualRecordScreen() {
   const [selectedTypes, setSelectedTypes] = useState<GoalType[]>([]);
   const [values, setValues] = useState<Record<GoalType, number>>({
     time: 1,
-    distance: 0,
+    distance: 0.1,
     reps: 1,
     sets: 1,
   });

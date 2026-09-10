@@ -16,6 +16,10 @@ import { useRecordFlowStore } from "@/features/workout-record/record-flow-store"
 import { getDailyMission } from "@/features/missions/api";
 import type { DailyMissionResponse } from "@/features/missions/types";
 import { getDailyPlans } from "@/features/workout-plan/api";
+import {
+  fromDailyPlanResponse,
+  type GoalType,
+} from "@/features/workout-plan/model";
 import type { DailyPlanResponse } from "@/features/workout-plan/types";
 
 // 체크 표시가 보이는 시간이자 목록이 사라지는 시간 — 이 뒤에 기록 입력으로
@@ -102,6 +106,8 @@ export default function RecordTargetScreen() {
       refType: "PLAN" | "MISSION";
       refId: number;
       title: string;
+      initialGoalTypes?: GoalType[];
+      initialGoalValues?: Record<GoalType, number>;
     },
   ) {
     if (selectedKey) return;
@@ -130,10 +136,17 @@ export default function RecordTargetScreen() {
     // Pressable의 disabled만 믿지 않는다 — 이미 완료된 오늘의 운동은 다시
     // 기록 대상으로 삼을 수 없으므로 핸들러에서도 한 번 더 막는다.
     if (workout.status === "COMPLETED") return;
+    // targets(API 단위)를 fromDailyPlanResponse로 UI 단위(분/km)까지 그대로
+    // 변환해서 넘긴다 — 홈의 오늘의 운동 카드가 쓰는 것과 같은 함수라 초→분,
+    // m→km 변환 로직을 여기서 새로 만들지 않는다.
+    const { selectedGoalTypes, goalValues } = fromDailyPlanResponse(workout);
     goToRecordEditor(`plan-${workout.id}`, {
       refType: "PLAN",
       refId: workout.id,
       title: workout.name,
+      ...(selectedGoalTypes.length > 0
+        ? { initialGoalTypes: selectedGoalTypes, initialGoalValues: goalValues }
+        : null),
     });
   }
 

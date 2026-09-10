@@ -1260,11 +1260,23 @@ export default function HomeScreen() {
         title: recordModalTitle,
       };
     }
+    // todayWorkouts의 plan은 이미 fromDailyPlanResponse를 거친 UI 도메인
+    // 값(selectedGoalTypes/goalValues, 분·km)이다 — record-editor가 "실제
+    // 수행값"의 초기값으로 그대로 쓸 수 있도록 함께 넘긴다. 목록에서 찾지
+    // 못하면(이론상 있을 수 없지만 방어적으로) 초기값 없이 기존 빈 선택
+    // 상태로 시작한다.
+    const workout = todayWorkouts.find((item) => item.id === planItemId);
     return {
       mode: "LINKED" as const,
       refType: "PLAN" as const,
       refId: Number(planItemId),
       title: recordModalTitle,
+      ...(workout && workout.plan.selectedGoalTypes.length > 0
+        ? {
+            initialGoalTypes: workout.plan.selectedGoalTypes,
+            initialGoalValues: workout.plan.goalValues,
+          }
+        : null),
     };
   }
 
@@ -1300,6 +1312,20 @@ export default function HomeScreen() {
 
   function startRecordPhotoCapture() {
     setIsRecordMethodModalVisible(false);
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const target = buildRecordTarget(planItemId);
+    if (!target) {
+      revertPendingRecord();
+      return;
+    }
+    // camera.tsx가 업로드 완료 후 route param(refType/refId)만으로 target을
+    // 다시 만들면 여기서 계산한 initialGoalTypes/initialGoalValues(PLAN
+    // 목표값 prefill)가 사라진다 — 카메라로 넘어가기 전에 미리 full target을
+    // store에 심어 두면 camera.tsx가 이 값을 그대로 보존해 쓴다(camera.tsx의
+    // handleUsePhoto 참고). 이전 세션에서 남은 사진이 있을 수 있어 함께
+    // 정리한다.
+    useRecordFlowStore.getState().setPhoto(null);
+    useRecordFlowStore.getState().setTarget(target);
     router.push({
       pathname: "/camera",
       params: buildRecordCameraParams(),
@@ -1313,6 +1339,12 @@ export default function HomeScreen() {
   // 사진을 고르면 그때 /camera를 그 사진 미리보기(확인) 화면으로 바로 띄운다.
   async function startRecordLibraryPick() {
     setIsRecordMethodModalVisible(false);
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const target = buildRecordTarget(planItemId);
+    if (!target) {
+      revertPendingRecord();
+      return;
+    }
     try {
       const libraryPermission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1331,6 +1363,12 @@ export default function HomeScreen() {
       }
 
       const asset = result.assets[0];
+      // startRecordPhotoCapture와 같은 이유로, 실제로 사진이 확정된 뒤(취소/
+      // 권한 거부 시에는 건드리지 않는다) /camera로 넘어가기 직전에만 full
+      // target을 store에 심는다 — 그래야 picker를 취소해도 stale target이
+      // 남지 않는다.
+      useRecordFlowStore.getState().setPhoto(null);
+      useRecordFlowStore.getState().setTarget(target);
       router.push({
         pathname: "/camera",
         params: {

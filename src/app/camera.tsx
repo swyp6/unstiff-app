@@ -245,12 +245,30 @@ export default function CameraScreen() {
 
       const linkedTarget = parseLinkedTarget(refType, refId);
       if (linkedTarget) {
-        useRecordFlowStore.getState().setTarget({
-          mode: "LINKED",
-          refType: linkedTarget.refType,
-          refId: linkedTarget.refId,
-          title: title ?? "",
-        });
+        // home.tsx가 이 화면으로 넘어오기 전에(사진 촬영/앨범 선택 시작
+        // 시점) 이미 PLAN 목표값(initialGoalTypes/initialGoalValues)까지
+        // 포함한 full target을 store에 심어둔다 — 지금 route param
+        // (refType/refId)과 정확히 같은 대상이면 그 target을 그대로 두고
+        // 덮어쓰지 않는다. 여기서 무조건 refType/refId만으로 새 target을
+        // 만들면 그 초기 목표값이 사라진다. store에 남아있는 target이 다른
+        // PLAN/MISSION의 것이거나(예: 이전 기록을 하다 만 상태) 아예
+        // 없으면(딥링크로 곧장 들어온 경우 등) 재사용하지 않고 route param
+        // 기반 최소 target으로 새로 만든다 — stale target을 현재 사진에
+        // 잘못 연결하지 않기 위함이다.
+        const existingTarget = useRecordFlowStore.getState().target;
+        const hasMatchingExistingTarget =
+          existingTarget?.mode === "LINKED" &&
+          existingTarget.refType === linkedTarget.refType &&
+          existingTarget.refId === linkedTarget.refId;
+
+        if (!hasMatchingExistingTarget) {
+          useRecordFlowStore.getState().setTarget({
+            mode: "LINKED",
+            refType: linkedTarget.refType,
+            refId: linkedTarget.refId,
+            title: title ?? "",
+          });
+        }
         router.push("/record-editor");
       } else {
         // 하단 카메라 탭(capture/index)에서 진입한 경우만 여기로 온다

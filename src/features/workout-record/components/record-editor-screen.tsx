@@ -74,13 +74,25 @@ export function RecordEditorScreen() {
   const target = useRecordFlowStore((state) => state.target);
   const setConfirmed = useRecordFlowStore((state) => state.setConfirmed);
 
-  const [selectedTypes, setSelectedTypes] = useState<GoalType[]>([]);
-  const [values, setValues] = useState<Record<GoalType, number>>({
+  // 오늘의 운동(PLAN)을 만들 때 정한 목표(target.initialGoalTypes/
+  // initialGoalValues, home.tsx/capture/target.tsx가 채워 넣는다)가 있으면
+  // 그 값을 "실제 수행값"의 최초 입력값으로 쓴다 — 여기서 한 번만 초기화할
+  // 뿐, 이후 칩 토글/스테퍼 조정은 기존처럼 자유롭다. MISSION이거나 값이
+  // 없으면(누락/잘못된 데이터 포함) 기존 빈 선택 상태로 안전하게 시작한다.
+  // useState 초기화 함수 안에서만 읽으므로 target이 이후 바뀌어도 다시
+  // 반영되지 않는다(최초 진입 시점의 스냅샷).
+  const [selectedTypes, setSelectedTypes] = useState<GoalType[]>(() =>
+    target?.mode === "LINKED" && target.initialGoalTypes?.length
+      ? target.initialGoalTypes
+      : [],
+  );
+  const [values, setValues] = useState<Record<GoalType, number>>(() => ({
     time: 1,
     distance: 0,
     reps: 1,
     sets: 1,
-  });
+    ...(target?.mode === "LINKED" ? target.initialGoalValues : null),
+  }));
   const [intensity, setIntensity] = useState<Intensity>(null);
   const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
   const [memo, setMemo] = useState("");

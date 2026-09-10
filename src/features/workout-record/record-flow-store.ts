@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import type { GoalType } from "@/features/workout-plan/model";
 import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 
 import type { WorkoutRefType } from "./types";
@@ -20,6 +21,15 @@ export type RecordFlowTarget =
       refId: number;
       // 기록 입력/완료 화면 헤더에 보여줄 표시용 제목 — 서버에 보내지 않는다.
       title: string;
+      // refType === "PLAN"일 때만 있다 — 오늘의 운동을 만들 때 정한 목표
+      // (targets)를 record-editor의 "실제 수행값" 초기값으로 쓰기 위한
+      // 스냅샷이다(UI 단위: 분/km, fromDailyPlanResponse와 동일 도메인).
+      // MISSION은 이 개념이 없어 항상 undefined이고, record-editor는 그 경우
+      // 기존처럼 빈 선택 상태로 시작한다. 계획(targets) 자체를 수정하는 값이
+      // 아니므로 여기서 PUT을 호출하지 않는다 — 실제 저장은 POST /workouts의
+      // measures만 쓴다.
+      initialGoalTypes?: GoalType[];
+      initialGoalValues?: Record<GoalType, number>;
     }
   | {
       mode: "MANUAL";
