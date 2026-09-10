@@ -1,7 +1,12 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import { router, useLocalSearchParams, useNavigation } from "expo-router";
+import {
+  router,
+  useIsFocused,
+  useLocalSearchParams,
+  useNavigation,
+} from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
 import { Image, Pressable, View } from "react-native";
@@ -10,11 +15,40 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { logImageUploadError } from "@/features/upload/cloudinary";
-import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { uploadPickedImage } from "@/features/upload/upload-image";
+import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
 // Figma 1917:24863/1917:24879 배경색과 동일한 값 — 하드코딩 대신 토큰을 쓴다.
 const CAMERA_BG = semanticColors["label-normal"];
+
+// useLocalSearchParams의 제네릭 타입은 컴파일 타임 단언일 뿐이다 — 실제 URL
+// 쿼리값은 타입과 무관하게 임의 문자열이거나(예: /camera?refType=PLAN&refId=abc)
+// 같은 키가 반복되면 배열로 온다. 여기서 실제 값을 검증한다.
+function firstParamValue(value: unknown): string | undefined {
+  if (Array.isArray(value)) {
+    return typeof value[0] === "string" ? value[0] : undefined;
+  }
+  return typeof value === "string" ? value : undefined;
+}
+
+// refType/refId가 있어야 LINKED(PLAN/MISSION에서 진입) 흐름으로 인정한다 —
+// refId가 숫자로 파싱되지 않거나(예: "abc") 0/음수/실수면 유효하지 않다고
+// 보고, sentinel(0, -1 등)을 지어내 만들지 않는다. 유효하지 않으면 standalone
+// 카메라 흐름(target 화면)으로 그대로 흘려보낸다.
+function parseLinkedTarget(
+  rawRefType: unknown,
+  rawRefId: unknown,
+): { refType: "PLAN" | "MISSION"; refId: number } | null {
+  const refType = firstParamValue(rawRefType);
+  const refId = firstParamValue(rawRefId);
+  if (refType !== "PLAN" && refType !== "MISSION") return null;
+  if (refId == null) return null;
+
+  const parsedRefId = Number(refId);
+  if (!Number.isSafeInteger(parsedRefId) || parsedRefId <= 0) return null;
+
+  return { refType, refId: parsedRefId };
+}
 
 type CapturedPhoto = {
   uri: string;
@@ -49,15 +83,22 @@ function ViewfinderCorner({
   );
 }
 
-// [체크] 1.10/1.10.2 카메라 · 촬영 결과 (Figma) — 오늘의 미션/계획 완료 시
-// 인증 사진을 촬영하는 커스텀 카메라 화면. 촬영 후 확인까지 마치면
-// Cloudinary 업로드를 수행하고, 결과는 daily-photo-store를 통해 홈 화면으로
-// 전달한다(저장 API가 아직 없어 로컬 상태로만 반영됨).
+// [체크] 1.10/1.10.2 카메라 · 촬영 결과 (Figma) — 오늘의 미션/계획 완료 시,
+// 또는 하단 카메라 탭에서 곧장 인증 사진을 촬영하는 커스텀 카메라 화면.
+// 촬영 후 확인까지 마치면 Cloudinary 업로드를 수행하고, 결과는
+// record-flow-store를 거쳐 다음 화면으로 넘어간다:
+// - refType/refId가 이미 있으면(PLAN/MISSION에서 진입) 대상 선택을 건너뛰고
+//   바로 실제 수행값 입력(record-editor)으로 이어간다.
+// - 없으면(하단 카메라 탭에서 진입) 대상 선택 화면(record-target)에서
+//   오늘의 미션/오늘의 운동/루틴 중 무엇에 연결할지 고르게 한다.
 export default function CameraScreen() {
-  const { title, planItemId, pickedUri, pickedWidth, pickedHeight } =
+  const { title, refType, refId, pickedUri, pickedWidth, pickedHeight } =
     useLocalSearchParams<{
       title?: string;
-      planItemId?: string;
+      // PLAN/MISSION 화면에서 이미 대상이 정해진 채로 들어올 때만 채워짐
+      // — 하단 카메라 탭(standalone)에서는 둘 다 비어 있다.
+      refType?: "PLAN" | "MISSION";
+      refId?: string;
       // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
       // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
       // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
@@ -65,6 +106,14 @@ export default function CameraScreen() {
       pickedWidth?: string;
       pickedHeight?: string;
     }>();
+  // expo-camera 문서: "Only one Camera preview can be active at any given
+  // time. If you have multiple screens in your app, you should unmount
+  // Camera components whenever a screen is unfocused." 이 화면(/camera)은
+  // Stack push/pop으로 마운트/언마운트되지만, 뒤로 나가는 전환 애니메이션이
+  // 끝나기 전에 다시 진입하면 이전 인스턴스가 아직 언마운트되는 중일 수
+  // 있다 — isFocused로 CameraView를 직접 게이팅해 그 순간에도 두 세션이
+  // 겹치지 않게 한다.
+  const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [photo, setPhoto] = useState<CapturedPhoto | null>(() =>
@@ -100,6 +149,15 @@ export default function CameraScreen() {
       hasLeftRef.current = true;
     });
   }, [navigation]);
+
+  // 포커스를 잃는 즉시(cleanup) ready 상태를 내려서, 화면이 아직 완전히
+  // unmount되지 않은 전환 애니메이션 도중에도 셔터가 눌리지 않게 막는다.
+  // 다시 포커스를 받으면 CameraView가 새로 mount되며 onCameraReady가 다시
+  // 불릴 때까지는 계속 false로 남는다.
+  useEffect(() => {
+    if (!isFocused) return;
+    return () => setIsCameraReady(false);
+  }, [isFocused]);
 
   async function handleCapture() {
     try {
@@ -163,7 +221,7 @@ export default function CameraScreen() {
   }
 
   async function handleUsePhoto() {
-    if (!photo || !planItemId || isUploading) return;
+    if (!photo || isUploading) return;
 
     setIsUploading(true);
     setError(null);
@@ -174,9 +232,50 @@ export default function CameraScreen() {
         photo.height,
         "DAILY_PHOTO",
       );
-      useDailyPhotoStore.getState().setResult({ planItemId, secureUrl });
-      if (!hasLeftRef.current) {
-        router.back();
+
+      // 화면을 이미 벗어났으면(뒤로가기 등) 업로드 자체는 끝까지 흘러가게
+      // 두되, 그 결과로 전역 record-flow-store를 건드리지 않는다 — 그 사이
+      // 사용자가 새 기록을 시작했다면 store에는 이미 새 photo/target이 들어가
+      // 있고, 여기서 setPhoto를 부르면 뒤늦게 도착한 이전 기록의 사진이 그
+      // 새 기록의 사진을 덮어써 버린다. 다음 화면으로 밀어넣지 않는 것도
+      // 마찬가지 이유(예상 밖의 화면 전환)로 그대로 유지한다.
+      if (hasLeftRef.current) return;
+
+      useRecordFlowStore.getState().setPhoto({ secureUrl });
+
+      const linkedTarget = parseLinkedTarget(refType, refId);
+      if (linkedTarget) {
+        // home.tsx가 이 화면으로 넘어오기 전에(사진 촬영/앨범 선택 시작
+        // 시점) 이미 PLAN 목표값(initialGoalTypes/initialGoalValues)까지
+        // 포함한 full target을 store에 심어둔다 — 지금 route param
+        // (refType/refId)과 정확히 같은 대상이면 그 target을 그대로 두고
+        // 덮어쓰지 않는다. 여기서 무조건 refType/refId만으로 새 target을
+        // 만들면 그 초기 목표값이 사라진다. store에 남아있는 target이 다른
+        // PLAN/MISSION의 것이거나(예: 이전 기록을 하다 만 상태) 아예
+        // 없으면(딥링크로 곧장 들어온 경우 등) 재사용하지 않고 route param
+        // 기반 최소 target으로 새로 만든다 — stale target을 현재 사진에
+        // 잘못 연결하지 않기 위함이다.
+        const existingTarget = useRecordFlowStore.getState().target;
+        const hasMatchingExistingTarget =
+          existingTarget?.mode === "LINKED" &&
+          existingTarget.refType === linkedTarget.refType &&
+          existingTarget.refId === linkedTarget.refId;
+
+        if (!hasMatchingExistingTarget) {
+          useRecordFlowStore.getState().setTarget({
+            mode: "LINKED",
+            refType: linkedTarget.refType,
+            refId: linkedTarget.refId,
+            title: title ?? "",
+          });
+        }
+        router.push("/record-editor");
+      } else {
+        // 하단 카메라 탭(capture/index)에서 진입한 경우만 여기로 온다
+        // — 대상 선택 화면은 그 탭의 nested route(capture/target)라
+        // Native TabBar가 계속 보인다(camera 탭 자체가 root fullScreenModal
+        // 이 아니라 탭 콘텐츠라서 이 분기는 항상 그 안에서만 실행된다).
+        router.push("/capture/target");
       }
     } catch (uploadError) {
       logImageUploadError("daily photo upload failed", uploadError);
@@ -211,16 +310,18 @@ export default function CameraScreen() {
         </View>
 
         <View className="relative mt-6 flex-1 overflow-hidden bg-[#292e33]">
-          {photo ? (
-            <Image
-              source={{ uri: photo.uri }}
-              className="flex-1"
-              resizeMode="cover"
-            />
-          ) : permission?.granted ? (
+          {permission?.granted && isFocused ? (
+            // photo 유무와 무관하게 계속 mount된 상태로 둔다 — "다시
+            // 찍기"마다 이 CameraView를 unmount/remount하면(예전엔 photo가
+            // 있을 때 이 자리에 <Image>를 대신 렌더해 매번 없앴다가 다시
+            // 만들었다) 네이티브 세션이 새로 뜨는 도중에 촬영하는 셈이 돼
+            // takePictureAsync가 응답하지 않는 문제가 실기기/시뮬레이터
+            // 모두에서 재현됐다. 촬영된 사진은 이 위에 <Image>로 덮어
+            // 보여주고, 세션 자체는 화면 포커스를 잃을 때만 내린다.
             <CameraView
-              // facing이 바뀌면 강제로 재마운트해 새 카메라 세션이 열릴 때까지
-              // (onCameraReady가 다시 불릴 때까지) 촬영이 막히도록 한다.
+              // facing이 바뀔 때만 강제로 재마운트해 새 카메라 세션이 열릴
+              // 때까지(onCameraReady가 다시 불릴 때까지) 촬영이 막히도록
+              // 한다 — photo는 이제 이 key에 관여하지 않는다.
               key={facing}
               ref={cameraRef}
               style={{ flex: 1 }}
@@ -231,7 +332,12 @@ export default function CameraScreen() {
                 setError(mountError.message || "카메라를 열지 못했어요.");
               }}
             />
-          ) : (
+          ) : permission?.granted ? (
+            // 포커스를 잃은 동안(전환 애니메이션 등)에는 CameraView 자체를
+            // 렌더하지 않는다 — expo-camera 문서 권고: 동시에 활성화된
+            // 프리뷰는 하나만 유지해야 한다.
+            <View style={{ flex: 1 }} />
+          ) : !photo ? (
             <Pressable
               className="flex-1 items-center justify-center gap-4 px-8"
               accessibilityRole="button"
@@ -247,6 +353,15 @@ export default function CameraScreen() {
                 <ThemedText typography="body-3-bold">권한 허용</ThemedText>
               </View>
             </Pressable>
+          ) : null}
+          {photo && (
+            // CameraView 위를 완전히 덮는 오버레이로 찍은 사진을 보여준다 —
+            // 아래 CameraView는 이 동안에도 계속 살아 있다(위 주석 참고).
+            <Image
+              source={{ uri: photo.uri }}
+              className="absolute inset-0"
+              resizeMode="cover"
+            />
           )}
           <ViewfinderCorner position="tl" />
           <ViewfinderCorner position="tr" />
@@ -274,10 +389,10 @@ export default function CameraScreen() {
                 className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white/[0.16]"
                 accessibilityRole="button"
                 disabled={isUploading}
-                onPress={() => {
-                  setPhoto(null);
-                  setIsCameraReady(false);
-                }}
+                // CameraView는 photo가 있는 동안에도 계속 mount돼 있으므로
+                // (위 뷰파인더 참고) isCameraReady를 여기서 다시 false로
+                // 내릴 필요가 없다 — 이미 준비된 같은 세션을 그대로 쓴다.
+                onPress={() => setPhoto(null)}
               >
                 <ThemedText
                   typography="body-3-bold"

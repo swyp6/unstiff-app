@@ -1,3 +1,4 @@
+import { useSegments } from "expo-router";
 import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { useColorScheme } from "react-native";
 
@@ -7,12 +8,19 @@ import { primitiveColors } from "@/constants/tokens";
 export default function AppTabs() {
   const scheme = useColorScheme();
   const colors = Colors[scheme === "unspecified" ? "light" : scheme];
+  // 카메라 탭의 촬영 화면(capture/index)만 탭바 없이 몰입형으로 보여준다 —
+  // 그 탭의 nested route(capture/target·record-editor·manual-record)로 들어가면
+  // 마지막 segment가 바뀌면서 탭바가 다시 나타난다. 화면을 root modal로
+  // 옮기지 않고 탭바 표시 여부만 바꾸므로 nested Stack 구조는 그대로다.
+  const segments = useSegments();
+  const isCameraCaptureScreen = segments[segments.length - 1] === "capture";
   // Figma node 3502:36518 (Nav / 하단 탭): selected tab uses brand/primary
   // orange instead of the default textSecondary.
   const selectedColor = primitiveColors.orange["500"];
 
   return (
     <NativeTabs
+      hidden={isCameraCaptureScreen}
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
       // shadowColor is iOS-only (react-native-screens has no Android tab bar

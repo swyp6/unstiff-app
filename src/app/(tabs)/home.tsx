@@ -68,8 +68,8 @@ import {
 } from "@/features/workout-plan/model";
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
 import { logImageUploadError } from "@/features/upload/cloudinary";
-import { useDailyPhotoStore } from "@/features/upload/daily-photo-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
+import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 // Figma node 3502:36518 요일 헤더: 일=red/5, 토=blue/7, 나머지 charcoal/5.
@@ -100,10 +100,11 @@ const DAILY_MISSION_STATUS_MAP: Record<
   COMPLETED: "completed",
   DISMISSED: "dismissed",
 };
-// Sentinel planItemId so the shared daily-photo-store result can be routed
-// to the mission's completion instead of a todayWorkouts entry — distinct
-// from the `today-${Date.now()}-${counter}` ids createTodayWorkoutInstance
-// generates.
+// Sentinel local id so pendingRecordPlanItemId/openRecordMethodModal can
+// route a record-flow entry to the mission instead of a todayWorkouts
+// entry — distinct from the real server 오늘의 운동(daily-plan) ids
+// createTodayWorkoutInstance receives (see addSavedPlanToDate/
+// loadWorkoutsForDate). Never sent as a PLAN refId — see buildRecordTarget.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
 
 // GET /api/v1/workouts?date=(운동 기록 조회) 응답을 그대로 매핑한다 — 미션인지
@@ -308,13 +309,7 @@ export default function HomeScreen() {
   // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
   useEffect(() => {
     getDailyMission()
-      .then((response) => {
-        // offerTime이 빈 문자열/undefined로 오면 도착 문구만 조용히
-        // 비어버리는 문제가 있어(포맷 함수는 방어했지만 원인 확인용),
-        // 실제 응답 값을 남겨서 기기 로그에서 확인할 수 있게 한다.
-        console.log("[mission] daily mission response", response);
-        applyMissionResponse(response);
-      })
+      .then(applyMissionResponse)
       .catch((error) => console.error("Failed to load daily mission", error));
   }, []);
 
@@ -390,6 +385,10 @@ export default function HomeScreen() {
   // 않는다 — ref라 값이 바뀌어도 리렌더를 트리거하지 않고, 이미 로드된
   // 날짜에 로컬로 추가한 항목(addSavedPlanToDate 등)이 재조회로 덮어써지지
   // 않게 막아준다.
+  // 카메라 탭에서 시작한 기록(LINKED/MANUAL)은 이 화면을 거치지 않아
+  // pendingRecordPlanItemId 기반 resync가 걸리지 않는다. 저장 성공 시각을
+  // 구독해 그때만 오늘의 운동/미션/캘린더를 서버에서 다시 읽는다.
+  const savedRecordAt = useRecordFlowStore((state) => state.savedRecordAt);
   const loadedWorkoutDateKeysRef = useRef(new Set<string>());
 
   function loadWorkoutsForDate(date: Date) {
@@ -428,6 +427,23 @@ export default function HomeScreen() {
         loadedWorkoutDateKeysRef.current.delete(key);
       });
   }
+
+  // 기록 저장이 성공하면(카메라 탭에서 시작한 LINKED/MANUAL 포함) 오늘 데이터를
+  // 서버 기준으로 다시 맞춘다 — MANUAL은 오늘의 운동이 새로 하나 생기고,
+  // LINKED는 해당 항목이 완료로 바뀐다. loadWorkoutsForDate는 날짜당 한 번만
+  // 받아오는 캐시가 있어 오늘 키를 먼저 지운다. 캘린더는 위 effect가
+  // savedRecordAt을 dep으로 함께 다시 읽는다.
+  useEffect(() => {
+    if (savedRecordAt == null) return;
+    const now = new Date();
+    loadedWorkoutDateKeysRef.current.delete(now.toDateString());
+    loadWorkoutsForDate(now);
+    getDailyMission()
+      .then(applyMissionResponse)
+      .catch((error) => {
+        console.error("Failed to refresh daily mission", error);
+      });
+  }, [savedRecordAt]);
 
   // "지난 운동"(오늘/미래가 아닌 날짜)에 쓰는 실제 서버 기록 — GET
   // /api/v1/workouts?date=는 그 날 남긴 운동/미션 기록을 refType까지 포함해
@@ -527,7 +543,10 @@ export default function HomeScreen() {
     return () => {
       cancelled = true;
     };
-  }, [viewedYear, viewedMonthNumber]);
+    // savedRecordAt: 기록 저장이 실제로 성공했을 때만 바뀌는 신호라, 이 달을
+    // 다시 읽어 recordCount/imageUrl을 최신 서버 값으로 맞춘다(화면 포커스마다
+    // 무조건 재조회하지는 않는다).
+  }, [viewedYear, viewedMonthNumber, savedRecordAt]);
 
   // date(YYYY-MM-DD) 기준 lookup — days는 기록/예정 운동이 있는 날짜만 내려오는
   // sparse 배열이라 index로 캘린더 셀과 매칭하면 안 되고 반드시 date로 찾아야
@@ -563,50 +582,45 @@ export default function HomeScreen() {
   >(null);
   const [recordModalTitle, setRecordModalTitle] = useState("");
 
-  // 카메라 화면(/camera)은 라우트 파라미터로 결과를 돌려줄 수 없어 이 스토어를
-  // 거쳐 전달한다 — planItemId가 미션이면 미션을, 아니면 해당 today workout
-  // instance를 완료 처리하고 사진 URL을 붙인다.
-  useEffect(() => {
-    return useDailyPhotoStore.subscribe((state) => {
-      if (!state.result) return;
-      const { planItemId, secureUrl } = state.result;
-      if (planItemId === MISSION_PLAN_ITEM_ID) {
-        setMissionStatus("completed");
-      } else {
-        updateWorkoutsForDate(new Date(), (workouts) =>
-          workouts.map((workout) =>
-            workout.id === planItemId
-              ? { ...workout, isDone: true, photoUrl: secureUrl }
-              : workout,
-          ),
-        );
-      }
-      setPendingRecordPlanItemId(null);
-      useDailyPhotoStore.getState().clearResult();
-    });
-  }, []);
-
-  // 카메라 close, 앨범 선택 취소 후 이탈, 업로드 실패 등 기록을 확정하지
-  // 못한 채(=pendingRecordPlanItemId가 여전히 남은 채) 홈 탭으로 다시
-  // 포커스가 돌아오면 낙관적으로 켰던 체크를 되돌린다. isFocused가 마운트
-  // 시점부터 이미 true이므로 "false→true 전환"만 감지해야 한다.
-  const wasFocusedRef = useRef(isFocused);
-  useEffect(() => {
-    const wasFocused = wasFocusedRef.current;
-    wasFocusedRef.current = isFocused;
-    const regainedFocusWithPending =
-      !wasFocused && isFocused && pendingRecordPlanItemId !== null;
-
-    if (
-      regainedFocusWithPending &&
-      pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID
-    ) {
-      setMissionStatus("accepted");
+  // 체크 탭 → 기록 방식 선택 → (사진 촬영/앨범/생략) → 실제 수행값 입력
+  // (record-editor) → POST /api/v1/workouts까지는 전부 다른 라우트로
+  // 넘어갔다 돌아오는 흐름이라, 그 사이 실제로 기록 저장에 성공했는지
+  // 이 화면은 직접 알 수 없다(성공/실패를 별도 신호로 넘겨받지 않는다).
+  // 그래서 낙관적으로 켰던 체크를 무조건 되돌리는 대신, 홈으로 다시
+  // 포커스가 돌아왔을 때 서버의 실제 상태를 다시 물어봐서 그대로 반영한다
+  // — 중간에 그냥 나왔으면 여전히 미완료로, 실제로 저장됐으면 완료로
+  // 자연스럽게 맞춰진다.
+  function resyncPendingRecordWithServer(planItemId: string) {
+    if (planItemId === MISSION_PLAN_ITEM_ID) {
+      getDailyMission()
+        .then(applyMissionResponse)
+        .catch((error) => {
+          console.error("Failed to resync mission status", error);
+        });
+      return;
     }
-    if (
-      regainedFocusWithPending &&
-      pendingRecordPlanItemId !== MISSION_PLAN_ITEM_ID
-    ) {
+
+    // loadWorkoutsForDate는 날짜당 한 번만 불러오는 캐시가 있어, 오늘
+    // 날짜는 강제로 다시 불러오게 캐시를 지운다.
+    const now = new Date();
+    loadedWorkoutDateKeysRef.current.delete(now.toDateString());
+    loadWorkoutsForDate(now);
+  }
+
+  // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 포커스
+  // 재획득 시 pending rollback(바로 아래 effect), 그리고 앨범에서 선택하다
+  // 취소/거부됐을 때 공통으로 쓴다. 카메라로 넘어가거나 "사진 없이
+  // 기록하기"를 고르는 경우는 기록이 확정되므로 여기로 오지 않는다.
+  // (아래 effect보다 먼저 선언해야 한다 — 함수 선언이라 런타임 호이스팅은
+  // 되지만, 그 상태로 두면 "선언 전에 참조" 린트 경고가 난다.)
+  function revertPendingRecord() {
+    if (!pendingRecordPlanItemId) return;
+    if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
+      setMissionStatus("accepted");
+    } else {
+      // 여기서 쓰는 today는 날짜 키(toDateString)로만 쓰여서 컴포넌트
+      // 상단의 today와 같은 날짜를 가리킨다 — 굳이 그 선언을 이 effect보다
+      // 앞으로 옮기지 않고 그때그때 새로 만든다.
       updateWorkoutsForDate(new Date(), (workouts) =>
         workouts.map((workout) =>
           workout.id === pendingRecordPlanItemId
@@ -615,9 +629,32 @@ export default function HomeScreen() {
         ),
       );
     }
+    setPendingRecordPlanItemId(null);
+  }
+
+  // 카메라 close, 앨범 선택 취소 후 이탈 등으로 기록 흐름을 아예 시작하지
+  // 못한 채(=pendingRecordPlanItemId가 여전히 남은 채) 홈 탭으로 다시
+  // 포커스가 돌아오면 위 재조회로 실제 상태를 맞춘다. isFocused가 마운트
+  // 시점부터 이미 true이므로 "false→true 전환"만 감지해야 한다.
+  const wasFocusedRef = useRef(isFocused);
+  useEffect(() => {
+    const wasFocused = wasFocusedRef.current;
+    wasFocusedRef.current = isFocused;
+    const regainedFocusWithPending =
+      !wasFocused && isFocused && pendingRecordPlanItemId !== null;
+
     if (regainedFocusWithPending) {
-      setPendingRecordPlanItemId(null);
+      // 먼저 낙관적으로 켰던 완료 표시를 되돌린 뒤에 서버를 재조회한다 —
+      // 재조회가 실패해도(네트워크 오류 등) rollback된 미완료 상태가 그대로
+      // 남는다. 성공하면 그 응답이 실제 서버 상태(완료/미완료 어느 쪽이든)로
+      // 다시 덮어써서 자연스럽게 맞춰진다. revertPendingRecord()가 이미
+      // pendingRecordPlanItemId를 null로 지우므로, resync에 넘길 id를 먼저
+      // 로컬 변수로 붙잡아 둔다.
+      const planItemId = pendingRecordPlanItemId;
+      revertPendingRecord();
+      resyncPendingRecordWithServer(planItemId);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isFocused, pendingRecordPlanItemId]);
 
   // 다른 탭으로 이동해 포커스를 잃으면 모달을 닫는다. isFocused를 visible
@@ -1204,43 +1241,94 @@ export default function HomeScreen() {
     openRecordMethodModal(MISSION_PLAN_ITEM_ID, missionTitle);
   }
 
-  // 낙관적으로 켰던 체크를 되돌린다 — 백드롭 탭으로 모달을 닫을 때, 그리고
-  // 앨범에서 선택하다 취소/거부됐을 때 공통으로 쓴다. 카메라로 넘어가거나
-  // "사진 없이 기록하기"를 고르는 경우는 기록이 확정되므로 여기로 오지 않는다.
-  function revertPendingRecord() {
-    if (!pendingRecordPlanItemId) return;
-    if (pendingRecordPlanItemId === MISSION_PLAN_ITEM_ID) {
-      setMissionStatus("accepted");
-    } else {
-      updateWorkoutsForDate(today, (workouts) =>
-        workouts.map((workout) =>
-          workout.id === pendingRecordPlanItemId
-            ? { ...workout, isDone: false }
-            : workout,
-        ),
-      );
-    }
-    setPendingRecordPlanItemId(null);
-  }
-
   function dismissRecordMethodModal() {
     setIsRecordMethodModalVisible(false);
     revertPendingRecord();
   }
 
+  // planItemId가 미션 sentinel이면 missionId(실제 서버 id)를, 아니면
+  // planItemId 자체(이미 실제 서버 오늘의 운동 id)를 refId로 삼는다.
+  // MISSION_PLAN_ITEM_ID sentinel은 절대 refId로 보내지 않는다 — 미션
+  // id를 아직 모르면(이론상 있을 수 없지만 방어적으로) null을 돌려준다.
+  function buildRecordTarget(planItemId: string) {
+    if (planItemId === MISSION_PLAN_ITEM_ID) {
+      if (missionId == null) return null;
+      return {
+        mode: "LINKED" as const,
+        refType: "MISSION" as const,
+        refId: missionId,
+        title: recordModalTitle,
+      };
+    }
+    // todayWorkouts의 plan은 이미 fromDailyPlanResponse를 거친 UI 도메인
+    // 값(selectedGoalTypes/goalValues, 분·km)이다 — record-editor가 "실제
+    // 수행값"의 초기값으로 그대로 쓸 수 있도록 함께 넘긴다. 목록에서 찾지
+    // 못하면(이론상 있을 수 없지만 방어적으로) 초기값 없이 기존 빈 선택
+    // 상태로 시작한다.
+    const workout = todayWorkouts.find((item) => item.id === planItemId);
+    return {
+      mode: "LINKED" as const,
+      refType: "PLAN" as const,
+      refId: Number(planItemId),
+      title: recordModalTitle,
+      ...(workout && workout.plan.selectedGoalTypes.length > 0
+        ? {
+            initialGoalTypes: workout.plan.selectedGoalTypes,
+            initialGoalValues: workout.plan.goalValues,
+          }
+        : null),
+    };
+  }
+
+  // 사진 없이도 실제 수행값 입력(record-editor)은 그대로 거쳐야 한다 —
+  // "사진 생략"은 사진만 건너뛸 뿐, 기록 자체는 여전히 그 화면에서
+  // 확정된다.
   function completeRecordWithoutPhoto() {
     setIsRecordMethodModalVisible(false);
-    setPendingRecordPlanItemId(null);
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const target = buildRecordTarget(planItemId);
+    if (!target) {
+      revertPendingRecord();
+      return;
+    }
+    useRecordFlowStore.getState().setPhoto(null);
+    useRecordFlowStore.getState().setTarget(target);
+    router.push("/record-editor");
+  }
+
+  // camera.tsx가 refType/refId를 이미 받았으면(PLAN/MISSION 둘 다) 대상
+  // 선택 화면을 건너뛰고 바로 기록 입력으로 이어간다 — route param은
+  // 문자열만 가능해 refId를 String으로 보낸다.
+  function buildRecordCameraParams() {
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const target = buildRecordTarget(planItemId);
+    return {
+      title: recordModalTitle,
+      ...(target
+        ? { refType: target.refType, refId: String(target.refId) }
+        : null),
+    };
   }
 
   function startRecordPhotoCapture() {
     setIsRecordMethodModalVisible(false);
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const target = buildRecordTarget(planItemId);
+    if (!target) {
+      revertPendingRecord();
+      return;
+    }
+    // camera.tsx가 업로드 완료 후 route param(refType/refId)만으로 target을
+    // 다시 만들면 여기서 계산한 initialGoalTypes/initialGoalValues(PLAN
+    // 목표값 prefill)가 사라진다 — 카메라로 넘어가기 전에 미리 full target을
+    // store에 심어 두면 camera.tsx가 이 값을 그대로 보존해 쓴다(camera.tsx의
+    // handleUsePhoto 참고). 이전 세션에서 남은 사진이 있을 수 있어 함께
+    // 정리한다.
+    useRecordFlowStore.getState().setPhoto(null);
+    useRecordFlowStore.getState().setTarget(target);
     router.push({
       pathname: "/camera",
-      params: {
-        title: recordModalTitle,
-        planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
-      },
+      params: buildRecordCameraParams(),
     });
   }
 
@@ -1251,6 +1339,12 @@ export default function HomeScreen() {
   // 사진을 고르면 그때 /camera를 그 사진 미리보기(확인) 화면으로 바로 띄운다.
   async function startRecordLibraryPick() {
     setIsRecordMethodModalVisible(false);
+    const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
+    const target = buildRecordTarget(planItemId);
+    if (!target) {
+      revertPendingRecord();
+      return;
+    }
     try {
       const libraryPermission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -1269,11 +1363,16 @@ export default function HomeScreen() {
       }
 
       const asset = result.assets[0];
+      // startRecordPhotoCapture와 같은 이유로, 실제로 사진이 확정된 뒤(취소/
+      // 권한 거부 시에는 건드리지 않는다) /camera로 넘어가기 직전에만 full
+      // target을 store에 심는다 — 그래야 picker를 취소해도 stale target이
+      // 남지 않는다.
+      useRecordFlowStore.getState().setPhoto(null);
+      useRecordFlowStore.getState().setTarget(target);
       router.push({
         pathname: "/camera",
         params: {
-          title: recordModalTitle,
-          planItemId: pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID,
+          ...buildRecordCameraParams(),
           pickedUri: asset.uri,
           pickedWidth: String(asset.width),
           pickedHeight: String(asset.height),
