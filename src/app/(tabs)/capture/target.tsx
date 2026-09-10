@@ -310,6 +310,7 @@ function TargetRow({
   const isFilled = completed || variant === "mission" || selected;
   return (
     <Pressable
+      accessibilityLabel={completed ? `${title}, 완료됨` : title}
       accessibilityRole="button"
       accessibilityState={{ disabled: completed }}
       disabled={completed}
