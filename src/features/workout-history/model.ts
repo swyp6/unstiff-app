@@ -2,14 +2,14 @@ import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 
 import type { WorkoutHistoryResponse } from "./types";
 
-const MEASURE_ORDER: (keyof ExerciseMeasuresDto)[] = [
+export const MEASURE_ORDER: (keyof ExerciseMeasuresDto)[] = [
   "duration",
   "distance",
   "count",
   "sets",
 ];
 
-function formatMeasureValue(
+export function formatMeasureValue(
   key: keyof ExerciseMeasuresDto,
   value: number,
 ): string {

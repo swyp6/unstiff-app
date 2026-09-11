@@ -191,6 +191,7 @@ function DayRecordCard({
   serverRecordCount,
   expanded,
   onToggleExpanded,
+  onSelectRecord,
 }: {
   dateLabel: string;
   record: DayRecord | null;
@@ -199,6 +200,8 @@ function DayRecordCard({
   serverRecordCount: number;
   expanded: boolean;
   onToggleExpanded: () => void;
+  // 항목을 탭하면 그 기록부터 스와이프로 볼 수 있는 day-record 화면을 연다.
+  onSelectRecord: (index: number) => void;
 }) {
   const entries = record ? record.workouts : [];
 
@@ -240,9 +243,11 @@ function DayRecordCard({
               </View>
             ) : (
               entries.map((entry, index) => (
-                <View
+                <Pressable
                   key={index}
+                  accessibilityRole="button"
                   className="flex-row items-center gap-3 border-b border-line-subtle py-3"
+                  onPress={() => onSelectRecord(index)}
                 >
                   <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500">
                     <Ionicons
@@ -278,7 +283,7 @@ function DayRecordCard({
                       {entry.subtitle}
                     </ThemedText>
                   </View>
-                </View>
+                </Pressable>
               ))
             )}
           </View>
@@ -903,6 +908,7 @@ export default function HomeScreen() {
           // 스와이프 중인 옆 달 패널의 날짜는 자연히 매칭되지 않아 하이라이트가
           // 없는 상태로 보인다 — 그 달로 넘어가 API가 다시 조회되면 채워진다.
           const dayEntry = daysByDate.get(toDateKey(cellDate));
+          const dayRecordCount = dayEntry?.recordCount ?? 0;
           // hasPhoto는 "사진이 있다"는 뜻이지 "기록이 있다"는 뜻이 아니다 — 이
           // 값은 오늘이 아닌 셀에만 실제로 쓰이므로(아래 className/textColor는
           // isToday를 먼저 분기해 오늘 셀에서는 이 값을 보지 않는다) imageUrl만
@@ -942,7 +948,19 @@ export default function HomeScreen() {
               key={dayIndex}
               accessibilityRole="button"
               accessibilityLabel={`${monthDate.getMonth() + 1}월 ${day}일`}
-              onPress={() => setSelectedCalendarDate(cellDate)}
+              onPress={() => {
+                setSelectedCalendarDate(cellDate);
+                // 지난 날짜에 기록이 있으면 "지난 운동" 카드를 펼치는 대신
+                // day-record 화면으로 바로 넘어간다. 오늘/미래는 각각
+                // TodayWorkoutCard(체크 가능)와 예정 운동 화면을 계속 써야
+                // 하므로 대상에서 뺀다.
+                if (!isToday && !isFutureDay && dayRecordCount > 0) {
+                  router.push({
+                    pathname: "/day-record",
+                    params: { date: toDateKey(cellDate), index: "0" },
+                  });
+                }
+              }}
               className="h-[60px] w-[43px]"
             >
               {/* 메인 카드보다 먼저 그려야 "뒤에 깔린" 것처럼 보인다 — 형제로
@@ -1614,6 +1632,15 @@ export default function HomeScreen() {
               expanded={isTodayCardExpanded}
               onToggleExpanded={() =>
                 setIsTodayCardExpanded((expanded) => !expanded)
+              }
+              onSelectRecord={(index) =>
+                router.push({
+                  pathname: "/day-record",
+                  params: {
+                    date: toDateKey(selectedCalendarDate),
+                    index: String(index),
+                  },
+                })
               }
             />
           )}
