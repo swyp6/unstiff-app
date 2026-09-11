@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useCallback, useMemo, useState } from "react";
 import { Pressable, View } from "react-native";
@@ -20,23 +21,25 @@ const SWIPE_THRESHOLD = 60;
 type OnboardingStep = {
   title: string;
   subtitle: string;
+  illustration: number;
 };
 
-// The Figma file only has designs for steps 1-2 ("온보딩 4"/"온보딩 5") but its
-// indicator is built for 3 dots, and the user asked to build a 3rd step as a
-// placeholder to match. Replace this step's copy once that design exists.
+// Figma nodes 4501:44559 / 44580 / 44601 ("온보딩 7/8/9").
 const STEPS: OnboardingStep[] = [
   {
     title: "운동한 날을\n사진으로 남겨요",
     subtitle: "오늘 뭘 했는지 한 장이면 충분해요",
+    illustration: require("@/assets/onboarding/step-1.png"),
   },
   {
     title: "달력에 사진이 쌓여요",
     subtitle: "한 달을 한눈에 돌아볼 수 있어요",
+    illustration: require("@/assets/onboarding/step-2.png"),
   },
   {
     title: "매일 맞춤 미션을 받아요",
     subtitle: "기록을 보고 무리 없는 양을 제안해요",
+    illustration: require("@/assets/onboarding/step-3.png"),
   },
 ];
 
@@ -87,7 +90,7 @@ export default function OnboardingScreen() {
             accessibilityLabel="건너뛰기"
             onPress={finishOnboarding}
           >
-            <ThemedText typography="body-3-bold" themeColor="textSecondary">
+            <ThemedText typography="body-3-bold" className="text-charcoal-5">
               건너뛰기
             </ThemedText>
           </Pressable>
@@ -106,7 +109,11 @@ export default function OnboardingScreen() {
                 gap: 40,
               }}
             >
-              <View className="h-[220px] w-[255px] rounded-[20px] bg-fill-subtle" />
+              <Image
+                source={current.illustration}
+                style={{ width: 255, height: 273 }}
+                contentFit="contain"
+              />
               <View className="items-center gap-2">
                 <ThemedText
                   typography="title-2-bold"
@@ -116,7 +123,7 @@ export default function OnboardingScreen() {
                 </ThemedText>
                 <ThemedText
                   typography="body-2-medium"
-                  themeColor="textSecondary"
+                  className="text-charcoal-5"
                   style={{ textAlign: "center" }}
                 >
                   {current.subtitle}
@@ -133,7 +140,7 @@ export default function OnboardingScreen() {
                 key={index}
                 className={
                   index === step
-                    ? "h-1.5 w-[18px] rounded-full bg-label-normal"
+                    ? "h-1.5 w-[18px] rounded-full bg-orange-500"
                     : "h-1.5 w-1.5 rounded-full bg-line-strong"
                 }
               />
