@@ -737,9 +737,6 @@ export default function HomeScreen() {
   // "오늘이 기록됐는지" 판정에 직접 연결한다.
   const isTodayRecorded =
     doneCount > 0 || (daysByDate.get(toDateKey(today))?.recordCount ?? 0) > 0;
-  const todayPhotoUrl = todayWorkouts.find(
-    (workout) => workout.photoUrl,
-  )?.photoUrl;
   const isSelectedDateToday =
     selectedCalendarDate.toDateString() === today.toDateString();
   // 오늘 이후(미래) 날짜는 아직 안 지난 날이라 "운동 추가"는 계속 가능해야
@@ -909,10 +906,10 @@ export default function HomeScreen() {
           // 없는 상태로 보인다 — 그 달로 넘어가 API가 다시 조회되면 채워진다.
           const dayEntry = daysByDate.get(toDateKey(cellDate));
           const dayRecordCount = dayEntry?.recordCount ?? 0;
-          // hasPhoto는 "사진이 있다"는 뜻이지 "기록이 있다"는 뜻이 아니다 — 이
-          // 값은 오늘이 아닌 셀에만 실제로 쓰이므로(아래 className/textColor는
-          // isToday를 먼저 분기해 오늘 셀에서는 이 값을 보지 않는다) imageUrl만
-          // 본다. 오늘 실제로 업로드된 사진은 todayPhotoUrl로 별도 렌더링된다.
+          // hasPhoto는 "사진이 있다"는 뜻이지 "기록이 있다"는 뜻이 아니다.
+          // 오늘 포함 모든 날짜가 같은 서버 값(dayEntry.imageUrl)을 쓴다 —
+          // 오늘 셀만 로컬 상태에서 사진을 찾던 이전 방식은 그 필드가 실제로
+          // 채워지는 경로가 없어 오늘 사진이 영영 안 뜨는 버그였다.
           const hasPhoto = dayEntry?.imageUrl != null;
           // recordCount는 "그 날 남긴 기록 수"이지 사진 수가 아니다 — API에
           // 사진 개수 필드가 없어서 이 값으로 "여러 장 사진" 스택 UI를 채우면
@@ -933,7 +930,7 @@ export default function HomeScreen() {
               getWorkoutsForDate(cellDate).length > 0);
 
           const textColor =
-            isToday && todayPhotoUrl
+            isToday && hasPhoto
               ? "#ffffff"
               : isToday
                 ? semanticColors["label-normal"]
@@ -950,11 +947,12 @@ export default function HomeScreen() {
               accessibilityLabel={`${monthDate.getMonth() + 1}월 ${day}일`}
               onPress={() => {
                 setSelectedCalendarDate(cellDate);
-                // 지난 날짜에 기록이 있으면 "지난 운동" 카드를 펼치는 대신
-                // day-record 화면으로 바로 넘어간다. 오늘/미래는 각각
-                // TodayWorkoutCard(체크 가능)와 예정 운동 화면을 계속 써야
-                // 하므로 대상에서 뺀다.
-                if (!isToday && !isFutureDay && dayRecordCount > 0) {
+                // 그 날 기록이 있으면 day-record 화면으로 바로 넘어간다.
+                // 오늘도 포함 — 체크 가능한 TodayWorkoutCard는 계속 기본으로
+                // 보이고, 이미 완료해 기록이 남은 항목은 다른 날짜와 똑같이
+                // 여기서 사진과 함께 볼 수 있어야 한다. 미래만 예정 운동
+                // 화면을 계속 써야 하므로 대상에서 뺀다.
+                if (!isFutureDay && dayRecordCount > 0) {
                   router.push({
                     pathname: "/day-record",
                     params: { date: toDateKey(cellDate), index: "0" },
@@ -982,11 +980,11 @@ export default function HomeScreen() {
                       : "h-[60px] w-[43px] items-start p-1.5"
                 }
               >
-                {isToday && todayPhotoUrl && (
+                {hasPhoto && (
                   <>
                     <Image
                       source={{
-                        uri: getOptimizedImageUrl(todayPhotoUrl, {
+                        uri: getOptimizedImageUrl(dayEntry!.imageUrl!, {
                           ...CALENDAR_DAY_THUMBNAIL_SIZE,
                           crop: "fill",
                         }),
@@ -994,23 +992,13 @@ export default function HomeScreen() {
                       style={{ position: "absolute", inset: 0 }}
                       contentFit="cover"
                     />
-                    <View
-                      className="absolute inset-0"
-                      style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
-                    />
+                    {isToday && (
+                      <View
+                        className="absolute inset-0"
+                        style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
+                      />
+                    )}
                   </>
-                )}
-                {!isToday && hasPhoto && (
-                  <Image
-                    source={{
-                      uri: getOptimizedImageUrl(dayEntry!.imageUrl!, {
-                        ...CALENDAR_DAY_THUMBNAIL_SIZE,
-                        crop: "fill",
-                      }),
-                    }}
-                    style={{ position: "absolute", inset: 0 }}
-                    contentFit="cover"
-                  />
                 )}
                 {/* Figma 4305:34469 "장수 배지" — 그 날 기록이 여러 건일 때만
                     개수를 보여준다(1건이면 굳이 셀 필요가 없다). */}

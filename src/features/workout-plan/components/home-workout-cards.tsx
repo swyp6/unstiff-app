@@ -31,7 +31,6 @@ export type TodayWorkoutInstance = {
   // 편집한다.
   plan: WorkoutPlanDraft;
   isDone: boolean;
-  photoUrl?: string;
   // plan.stopwatchEnabled인 항목에만 있다.
   stopwatch?: StopwatchState;
 };

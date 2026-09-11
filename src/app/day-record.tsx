@@ -5,6 +5,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   Modal,
   NativeScrollEvent,
@@ -17,10 +18,20 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import {
+  ImageUploadError,
+  logImageUploadError,
+} from "@/features/upload/cloudinary";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
-import { getWorkoutHistory } from "@/features/workout-history/api";
+import { uploadPickedImage } from "@/features/upload/upload-image";
+import { pickImage } from "@/features/upload/use-image-upload";
+import {
+  getWorkoutHistory,
+  updateWorkoutHistory,
+} from "@/features/workout-history/api";
 import { WorkoutHistoryEditSheet } from "@/features/workout-history/components/workout-history-edit-sheet";
 import { formatMeasureValue } from "@/features/workout-history/model";
+import { saveImageToAlbum } from "@/features/workout-history/save-photo";
 import type {
   ExerciseMeasuresDto,
   IntensityDto,
@@ -49,15 +60,6 @@ const INTENSITY_LABELS: Record<IntensityDto, string> = {
 
 const BOT_AVATAR = require("@/assets/chat/bot-avatar.png");
 
-// Figma 4501:31546-31547 "Touch / More" 메뉴 항목. 저장/변경/수정/삭제는
-// 아직 실제 동작이 없다 — UI만 붙여둔 상태(별도 작업 필요).
-const MENU_ITEMS: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
-  { label: "사진 저장", icon: "download-outline" },
-  { label: "사진 변경", icon: "swap-horizontal-outline" },
-  { label: "기록 수정", icon: "create-outline" },
-  { label: "사진 삭제", icon: "trash-outline" },
-];
-
 function parseDateParam(date: string): Date {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -82,6 +84,10 @@ export default function DayRecordScreen() {
   );
   const [isMenuVisible, setIsMenuVisible] = useState(false);
   const [isEditSheetVisible, setIsEditSheetVisible] = useState(false);
+  const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
+  // 저장/변경/삭제가 진행되는 동안 메뉴를 다시 열지 못하게 막는다 — 셋 다
+  // 짧게 끝나는 단발성 동작이라 화면 전체를 덮는 로딩 UI까지는 필요 없다.
+  const [isPhotoActionPending, setIsPhotoActionPending] = useState(false);
 
   useEffect(() => {
     getWorkoutHistory(params.date)
@@ -99,6 +105,87 @@ export default function DayRecordScreen() {
   ) {
     const index = Math.round(event.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setCurrentIndex(index);
+  }
+
+  function applyUpdatedEntry(updated: WorkoutHistoryResponse) {
+    setWorkouts((current) =>
+      current!.map((entry, index) =>
+        index === currentIndex ? updated : entry,
+      ),
+    );
+  }
+
+  async function handleSavePhoto() {
+    const entry = workouts![currentIndex];
+    if (!entry.imageUrl) return;
+    setIsPhotoActionPending(true);
+    try {
+      await saveImageToAlbum(entry.imageUrl);
+      Alert.alert("저장 완료", "사진을 앨범에 저장했어요.");
+    } catch (error) {
+      console.error("Failed to save photo to album", error);
+      Alert.alert("오류", "사진을 저장하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsPhotoActionPending(false);
+    }
+  }
+
+  async function handleChangePhoto() {
+    const entry = workouts![currentIndex];
+    setIsPhotoActionPending(true);
+    try {
+      const asset = await pickImage("camera");
+      if (!asset) return;
+
+      // 낙관적 업데이트: 업로드/저장이 끝나길 기다리지 않고 방금 찍은 로컬
+      // 사진으로 바로 바꿔 보여준다. 실패하면 원래 사진으로 되돌린다.
+      applyUpdatedEntry({ ...entry, imageUrl: asset.uri });
+
+      const secureUrl = await uploadPickedImage(
+        asset.uri,
+        asset.width,
+        asset.height,
+        "DAILY_PHOTO",
+      );
+      await updateWorkoutHistory(entry.id, {
+        measures: entry.measures,
+        intensity: entry.intensity,
+        memo: entry.memo,
+        imageUrl: secureUrl,
+      });
+      applyUpdatedEntry({ ...entry, imageUrl: secureUrl });
+    } catch (error) {
+      applyUpdatedEntry(entry);
+      logImageUploadError("day-record change photo failed", error);
+      Alert.alert(
+        "오류",
+        error instanceof ImageUploadError
+          ? error.message
+          : "사진을 바꾸지 못했습니다. 다시 시도해주세요.",
+      );
+    } finally {
+      setIsPhotoActionPending(false);
+    }
+  }
+
+  async function handleConfirmDeletePhoto() {
+    const entry = workouts![currentIndex];
+    setIsDeleteConfirmVisible(false);
+    setIsPhotoActionPending(true);
+    try {
+      // imageUrl을 보내지 않으면 서버가 사진을 지우고 스티커로 표시한다.
+      await updateWorkoutHistory(entry.id, {
+        measures: entry.measures,
+        intensity: entry.intensity,
+        memo: entry.memo,
+      });
+      applyUpdatedEntry({ ...entry, imageUrl: undefined });
+    } catch (error) {
+      console.error("Failed to delete photo", error);
+      Alert.alert("오류", "사진을 삭제하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsPhotoActionPending(false);
+    }
   }
 
   return (
@@ -139,54 +226,138 @@ export default function DayRecordScreen() {
         </Pressable>
       </View>
 
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setIsMenuVisible(false)}
-        transparent
-        visible={isMenuVisible}
-      >
-        <Pressable
-          accessibilityLabel="메뉴 닫기"
-          accessibilityRole="button"
-          onPress={() => setIsMenuVisible(false)}
-          style={{ flex: 1 }}
+      {workouts !== null && workouts.length > 0 && (
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setIsMenuVisible(false)}
+          transparent
+          visible={isMenuVisible}
         >
-          <View
-            style={{
-              position: "absolute",
-              top: insets.top + 52,
-              right: 12,
-              width: 168,
-              borderRadius: 16,
-              paddingVertical: 4,
-              backgroundColor: semanticColors["background-normal"],
-              shadowColor: "#000000",
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.12,
-              shadowRadius: 16,
-              elevation: 8,
-            }}
+          <Pressable
+            accessibilityLabel="메뉴 닫기"
+            accessibilityRole="button"
+            onPress={() => setIsMenuVisible(false)}
+            style={{ flex: 1 }}
           >
-            {MENU_ITEMS.map((item) => (
-              <Pressable
-                key={item.label}
-                accessibilityRole="button"
-                className="flex-row items-center gap-2 px-4 py-3"
+            <View
+              style={{
+                position: "absolute",
+                top: insets.top + 52,
+                right: 12,
+                width: 168,
+                borderRadius: 16,
+                paddingVertical: 4,
+                backgroundColor: semanticColors["background-normal"],
+                shadowColor: "#000000",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.12,
+                shadowRadius: 16,
+                elevation: 8,
+              }}
+            >
+              <MenuRow
+                disabled={
+                  isPhotoActionPending || !workouts[currentIndex].imageUrl
+                }
+                icon="download-outline"
+                label="사진 저장"
                 onPress={() => {
                   setIsMenuVisible(false);
-                  if (item.label === "기록 수정") setIsEditSheetVisible(true);
+                  handleSavePhoto();
+                }}
+              />
+              <MenuRow
+                disabled={isPhotoActionPending}
+                icon="swap-horizontal-outline"
+                label="사진 변경"
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  handleChangePhoto();
+                }}
+              />
+              <MenuRow
+                disabled={isPhotoActionPending}
+                icon="create-outline"
+                label="기록 수정"
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  setIsEditSheetVisible(true);
+                }}
+              />
+              <MenuRow
+                disabled={
+                  isPhotoActionPending || !workouts[currentIndex].imageUrl
+                }
+                icon="trash-outline"
+                label="사진 삭제"
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  setIsDeleteConfirmVisible(true);
+                }}
+              />
+            </View>
+          </Pressable>
+        </Modal>
+      )}
+
+      {/* Figma 4501:32621-32622 "사진을 삭제할까요?" 확인 모달. */}
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsDeleteConfirmVisible(false)}
+        transparent
+        visible={isDeleteConfirmVisible}
+      >
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ backgroundColor: "rgba(23, 23, 25, 0.45)" }}
+        >
+          <View
+            className="items-center gap-5 rounded-[20px] bg-background-normal px-5 pb-[18px] pt-[26px]"
+            style={{ width: 300 }}
+          >
+            <View className="items-center gap-2">
+              <ThemedText typography="title-3-bold">
+                사진을 삭제할까요?
+              </ThemedText>
+              <ThemedText
+                typography="caption-1-regular"
+                style={{ color: "#8c8c92" }}
+              >
+                기록은 남고 스티커로 바뀌어요
+              </ThemedText>
+            </View>
+            <View className="flex-row items-stretch gap-2.5">
+              <Pressable
+                accessibilityRole="button"
+                className="items-center justify-center rounded-[42px]"
+                onPress={handleConfirmDeletePhoto}
+                style={{
+                  width: 125,
+                  backgroundColor: semanticColors["status-negative-normal"],
                 }}
               >
-                <Ionicons
-                  color={semanticColors["label-normal"]}
-                  name={item.icon}
-                  size={18}
-                />
-                <ThemedText typography="body-3-medium">{item.label}</ThemedText>
+                <ThemedText
+                  typography="body-2-bold"
+                  style={{ color: semanticColors["label-inverse"] }}
+                >
+                  삭제하기
+                </ThemedText>
               </Pressable>
-            ))}
+              <Pressable
+                accessibilityRole="button"
+                className="items-center justify-center rounded-[42px] border"
+                onPress={() => setIsDeleteConfirmVisible(false)}
+                style={{
+                  width: 125,
+                  height: 50,
+                  borderColor: "#dddddf",
+                }}
+              >
+                <ThemedText typography="body-2-bold">취소하기</ThemedText>
+              </Pressable>
+            </View>
           </View>
-        </Pressable>
+        </View>
       </Modal>
 
       {workouts !== null && workouts.length > 0 && (
@@ -194,13 +365,7 @@ export default function DayRecordScreen() {
           entry={workouts[currentIndex]}
           key={workouts[currentIndex].id}
           onClose={() => setIsEditSheetVisible(false)}
-          onSaved={(updated) =>
-            setWorkouts((current) =>
-              current!.map((entry, index) =>
-                index === currentIndex ? updated : entry,
-              ),
-            )
-          }
+          onSaved={applyUpdatedEntry}
           visible={isEditSheetVisible}
         />
       )}
@@ -241,6 +406,32 @@ export default function DayRecordScreen() {
         </ScrollView>
       )}
     </View>
+  );
+}
+
+function MenuRow({
+  icon,
+  label,
+  disabled,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      className="flex-row items-center gap-2 px-4 py-3"
+      disabled={disabled}
+      onPress={onPress}
+      style={disabled && { opacity: 0.4 }}
+    >
+      <Ionicons color={semanticColors["label-normal"]} name={icon} size={18} />
+      <ThemedText typography="body-3-medium">{label}</ThemedText>
+    </Pressable>
   );
 }
 

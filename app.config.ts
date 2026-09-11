@@ -108,6 +108,17 @@ const config: ExpoConfig = {
     "expo-secure-store",
 
     [
+      "expo-media-library",
+      {
+        photosPermission:
+          "사진을 저장하기 위해 사진 보관함 접근 권한이 필요합니다.",
+        savePhotosPermission:
+          "사진을 앨범에 저장하기 위해 접근 권한이 필요합니다.",
+        isAccessMediaLocationEnabled: false,
+      },
+    ],
+
+    [
       "expo-image-picker",
       {
         photosPermission:
