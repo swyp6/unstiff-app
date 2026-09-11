@@ -220,13 +220,15 @@ export function MissionFeedbackModal({
 
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: isSubmitting }}
+                  disabled={isSubmitting}
                   onPress={handleSkip}
                   style={styles.linkPressable}
                 >
                   {({ pressed }) => (
                     <View
                       pointerEvents="none"
-                      style={pressed && styles.pressed}
+                      style={pressed && !isSubmitting && styles.pressed}
                     >
                       <ThemedText
                         style={styles.linkText}
@@ -319,13 +321,15 @@ export function MissionFeedbackModal({
 
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: isSubmitting }}
+                  disabled={isSubmitting}
                   onPress={handleSkip}
                   style={styles.linkPressable}
                 >
                   {({ pressed }) => (
                     <View
                       pointerEvents="none"
-                      style={pressed && styles.pressed}
+                      style={pressed && !isSubmitting && styles.pressed}
                     >
                       <ThemedText
                         style={styles.linkText}
@@ -412,13 +416,15 @@ export function MissionFeedbackModal({
 
                 <Pressable
                   accessibilityRole="button"
+                  accessibilityState={{ disabled: isSubmitting }}
+                  disabled={isSubmitting}
                   onPress={handleBackToReason}
                   style={styles.linkPressable}
                 >
                   {({ pressed }) => (
                     <View
                       pointerEvents="none"
-                      style={pressed && styles.pressed}
+                      style={pressed && !isSubmitting && styles.pressed}
                     >
                       <ThemedText
                         style={styles.linkText}
