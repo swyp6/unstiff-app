@@ -21,6 +21,7 @@ import ReanimatedAnimated, {
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { completeMission } from "@/features/missions/api";
+import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
 import { IntensityBottomSheet } from "@/features/workout-plan/components/intensity-bottom-sheet";
@@ -161,7 +162,15 @@ export function RecordEditorScreen() {
       // completeMission만 다시 부른다).
       if (target.refType === "MISSION") {
         try {
-          await completeMission(target.refId);
+          const completeResponse = await completeMission(target.refId);
+          // "10번마다" 같은 주기 판단은 서버가 이미 끝낸 결과다 — 프론트는
+          // 이 값만 그대로 믿는다. 완료 화면(record-complete) UX는 그대로
+          // 유지해야 하므로 여기서 곧장 피드백 모달을 띄우지 않고, 홈으로
+          // 돌아왔을 때 표시할 수 있도록 화면 전환에도 살아남는 별도
+          // store에 pending 상태만 남겨둔다(mission-feedback-store).
+          if (completeResponse.requireUserFeedback) {
+            useMissionFeedbackStore.getState().requestFeedback(target.refId);
+          }
         } catch (completeError) {
           console.error("Failed to complete mission", completeError);
           setError(

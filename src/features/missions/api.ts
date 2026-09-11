@@ -1,6 +1,10 @@
 import { apiClient } from "@/lib/api-client";
 
-import type { DailyMissionResponse, MissionSettingResponse } from "./types";
+import type {
+  DailyMissionResponse,
+  MissionFeedbackRequest,
+  MissionSettingResponse,
+} from "./types";
 
 // GET /api/v1/missions/setting — 미션 제공 시간 조회
 export async function getMissionSetting() {
@@ -57,4 +61,16 @@ export async function completeMission(missionId: number) {
     `/api/v1/missions/${missionId}/complete`,
   );
   return data;
+}
+
+// POST /api/v1/missions/{missionId}/feedback — 완료/무시 응답의
+// requireUserFeedback이 true일 때만 호출한다. 미션당 1건, 같은 missionId로
+// 다시 보내면 서버가 마지막 값으로 overwrite한다(재시도해도 여러 건 쌓이지
+// 않음) — 그래도 프론트에서 연타로 중복 요청을 보내지는 않는다(호출부의
+// isSubmitting 참고).
+export async function submitMissionFeedback(
+  missionId: number,
+  request: MissionFeedbackRequest,
+) {
+  await apiClient.post(`/api/v1/missions/${missionId}/feedback`, request);
 }

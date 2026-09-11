@@ -34,6 +34,9 @@ import {
   getDailyMission,
   prefetchDailyMission,
 } from "@/features/missions/api";
+import { MissionFeedbackModal } from "@/features/missions/components/mission-feedback-modal";
+import { MissionFeedbackToast } from "@/features/missions/components/mission-feedback-toast";
+import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
 import type { DailyMissionResponse } from "@/features/missions/types";
 import { useUnreadPushCount } from "@/features/notifications/use-unread-push-count";
@@ -297,6 +300,26 @@ export default function HomeScreen() {
   const [missionTitle, setMissionTitle] = useState("");
   const [missionDescription, setMissionDescription] = useState("");
   const [missionArrivalLabel, setMissionArrivalLabel] = useState("");
+  // completeMission/dismissMission의 requireUserFeedback이 true였던 미션의
+  // id — mission-feedback-store가 화면 전환(RecordEditor → RecordComplete →
+  // 홈)에도 살아남긴 하지만, 그 store 값 자체를 "이 화면에서 지금 모달을
+  // 띄워야 하는가"로 직접 구독하면 된다(아래 렌더 부분 참고). 토스트는 이
+  // local state로만 관리한다 — feedback 성공 이후에만 잠깐 켜지는 화면
+  // 전용 UI라 store로 공유할 필요가 없다.
+  const pendingMissionFeedbackId = useMissionFeedbackStore(
+    (state) => state.pendingMissionId,
+  );
+  const [isMissionFeedbackToastVisible, setIsMissionFeedbackToastVisible] =
+    useState(false);
+
+  function handleMissionFeedbackComplete() {
+    useMissionFeedbackStore.getState().clearFeedback();
+    setIsMissionFeedbackToastVisible(true);
+  }
+
+  function handleMissionFeedbackSkip() {
+    useMissionFeedbackStore.getState().clearFeedback();
+  }
 
   function applyMissionResponse(response: DailyMissionResponse) {
     setMissionId(response.missionId);
@@ -333,7 +356,14 @@ export default function HomeScreen() {
   async function handleMissionDismiss() {
     if (missionId == null) return;
     try {
-      applyMissionResponse(await dismissMission(missionId));
+      const response = await dismissMission(missionId);
+      applyMissionResponse(response);
+      // "10번마다" 같은 주기 판단은 서버가 이미 끝낸 결과다 — 여기서는 그
+      // 값만 그대로 믿는다. dismiss API 자체가 실패하면(위 catch) 이 분기에
+      // 도달하지 않으므로 feedback pending도 만들어지지 않는다.
+      if (response.requireUserFeedback) {
+        useMissionFeedbackStore.getState().requestFeedback(missionId);
+      }
     } catch {
       Alert.alert("오류", "미션을 닫지 못했습니다. 다시 시도해주세요.");
     }
@@ -1615,6 +1645,22 @@ export default function HomeScreen() {
         title={recordModalTitle}
         visible={isRecordMethodModalVisible}
       />
+
+      {isFocused && (
+        <MissionFeedbackModal
+          missionId={pendingMissionFeedbackId}
+          missionTitle={missionTitle}
+          onComplete={handleMissionFeedbackComplete}
+          onSkip={handleMissionFeedbackSkip}
+          visible={pendingMissionFeedbackId != null}
+        />
+      )}
+
+      {isFocused && isMissionFeedbackToastVisible && (
+        <MissionFeedbackToast
+          onHide={() => setIsMissionFeedbackToastVisible(false)}
+        />
+      )}
 
       {newPlanDraft && isFocused && (
         <WorkoutPlanEditSheet
