@@ -18,10 +18,7 @@ import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { getWorkoutHistory } from "@/features/workout-history/api";
-import {
-  formatMeasureValue,
-  MEASURE_ORDER,
-} from "@/features/workout-history/model";
+import { formatMeasureValue } from "@/features/workout-history/model";
 import type {
   ExerciseMeasuresDto,
   IntensityDto,
@@ -29,6 +26,11 @@ import type {
 import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
+// Figma 4501:31551 "사진 영역"은 프레임(375 너비) 기준 445 고정 높이다 —
+// flex:1로 남는 공간을 다 채우지 않고, 너비 비율만큼만 스케일한다. 기기가
+// 더 길면 아래 정보 영역 밑으로 여백이 남는다(디자인의 "여백" 스페이서와
+// 같은 효과).
+const PHOTO_HEIGHT = 445 * (SCREEN_WIDTH / 375);
 
 const MEASURE_LABELS: Record<keyof ExerciseMeasuresDto, string> = {
   duration: "시간",
@@ -105,7 +107,7 @@ export default function DayRecordScreen() {
             size={24}
           />
         </Pressable>
-        <ThemedText typography="body-2-bold">
+        <ThemedText typography="body-2-regular">
           {formatDateLabel(parseDateParam(params.date))}
         </ThemedText>
         <View style={{ width: 24 }} />
@@ -161,15 +163,23 @@ export default function DayRecordScreen() {
   );
 }
 
+// Figma 4501:31556-31572 "통계 그리드" — 강도 단독 행(있으면) 다음에
+// 시간·거리, 횟수·세트를 각각 한 행으로 묶어 보여준다. 항목 폭은 100px
+// 고정이고 행 안에서는 간격이 없다(두 칸이 붙어 총 200px).
+const MEASURE_ROW_PAIRS: (keyof ExerciseMeasuresDto)[][] = [
+  ["duration", "distance"],
+  ["count", "sets"],
+];
+
 function RecordPage({ entry }: { entry: WorkoutHistoryResponse }) {
-  const measureEntries = MEASURE_ORDER.filter(
-    (key) => entry.measures[key] != null,
-  );
+  const measureRows = MEASURE_ROW_PAIRS.map((pair) =>
+    pair.filter((key) => entry.measures[key] != null),
+  ).filter((row) => row.length > 0);
   const typeLabel = entry.exerciseType ?? "미션";
 
   return (
     <View style={{ width: SCREEN_WIDTH }}>
-      <View style={{ flex: 1 }}>
+      <View style={{ height: PHOTO_HEIGHT }}>
         {entry.imageUrl ? (
           <Image
             source={{
@@ -182,9 +192,9 @@ function RecordPage({ entry }: { entry: WorkoutHistoryResponse }) {
           <View style={{ flex: 1 }} />
         )}
 
-        {(entry.intensity || measureEntries.length > 0) && (
+        {(entry.intensity || measureRows.length > 0) && (
           <LinearGradient
-            colors={["rgba(13,15,20,0)", "rgba(13,15,20,0.9)"]}
+            colors={["rgba(13,15,20,0)", "rgba(13,15,20,0.92)"]}
             end={{ x: 0, y: 1 }}
             pointerEvents="none"
             start={{ x: 0, y: 0 }}
@@ -198,58 +208,74 @@ function RecordPage({ entry }: { entry: WorkoutHistoryResponse }) {
           />
         )}
 
-        <View style={{ position: "absolute", left: 24, bottom: 24, gap: 12 }}>
+        <View style={{ position: "absolute", left: 24, bottom: 24, gap: 14 }}>
           {entry.intensity && (
-            <ThemedText typography="title-3-bold" style={{ color: "#ffffff" }}>
-              {INTENSITY_LABELS[entry.intensity]}
-            </ThemedText>
+            <View style={{ width: 100 }}>
+              <ThemedText
+                typography="display-1-bold"
+                style={{ color: "#ffffff" }}
+              >
+                {INTENSITY_LABELS[entry.intensity]}
+              </ThemedText>
+              <ThemedText
+                typography="caption-2-regular"
+                style={{ color: "#c3c3c6" }}
+              >
+                강도
+              </ThemedText>
+            </View>
           )}
-          {measureEntries.length > 0 && (
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 24 }}>
-              {measureEntries.map((key) => (
+          {measureRows.map((row) => (
+            <View key={row.join("-")} style={{ flexDirection: "row" }}>
+              {row.map((key) => (
                 <View key={key} style={{ width: 100 }}>
                   <ThemedText
-                    typography="title-2-bold"
+                    typography="display-1-bold"
                     style={{ color: "#ffffff" }}
                   >
                     {formatMeasureValue(key, entry.measures[key]!)}
                   </ThemedText>
                   <ThemedText
                     typography="caption-2-regular"
-                    style={{ color: "rgba(255,255,255,0.7)" }}
+                    style={{ color: "#c3c3c6" }}
                   >
                     {MEASURE_LABELS[key]}
                   </ThemedText>
                 </View>
               ))}
             </View>
-          )}
+          ))}
         </View>
       </View>
 
-      <View className="gap-1.5 px-5 pb-6 pt-4">
-        <ThemedText
-          typography="body-2-bold"
-          style={{ color: primitiveColors.orange["500"] }}
-        >
-          {typeLabel}
-        </ThemedText>
-        <ThemedText typography="title-3-bold">{entry.name}</ThemedText>
+      <View className="gap-4 px-6 pb-6 pt-4">
+        <View className="gap-1.5">
+          <ThemedText
+            typography="body-2-medium"
+            style={{ color: primitiveColors.orange["500"] }}
+          >
+            {typeLabel}
+          </ThemedText>
+          <ThemedText typography="title-2-bold">{entry.name}</ThemedText>
+        </View>
 
         {entry.memo && (
-          <View className="mt-2 flex-row gap-2">
+          <View className="flex-row items-stretch">
             <View
-              className="w-1 rounded-full"
-              style={{ backgroundColor: primitiveColors.orange["500"] }}
+              className="rounded-sm"
+              style={{
+                width: 3,
+                backgroundColor: primitiveColors.orange["500"],
+              }}
             />
-            <View className="flex-1 gap-1">
+            <View className="flex-1 gap-2 pl-3.5">
               <ThemedText
-                typography="caption-1-medium"
-                themeColor="textSecondary"
+                typography="body-3-regular"
+                style={{ color: "#8c8c92" }}
               >
                 한 줄 메모
               </ThemedText>
-              <ThemedText typography="body-3-medium">{entry.memo}</ThemedText>
+              <ThemedText typography="body-2-bold">{entry.memo}</ThemedText>
             </View>
           </View>
         )}

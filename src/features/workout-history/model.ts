@@ -2,7 +2,7 @@ import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 
 import type { WorkoutHistoryResponse } from "./types";
 
-export const MEASURE_ORDER: (keyof ExerciseMeasuresDto)[] = [
+const MEASURE_ORDER: (keyof ExerciseMeasuresDto)[] = [
   "duration",
   "distance",
   "count",
