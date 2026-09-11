@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
+  Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
   Pressable,
@@ -18,6 +19,7 @@ import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { getWorkoutHistory } from "@/features/workout-history/api";
+import { WorkoutHistoryEditSheet } from "@/features/workout-history/components/workout-history-edit-sheet";
 import { formatMeasureValue } from "@/features/workout-history/model";
 import type {
   ExerciseMeasuresDto,
@@ -45,6 +47,17 @@ const INTENSITY_LABELS: Record<IntensityDto, string> = {
   HARD: "빡세게",
 };
 
+const BOT_AVATAR = require("@/assets/chat/bot-avatar.png");
+
+// Figma 4501:31546-31547 "Touch / More" 메뉴 항목. 저장/변경/수정/삭제는
+// 아직 실제 동작이 없다 — UI만 붙여둔 상태(별도 작업 필요).
+const MENU_ITEMS: { label: string; icon: keyof typeof Ionicons.glyphMap }[] = [
+  { label: "사진 저장", icon: "download-outline" },
+  { label: "사진 변경", icon: "swap-horizontal-outline" },
+  { label: "기록 수정", icon: "create-outline" },
+  { label: "사진 삭제", icon: "trash-outline" },
+];
+
 function parseDateParam(date: string): Date {
   const [year, month, day] = date.split("-").map(Number);
   return new Date(year, month - 1, day);
@@ -67,6 +80,8 @@ export default function DayRecordScreen() {
   const [currentIndex, setCurrentIndex] = useState(
     Number(params.index ?? 0) || 0,
   );
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [isEditSheetVisible, setIsEditSheetVisible] = useState(false);
 
   useEffect(() => {
     getWorkoutHistory(params.date)
@@ -94,11 +109,11 @@ export default function DayRecordScreen() {
         paddingTop: insets.top,
       }}
     >
-      <View className="h-11 flex-row items-center justify-between px-4">
+      <View className="h-12 flex-row items-center justify-between">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="닫기"
-          hitSlop={8}
+          className="h-12 w-12 items-center justify-center"
           onPress={() => router.back()}
         >
           <Ionicons
@@ -110,8 +125,85 @@ export default function DayRecordScreen() {
         <ThemedText typography="body-2-regular">
           {formatDateLabel(parseDateParam(params.date))}
         </ThemedText>
-        <View style={{ width: 24 }} />
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="더보기"
+          className="h-12 w-12 items-center justify-center"
+          onPress={() => setIsMenuVisible(true)}
+        >
+          <Ionicons
+            color={semanticColors["label-normal"]}
+            name="ellipsis-horizontal"
+            size={24}
+          />
+        </Pressable>
       </View>
+
+      <Modal
+        animationType="fade"
+        onRequestClose={() => setIsMenuVisible(false)}
+        transparent
+        visible={isMenuVisible}
+      >
+        <Pressable
+          accessibilityLabel="메뉴 닫기"
+          accessibilityRole="button"
+          onPress={() => setIsMenuVisible(false)}
+          style={{ flex: 1 }}
+        >
+          <View
+            style={{
+              position: "absolute",
+              top: insets.top + 52,
+              right: 12,
+              width: 168,
+              borderRadius: 16,
+              paddingVertical: 4,
+              backgroundColor: semanticColors["background-normal"],
+              shadowColor: "#000000",
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 8,
+            }}
+          >
+            {MENU_ITEMS.map((item) => (
+              <Pressable
+                key={item.label}
+                accessibilityRole="button"
+                className="flex-row items-center gap-2 px-4 py-3"
+                onPress={() => {
+                  setIsMenuVisible(false);
+                  if (item.label === "기록 수정") setIsEditSheetVisible(true);
+                }}
+              >
+                <Ionicons
+                  color={semanticColors["label-normal"]}
+                  name={item.icon}
+                  size={18}
+                />
+                <ThemedText typography="body-3-medium">{item.label}</ThemedText>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
+
+      {workouts !== null && workouts.length > 0 && (
+        <WorkoutHistoryEditSheet
+          entry={workouts[currentIndex]}
+          key={workouts[currentIndex].id}
+          onClose={() => setIsEditSheetVisible(false)}
+          onSaved={(updated) =>
+            setWorkouts((current) =>
+              current!.map((entry, index) =>
+                index === currentIndex ? updated : entry,
+              ),
+            )
+          }
+          visible={isEditSheetVisible}
+        />
+      )}
 
       {workouts === null ? (
         <View className="flex-1 items-center justify-center">
@@ -124,40 +216,29 @@ export default function DayRecordScreen() {
           </ThemedText>
         </View>
       ) : (
-        <>
-          <ScrollView
-            ref={scrollRef}
-            horizontal
-            pagingEnabled
-            showsHorizontalScrollIndicator={false}
-            onMomentumScrollEnd={handleMomentumScrollEnd}
-            contentOffset={{ x: currentIndex * SCREEN_WIDTH, y: 0 }}
-            style={{ flex: 1 }}
-          >
-            {workouts.map((entry) => (
-              <RecordPage key={entry.id} entry={entry} />
-            ))}
-          </ScrollView>
-
-          {workouts.length > 1 && (
-            <View className="flex-row items-center justify-center gap-1.5 py-2">
-              {workouts.map((entry, index) => (
-                <View
-                  key={entry.id}
-                  className={`h-1.5 rounded-full ${
-                    index === currentIndex ? "w-4" : "w-1.5"
-                  }`}
-                  style={{
-                    backgroundColor:
-                      index === currentIndex
-                        ? semanticColors["label-normal"]
-                        : semanticColors["line-normal"],
-                  }}
-                />
-              ))}
-            </View>
-          )}
-        </>
+        <ScrollView
+          ref={scrollRef}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleMomentumScrollEnd}
+          // 스와이프 속도가 느려 관성(momentum)이 거의 없으면 페이지는
+          // 넘어갔는데도 onMomentumScrollEnd가 안 불려서(RN paging 특유의
+          // 동작) 점 표시가 그대로 남는 문제가 있었다 — 드래그가 끝날 때도
+          // 같은 계산으로 한 번 더 맞춰준다.
+          onScrollEndDrag={handleMomentumScrollEnd}
+          contentOffset={{ x: currentIndex * SCREEN_WIDTH, y: 0 }}
+          style={{ flex: 1 }}
+        >
+          {workouts.map((entry) => (
+            <RecordPage
+              currentIndex={currentIndex}
+              entry={entry}
+              key={entry.id}
+              pageCount={workouts.length}
+            />
+          ))}
+        </ScrollView>
       )}
     </View>
   );
@@ -171,7 +252,15 @@ const MEASURE_ROW_PAIRS: (keyof ExerciseMeasuresDto)[][] = [
   ["count", "sets"],
 ];
 
-function RecordPage({ entry }: { entry: WorkoutHistoryResponse }) {
+function RecordPage({
+  entry,
+  currentIndex,
+  pageCount,
+}: {
+  entry: WorkoutHistoryResponse;
+  currentIndex: number;
+  pageCount: number;
+}) {
   const measureRows = MEASURE_ROW_PAIRS.map((pair) =>
     pair.filter((key) => entry.measures[key] != null),
   ).filter((row) => row.length > 0);
@@ -248,6 +337,25 @@ function RecordPage({ entry }: { entry: WorkoutHistoryResponse }) {
         </View>
       </View>
 
+      {pageCount > 1 && (
+        <View className="flex-row items-center justify-center gap-1.5 pb-3.5 pt-4">
+          {Array.from({ length: pageCount }, (_, index) => (
+            <View
+              key={index}
+              className={`h-1.5 rounded-full ${
+                index === currentIndex ? "w-4" : "w-1.5"
+              }`}
+              style={{
+                backgroundColor:
+                  index === currentIndex
+                    ? semanticColors["label-normal"]
+                    : semanticColors["line-normal"],
+              }}
+            />
+          ))}
+        </View>
+      )}
+
       <View className="gap-4 px-6 pb-6 pt-4">
         <View className="gap-1.5">
           <ThemedText
@@ -260,22 +368,38 @@ function RecordPage({ entry }: { entry: WorkoutHistoryResponse }) {
         </View>
 
         {entry.memo && (
-          <View className="flex-row items-stretch">
+          <View className="flex-row items-center gap-3">
+            <View className="flex-1 flex-row items-stretch">
+              <View
+                className="rounded-sm"
+                style={{
+                  width: 3,
+                  backgroundColor: primitiveColors.orange["500"],
+                }}
+              />
+              <View className="flex-1 gap-2 pl-3.5">
+                <ThemedText
+                  typography="body-3-regular"
+                  style={{ color: "#8c8c92" }}
+                >
+                  한 줄 메모
+                </ThemedText>
+                <ThemedText typography="body-2-bold">{entry.memo}</ThemedText>
+              </View>
+            </View>
             <View
-              className="rounded-sm"
+              className="items-center justify-center overflow-hidden rounded-full"
               style={{
-                width: 3,
-                backgroundColor: primitiveColors.orange["500"],
+                width: 63,
+                height: 63,
+                backgroundColor: primitiveColors.orange["50"],
               }}
-            />
-            <View className="flex-1 gap-2 pl-3.5">
-              <ThemedText
-                typography="body-3-regular"
-                style={{ color: "#8c8c92" }}
-              >
-                한 줄 메모
-              </ThemedText>
-              <ThemedText typography="body-2-bold">{entry.memo}</ThemedText>
+            >
+              <Image
+                contentFit="cover"
+                source={BOT_AVATAR}
+                style={{ width: 63, height: 63 }}
+              />
             </View>
           </View>
         )}
