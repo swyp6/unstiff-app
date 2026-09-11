@@ -1,18 +1,15 @@
-import { View } from "react-native";
+import { Image } from "expo-image";
 
-import { ThemedText } from "@/components/themed-text";
+const LOGO = require("@/assets/images/logo-wordmark.png");
+const LOGO_ASPECT_RATIO = 214 / 91;
 
-// Figma has no real logo asset yet — "로고 자리" is a placeholder box, so this
-// renders a neutral placeholder mark instead of baking in Figma's own
-// "missing image" pattern. Swap this out once branding delivers a real logo.
-export function BrandMark({ size = 88 }: { size?: number }) {
+// Wordmark from Figma nodes 4501:44549 (splash) / 4501:44623 (login).
+export function BrandMark({ size = 214 }: { size?: number }) {
   return (
-    <View style={{ alignItems: "center", gap: 14 }}>
-      <View
-        className="bg-fill-normal"
-        style={{ width: size, height: size, borderRadius: size * 0.25 }}
-      />
-      <ThemedText typography="title-2-bold">LOGO</ThemedText>
-    </View>
+    <Image
+      source={LOGO}
+      style={{ width: size, height: size / LOGO_ASPECT_RATIO }}
+      contentFit="contain"
+    />
   );
 }
