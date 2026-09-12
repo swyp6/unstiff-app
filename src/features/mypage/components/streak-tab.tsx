@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   type DayCell,
   MOCK_RECENT_ACTIVITY,
@@ -14,6 +15,20 @@ const RECENT_ACTIVITY_ICON = require("@/assets/mypage/recent-activity-icon.png")
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const CARD_SHADOW = "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)]";
+
+// The exported mascot/icon PNGs are full illustration sheets, not
+// single cropped assets — Figma displays only a small window of each via
+// an oversized, offset <img> inside an overflow-hidden box. These mirror
+// that same crop (computed from Figma's own offset/scale percentages)
+// instead of showing the whole sheet.
+const MASCOT_BOX = { height: 84, width: 90 };
+const MASCOT_CROP = {
+  height: MASCOT_BOX.height * 8.503,
+  left: MASCOT_BOX.width * -4.9689,
+  top: MASCOT_BOX.height * -3.2869,
+  width: MASCOT_BOX.width * 11.7752,
+};
+const RECENT_ICON_CROP = { height: 84, left: -45, top: 0, width: 247 };
 
 // Figma's heatmap only pins levels 1/2/3/5 to specific Orange shades (see
 // HeatmapLevel in mock-data.ts) — level 4 reuses level 3's shade since no
@@ -50,7 +65,11 @@ function StreakCard({
     >
       <View className="flex-1 gap-1">
         <ThemedText
-          className={active ? "text-orange-500" : "text-charcoal-5"}
+          style={{
+            color: active
+              ? primitiveColors.orange["500"]
+              : primitiveColors.charcoal["5"],
+          }}
           typography="caption-1-bold"
         >
           연속 기록
@@ -69,11 +88,19 @@ function StreakCard({
           </ThemedText>
         </View>
       </View>
-      <Image
-        contentFit="contain"
-        source={active ? STREAK_MASCOT_ACTIVE : STREAK_MASCOT_IDLE}
-        style={{ height: 84, width: 90 }}
-      />
+      <View
+        style={{
+          height: MASCOT_BOX.height,
+          overflow: "hidden",
+          width: MASCOT_BOX.width,
+        }}
+      >
+        <Image
+          contentFit="fill"
+          source={active ? STREAK_MASCOT_ACTIVE : STREAK_MASCOT_IDLE}
+          style={{ position: "absolute", ...MASCOT_CROP }}
+        />
+      </View>
     </View>
   );
 }
@@ -105,16 +132,14 @@ function MonthlyRecordCard({
           {WEEKDAY_LABELS.map((label, index) => (
             <View className="flex-1 items-center" key={label}>
               <ThemedText
-                className={
-                  index === 0
-                    ? "text-status-negative-normal"
-                    : index === 6
-                      ? "text-[#1b64da]"
-                      : undefined
-                }
-                themeColor={
-                  index === 0 || index === 6 ? undefined : "textDisabled"
-                }
+                style={{
+                  color:
+                    index === 0
+                      ? semanticColors["status-negative-normal"]
+                      : index === 6
+                        ? "#1b64da"
+                        : semanticColors["label-disabled"],
+                }}
                 typography="caption-2-bold"
               >
                 {label}
@@ -157,14 +182,17 @@ function RecentActivityCard() {
           >
             <View className="size-[52px] overflow-hidden rounded-full bg-background-normal">
               <Image
-                contentFit="cover"
+                contentFit="fill"
                 source={RECENT_ACTIVITY_ICON}
-                style={{ height: "100%", width: "100%" }}
+                style={{ position: "absolute", ...RECENT_ICON_CROP }}
               />
             </View>
             <View className="flex-1 gap-0.5">
               <ThemedText typography="body-1-bold">{row.category}</ThemedText>
-              <ThemedText className="text-charcoal-5" typography="body-1-bold">
+              <ThemedText
+                style={{ color: primitiveColors.charcoal["5"] }}
+                typography="body-1-bold"
+              >
                 {row.detail}
               </ThemedText>
             </View>

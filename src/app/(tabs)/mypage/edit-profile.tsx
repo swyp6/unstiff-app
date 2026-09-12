@@ -1,3 +1,4 @@
+import Ionicons from "@expo/vector-icons/Ionicons";
 import { router } from "expo-router";
 import { useRef, useState } from "react";
 import {
@@ -24,7 +25,7 @@ import {
 } from "@/features/auth/nickname-validation";
 import type { UpdateProfileRequest } from "@/features/auth/types";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
-import type { AvatarSelection } from "@/features/mypage/avatar-presets";
+import { avatarsEqual } from "@/features/mypage/avatar-presets";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import { ProfileImagePickerSheet } from "@/features/mypage/components/profile-image-picker-sheet";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
@@ -35,17 +36,8 @@ import {
 } from "@/features/upload/cloudinary";
 import { uploadImageFromUri } from "@/features/upload/upload-image";
 
-const AVATAR_SIZE = 88;
-
-function avatarsEqual(a: AvatarSelection, b: AvatarSelection) {
-  if (a === b) return true;
-  if (a?.type !== b?.type) return false;
-  if (a?.type === "preset" && b?.type === "preset") {
-    return a.presetId === b.presetId;
-  }
-  if (a?.type === "photo" && b?.type === "photo") return a.uri === b.uri;
-  return false;
-}
+const AVATAR_SIZE = 120;
+const CAMERA_BADGE_SIZE = 40;
 
 export default function EditProfileScreen() {
   // null means profile setup was never completed server-side — treated the
@@ -168,35 +160,36 @@ export default function EditProfileScreen() {
       className="flex-1 bg-fill-subtle"
       edges={["top", "left", "right", "bottom"]}
     >
-      <SettingsHeader onBack={() => router.back()} title="프로필 수정화면" />
+      <SettingsHeader onBack={() => router.back()} title="프로필 수정" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1 px-5 pt-4"
       >
-        <View className="items-center">
+        <View className="items-center py-6">
           <View>
             <AvatarCircle avatar={draftAvatar} size={AVATAR_SIZE} />
             <Pressable
               accessibilityLabel="프로필 이미지 변경"
               accessibilityRole="button"
-              className="absolute -bottom-1 -right-2 items-center justify-center rounded-full bg-fill-normal px-2.5 py-1.5"
+              className="absolute items-center justify-center rounded-full border-[3px] border-background-normal bg-orange-500"
               onPress={() => setIsPickerOpen(true)}
+              style={{
+                bottom: 0,
+                height: CAMERA_BADGE_SIZE,
+                right: 0,
+                width: CAMERA_BADGE_SIZE,
+              }}
             >
-              <ThemedText
-                themeColor="textSecondary"
-                typography="caption-1-regular"
-              >
-                변경
-              </ThemedText>
+              <Ionicons color="white" name="camera" size={18} />
             </Pressable>
           </View>
         </View>
 
-        <View className="mt-8 gap-2">
+        <View className="gap-2">
           <ThemedText typography="body-2-bold">닉네임</ThemedText>
           <View
-            className={`h-[52px] flex-row items-center justify-between rounded-default bg-fill-normal px-4 ${
+            className={`h-[52px] flex-row items-center justify-between rounded-default bg-fill-subtle px-4 ${
               nicknameHasError
                 ? "border-[1.4px] border-status-negative-normal"
                 : ""
@@ -218,16 +211,22 @@ export default function EditProfileScreen() {
               value={draftNickname}
             />
             <ThemedText
-              className={nicknameHasError ? "text-status-negative-normal" : ""}
-              themeColor={nicknameHasError ? undefined : "textDisabled"}
+              style={{
+                color: nicknameHasError
+                  ? semanticColors["status-negative-normal"]
+                  : semanticColors["label-disabled"],
+              }}
               typography="caption-1-regular"
             >
               {draftNickname.length}/{NICKNAME_MAX_LENGTH}
             </ThemedText>
           </View>
           <ThemedText
-            className={nicknameHasError ? "text-status-negative-normal" : ""}
-            themeColor={nicknameHasError ? undefined : "textSecondary"}
+            style={{
+              color: nicknameHasError
+                ? semanticColors["status-negative-normal"]
+                : semanticColors["label-subtle"],
+            }}
             typography="caption-1-regular"
           >
             {nicknameHelperText}
@@ -240,13 +239,18 @@ export default function EditProfileScreen() {
           accessibilityLabel="저장"
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSave }}
-          className={`mb-6 h-[52px] items-center justify-center rounded-[20px] border border-line-subtle bg-background-normal ${
+          className={`mb-6 h-[52px] items-center justify-center rounded-full bg-charcoal-11 ${
             canSave ? "" : "opacity-40"
           }`}
           disabled={!canSave}
           onPress={handleSave}
         >
-          <ThemedText typography="body-2-bold">저장</ThemedText>
+          <ThemedText
+            style={{ color: semanticColors["label-inverse"] }}
+            typography="body-1-bold"
+          >
+            저장
+          </ThemedText>
         </Pressable>
       </KeyboardAvoidingView>
 

@@ -3,10 +3,11 @@ import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   AVATAR_PRESETS,
   type AvatarSelection,
+  avatarsEqual,
 } from "@/features/mypage/avatar-presets";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import { WorkoutPlanBottomSheet } from "@/features/workout-plan/components/workout-plan-bottom-sheet";
@@ -16,7 +17,8 @@ import {
 } from "@/features/upload/cloudinary";
 import { pickImage } from "@/features/upload/use-image-upload";
 
-const OPTION_SIZE = 48;
+const PREVIEW_SIZE = 88;
+const OPTION_SIZE = 72;
 const OPTIONS_PER_ROW = 4;
 
 type ProfileImagePickerSheetProps = {
@@ -43,6 +45,8 @@ export function ProfileImagePickerSheet({
     setWasVisible(visible);
     if (visible) setPending(currentAvatar);
   }
+
+  const canConfirm = !avatarsEqual(pending, currentAvatar);
 
   async function handleUploadPress() {
     try {
@@ -73,47 +77,27 @@ export function ProfileImagePickerSheet({
       onPress={handleUploadPress}
       style={{ height: OPTION_SIZE, width: OPTION_SIZE }}
     >
-      <Ionicons color={semanticColors["label-subtle"]} name="add" size={22} />
+      <Ionicons color={semanticColors["label-subtle"]} name="add" size={28} />
     </Pressable>,
-    // A fixed 48x48 footprint for every option (Figma shows no selected
-    // state at all) — a checkmark overlay marks the pick instead of a
-    // border ring, which would otherwise grow the touch target and throw
-    // off the 4-per-row spacing when toggled.
-    //
-    // Disabled — PUT /api/v1/users/me/profile only accepts a real
-    // Cloudinary/workers.dev image URL, and there's no API yet for saving
-    // a preset (solid-color) choice. Selecting one would look like a
-    // successful save (picker closes, screen navigates back) while
-    // silently never reaching the server, so these stay non-interactive
-    // until a save path exists, reusing the same disabled/opacity
-    // treatment used elsewhere in the app rather than inventing new copy.
     ...AVATAR_PRESETS.map((preset) => {
       const selected =
         pending?.type === "preset" && pending.presetId === preset.id;
       return (
         <Pressable
-          accessibilityLabel={`${preset.id} 프로필 색상`}
+          accessibilityLabel={`${preset.id} 프로필 이미지`}
           accessibilityRole="button"
-          accessibilityState={{ disabled: true, selected }}
-          disabled
+          accessibilityState={{ selected }}
+          className={`overflow-hidden rounded-full ${
+            selected ? "border-[1.5px] border-orange-500" : ""
+          }`}
           key={preset.id}
-          style={{
-            alignItems: "center",
-            backgroundColor: preset.color,
-            borderRadius: OPTION_SIZE / 2,
-            height: OPTION_SIZE,
-            justifyContent: "center",
-            opacity: 0.4,
-            width: OPTION_SIZE,
-          }}
+          onPress={() => setPending({ type: "preset", presetId: preset.id })}
+          style={{ height: OPTION_SIZE, width: OPTION_SIZE }}
         >
-          {selected && (
-            <Ionicons
-              color={semanticColors["label-inverse"]}
-              name="checkmark"
-              size={20}
-            />
-          )}
+          <AvatarCircle
+            avatar={{ presetId: preset.id, type: "preset" }}
+            size={OPTION_SIZE}
+          />
         </Pressable>
       );
     }),
@@ -126,9 +110,9 @@ export function ProfileImagePickerSheet({
       visible={visible}
     >
       <View className="items-center gap-4 pb-2">
-        <AvatarCircle avatar={pending} size={96} />
+        <AvatarCircle avatar={pending} size={PREVIEW_SIZE} />
 
-        <View className="w-[288px] gap-3">
+        <View className="w-[335px] gap-3">
           {[
             options.slice(0, OPTIONS_PER_ROW),
             options.slice(OPTIONS_PER_ROW),
@@ -140,23 +124,36 @@ export function ProfileImagePickerSheet({
         </View>
       </View>
 
-      <View className="pt-3">
-        <View className="flex-row gap-3.5" style={{ height: 54 }}>
+      <View className="pt-2">
+        <View className="flex-row gap-2.5" style={{ height: 50 }}>
           <Pressable
             accessibilityLabel="닫기"
             accessibilityRole="button"
-            className="flex-1 items-center justify-center rounded-[10px] bg-fill-normal"
+            className="flex-1 items-center justify-center rounded-full border border-line-normal"
             onPress={onClose}
           >
-            <ThemedText typography="body-1-bold">닫기</ThemedText>
+            <ThemedText typography="body-2-bold">닫기</ThemedText>
           </Pressable>
           <Pressable
             accessibilityLabel="선택"
             accessibilityRole="button"
-            className="flex-1 items-center justify-center rounded-[10px] border border-line-subtle bg-background-normal"
+            accessibilityState={{ disabled: !canConfirm }}
+            className={`flex-1 items-center justify-center rounded-full ${
+              canConfirm ? "bg-charcoal-11" : "bg-charcoal-1"
+            }`}
+            disabled={!canConfirm}
             onPress={() => onConfirm(pending)}
           >
-            <ThemedText typography="body-1-bold">선택</ThemedText>
+            <ThemedText
+              style={{
+                color: canConfirm
+                  ? semanticColors["label-inverse"]
+                  : primitiveColors.charcoal["3"],
+              }}
+              typography="body-2-bold"
+            >
+              선택
+            </ThemedText>
           </Pressable>
         </View>
       </View>
