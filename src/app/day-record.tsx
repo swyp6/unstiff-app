@@ -91,7 +91,14 @@ export default function DayRecordScreen() {
 
   useEffect(() => {
     getWorkoutHistory(params.date)
-      .then(({ workouts }) => setWorkouts(workouts))
+      .then(({ workouts }) => {
+        setWorkouts(workouts);
+        setCurrentIndex((current) =>
+          workouts.length > 0
+            ? Math.min(Math.max(current, 0), workouts.length - 1)
+            : 0,
+        );
+      })
       .catch((error) => {
         console.error("Failed to load workout history", error);
         setWorkouts([]);

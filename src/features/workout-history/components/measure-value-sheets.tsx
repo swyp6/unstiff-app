@@ -95,8 +95,8 @@ export function TimeValueInputSheet({
           label="확인"
           onPress={() =>
             onConfirm(
-              Number(minuteText) || 0,
-              Math.min(59, Number(secondText) || 0),
+              Math.max(0, Number(minuteText) || 0),
+              Math.min(59, Math.max(0, Number(secondText) || 0)),
             )
           }
         />
@@ -173,7 +173,7 @@ export function NumberValueInputSheet({
       <View style={{ paddingTop: 20, paddingBottom: keyboardHeight }}>
         <PrimaryActionButton
           label="확인"
-          onPress={() => onConfirm(Number(text) || 0)}
+          onPress={() => onConfirm(Math.max(0, Number(text) || 0))}
         />
       </View>
     </WorkoutPlanBottomSheet>
