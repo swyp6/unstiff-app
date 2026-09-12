@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
-import { Keyboard, Platform, Pressable, TextInput, View } from "react-native";
+import { useState } from "react";
+import { Pressable, TextInput, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { WorkoutPlanBottomSheet } from "@/features/workout-plan/components/workout-plan-bottom-sheet";
 import { PrimaryActionButton } from "@/features/workout-plan/components/workout-plan-screen-ui";
+import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 
 const NUMBER_INPUT_STYLE = {
   flex: 1,
@@ -13,31 +14,6 @@ const NUMBER_INPUT_STYLE = {
   color: semanticColors["label-normal"],
   padding: 0,
 };
-
-// WorkoutPlanBottomSheet의 KeyboardAvoidingView는 시트 두 겹(메인 편집
-// 시트 안에 이 값 입력 시트가 겹쳐 뜨는 구조)에서는 패딩 계산이 씹혀서
-// 못 미덥다(workout-plan-detail-bottom-sheet.tsx와 동일한 이유) — 실제
-// 키보드 높이를 직접 추적해서 그 아래 CTA 버튼이 가려지지 않게 한다.
-function useKeyboardHeight(): number {
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const showSub = Keyboard.addListener(showEvent, (event) =>
-      setHeight(event.endCoordinates.height),
-    );
-    const hideSub = Keyboard.addListener(hideEvent, () => setHeight(0));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
-  return height;
-}
 
 // Figma 4501:36153 "시간 입력 시트" — 분/초를 따로 입력한다. 스텝퍼의 5분
 // 단위와 달리, 실제 기록은 초 단위까지 남아있어 그 정밀도를 유지해야 한다.

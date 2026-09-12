@@ -1,9 +1,7 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  Keyboard,
   type LayoutChangeEvent,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +26,7 @@ import {
   toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
+import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 
 import { DeletePlanModal } from "./delete-plan-modal";
 import { GoalStepper } from "./goal-stepper";
@@ -85,25 +84,10 @@ export function WorkoutPlanDetailBottomSheet({
   // 키보드 높이를 Keyboard API로 직접 추적해서 쓴다.
   // (reanimated의 useAnimatedKeyboard는 이 화면에서 "frozen object" 렌더
   // 에러를 던져서 순정 API로 대체했다.)
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardHeight = useKeyboardHeight();
   // 완료/삭제 버튼 묶음의 실제 높이(패딩 제외) — 스크롤 콘텐츠 맨 아래가
   // 이 떠 있는 푸터 뒤에 가리지 않도록 그만큼 여백을 더 잡아둔다.
   const [actionsHeight, setActionsHeight] = useState(0);
-
-  useEffect(() => {
-    const showEvent =
-      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
-    const hideEvent =
-      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
-    const showSub = Keyboard.addListener(showEvent, (event) =>
-      setKeyboardHeight(event.endCoordinates.height),
-    );
-    const hideSub = Keyboard.addListener(hideEvent, () => setKeyboardHeight(0));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
 
   // 완료/삭제 버튼은 키보드가 얼마나 떠 있든 항상 키보드 바로 위에 붙어
   // 있어야 하므로, 스크롤 영역 밖(overlay)에 별도로 떠 있는 바로 렌더링하고
