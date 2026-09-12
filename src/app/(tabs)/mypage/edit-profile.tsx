@@ -85,7 +85,7 @@ export default function EditProfileScreen() {
     if (nicknameChanged && !isNicknameValid) {
       Alert.alert(
         "다시 입력해주세요.",
-        "영어·숫자 및 특수기호(.,_)만 사용하여 2~10자로 입력해주세요.",
+        "영문과 숫자로 2~10자, 특수기호는 . _ 만 쓸 수 있어요",
       );
       return;
     }
@@ -215,7 +215,7 @@ export default function EditProfileScreen() {
             </ThemedText>
           </View>
           <ThemedText themeColor="textSecondary" typography="caption-1-regular">
-            영어·숫자 및 특수기호(.,_)만 사용하여 2~10자로 입력해주세요.
+            영문과 숫자로 2~10자, 특수기호는 . _ 만 쓸 수 있어요
           </ThemedText>
         </View>
 
