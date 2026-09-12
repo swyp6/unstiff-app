@@ -5,9 +5,9 @@ import { ThemedText } from "@/components/themed-text";
 export type MyPageTab = "streak" | "badges" | "summary";
 
 const TABS: { key: MyPageTab; label: string }[] = [
-  { key: "streak", label: "연속 기록" },
+  { key: "streak", label: "활동 기록" },
   { key: "badges", label: "획득한 뱃지" },
-  { key: "summary", label: "활동 요약" },
+  { key: "summary", label: "활동 리포트" },
 ];
 
 type MyPageTabsProps = {

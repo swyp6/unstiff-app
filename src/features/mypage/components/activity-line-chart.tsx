@@ -15,8 +15,7 @@ function toPixelPoints(values: number[]) {
 }
 
 // ponytail: no svg linked into the dev client, so each segment is a
-// rotated View "line" instead of an actual Polyline — see the note in
-// streak-ring-chart.tsx.
+// rotated View "line" instead of an actual Polyline.
 function LineSegment({
   from,
   to,

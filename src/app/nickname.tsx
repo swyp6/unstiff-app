@@ -92,7 +92,7 @@ export default function NicknameScreen() {
   const helperText =
     availability === "available"
       ? "사용 가능한 닉네임이에요."
-      : "영문, 숫자, 특수기호(. _) 포함 2~10자까지 가능해요.";
+      : "영문, 숫자, 특수기호(. _) 포함 2~20자까지 가능해요.";
 
   return (
     <SafeAreaView

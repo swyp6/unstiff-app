@@ -17,8 +17,10 @@ import {
   updateMyProfile,
 } from "@/features/auth/api";
 import {
-  NICKNAME_FORMAT_PATTERN,
+  NICKNAME_ALREADY_USED_TEXT,
+  NICKNAME_FORMAT_GUIDE_TEXT,
   NICKNAME_MAX_LENGTH,
+  getNicknameFormatError,
 } from "@/features/auth/nickname-validation";
 import type { UpdateProfileRequest } from "@/features/auth/types";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
@@ -63,7 +65,6 @@ export default function EditProfileScreen() {
     null,
   );
 
-  const isNicknameValid = NICKNAME_FORMAT_PATTERN.test(draftNickname);
   const nicknameChanged = draftNickname !== storedNickname;
   const avatarChanged = !avatarsEqual(draftAvatar, storedAvatar);
   // Matching the stored nickname bypasses the availability check — an
@@ -73,27 +74,30 @@ export default function EditProfileScreen() {
   const availability = useNicknameAvailability(draftNickname, {
     skipValue: storedNickname || undefined,
   });
-  // Neither the format check nor the duplicate check blocks 저장 itself
-  // anymore — pressing it is what tells the user what's wrong (via the
-  // alerts below), rather than silently disabling the button with no
-  // explanation.
-  const canSave = !isSaving;
+  // Only evaluated once the nickname is actually being edited — an
+  // untouched nickname never shows an error, even if it predates the
+  // current format rules.
+  const nicknameFormatError = nicknameChanged
+    ? getNicknameFormatError(draftNickname)
+    : null;
+  const nicknameDuplicate =
+    nicknameChanged && !nicknameFormatError && availability === "unavailable";
+  const nicknameHelperText = nicknameFormatError
+    ? nicknameFormatError
+    : nicknameDuplicate
+      ? NICKNAME_ALREADY_USED_TEXT
+      : NICKNAME_FORMAT_GUIDE_TEXT;
+  const nicknameHasError = Boolean(nicknameFormatError) || nicknameDuplicate;
+  // 저장 stays disabled while an edited nickname is invalid/unchecked/taken,
+  // matching Figma's Button CTA 비활성 variant — an avatar-only change (or no
+  // change at all) is unaffected by nickname validity.
+  const canSave =
+    !isSaving &&
+    (!nicknameChanged ||
+      (!nicknameFormatError && availability === "available"));
 
   async function handleSave() {
     if (!canSave) return;
-
-    if (nicknameChanged && !isNicknameValid) {
-      Alert.alert(
-        "다시 입력해주세요.",
-        "영어·숫자 및 특수기호(.,_)만 사용하여 2~10자로 입력해주세요.",
-      );
-      return;
-    }
-
-    if (nicknameChanged && availability !== "available") {
-      Alert.alert("중복된 닉네임이에요", "다른 닉네임을 입력해주세요.");
-      return;
-    }
 
     if (!nicknameChanged && !avatarChanged) {
       router.back();
@@ -191,7 +195,13 @@ export default function EditProfileScreen() {
 
         <View className="mt-8 gap-2">
           <ThemedText typography="body-2-bold">닉네임</ThemedText>
-          <View className="h-[52px] flex-row items-center justify-between rounded-default bg-fill-normal px-4">
+          <View
+            className={`h-[52px] flex-row items-center justify-between rounded-default bg-fill-normal px-4 ${
+              nicknameHasError
+                ? "border-[1.4px] border-status-negative-normal"
+                : ""
+            }`}
+          >
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
@@ -208,14 +218,19 @@ export default function EditProfileScreen() {
               value={draftNickname}
             />
             <ThemedText
-              themeColor="textDisabled"
+              className={nicknameHasError ? "text-status-negative-normal" : ""}
+              themeColor={nicknameHasError ? undefined : "textDisabled"}
               typography="caption-1-regular"
             >
               {draftNickname.length}/{NICKNAME_MAX_LENGTH}
             </ThemedText>
           </View>
-          <ThemedText themeColor="textSecondary" typography="caption-1-regular">
-            영어·숫자 및 특수기호(.,_)만 사용하여 2~10자로 입력해주세요.
+          <ThemedText
+            className={nicknameHasError ? "text-status-negative-normal" : ""}
+            themeColor={nicknameHasError ? undefined : "textSecondary"}
+            typography="caption-1-regular"
+          >
+            {nicknameHelperText}
           </ThemedText>
         </View>
 

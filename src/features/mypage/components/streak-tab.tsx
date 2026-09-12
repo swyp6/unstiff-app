@@ -1,113 +1,199 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
-import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { Image } from "expo-image";
+import { View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
-import { StreakDotMatrix } from "@/features/mypage/components/streak-dot-matrix";
-import { StreakRingChart } from "@/features/mypage/components/streak-ring-chart";
-import { getStreakDataForMonth } from "@/features/mypage/mock-data";
+import {
+  type DayCell,
+  MOCK_RECENT_ACTIVITY,
+  getStreakDataForMonth,
+} from "@/features/mypage/mock-data";
 
-function shiftMonth(year: number, month: number, delta: number) {
-  const zeroBased = month - 1 + delta;
-  const nextYear = year + Math.floor(zeroBased / 12);
-  const nextMonth = ((zeroBased % 12) + 12) % 12;
-  return { year: nextYear, month: nextMonth + 1 };
+const STREAK_MASCOT_ACTIVE = require("@/assets/mypage/streak-mascot-active.png");
+const STREAK_MASCOT_IDLE = require("@/assets/mypage/streak-mascot-idle.png");
+const RECENT_ACTIVITY_ICON = require("@/assets/mypage/recent-activity-icon.png");
+
+const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
+const CARD_SHADOW = "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)]";
+
+// Figma's heatmap only pins levels 1/2/3/5 to specific Orange shades (see
+// HeatmapLevel in mock-data.ts) — level 4 reuses level 3's shade since no
+// distinct swatch was specified between orange-400 and orange-500.
+const HEATMAP_LEVEL_CLASSES: Record<number, string> = {
+  0: "bg-charcoal-1",
+  1: "bg-orange-50",
+  2: "bg-orange-100",
+  3: "bg-orange-400",
+  4: "bg-orange-400",
+  5: "bg-orange-500",
+};
+
+function HeatmapCell({ level }: { level: DayCell }) {
+  if (level === null) return <View className="size-6" />;
+  return (
+    <View className={`size-6 rounded-full ${HEATMAP_LEVEL_CLASSES[level]}`} />
+  );
+}
+
+function StreakCard({
+  currentStreakDays,
+  bestStreakDays,
+}: {
+  currentStreakDays: number;
+  bestStreakDays: number;
+}) {
+  const active = currentStreakDays > 0;
+  return (
+    <View
+      className={`flex-row items-center gap-3 overflow-hidden rounded-[24px] py-5 pl-5 pr-4 ${
+        active ? "bg-background-normal" : "bg-charcoal-1"
+      }`}
+    >
+      <View className="flex-1 gap-1">
+        <ThemedText
+          className={active ? "text-orange-500" : "text-charcoal-5"}
+          typography="caption-1-bold"
+        >
+          연속 기록
+        </ThemedText>
+        <ThemedText typography="title-3-bold">
+          {active
+            ? `${currentStreakDays}일째 이어가는 중`
+            : "오늘 기록이 없어요"}
+        </ThemedText>
+        <View className="flex-row gap-1 pt-1">
+          <ThemedText themeColor="textSecondary" typography="caption-1-regular">
+            최고 기록
+          </ThemedText>
+          <ThemedText typography="caption-1-bold">
+            {bestStreakDays}일
+          </ThemedText>
+        </View>
+      </View>
+      <Image
+        contentFit="contain"
+        source={active ? STREAK_MASCOT_ACTIVE : STREAK_MASCOT_IDLE}
+        style={{ height: 84, width: 90 }}
+      />
+    </View>
+  );
+}
+
+function MonthlyRecordCard({
+  recordedDaysThisMonth,
+  weeks,
+}: {
+  recordedDaysThisMonth: number;
+  weeks: DayCell[][];
+}) {
+  const hasRecord = recordedDaysThisMonth > 0;
+  return (
+    <View
+      className={`gap-4 rounded-[24px] bg-background-normal px-4 pb-4 pt-5 ${CARD_SHADOW}`}
+    >
+      <View className="gap-0.5">
+        <ThemedText themeColor="textSecondary" typography="caption-1-medium">
+          이번 달 얼마나 기록했을까요?
+        </ThemedText>
+        <ThemedText typography="title-3-bold">
+          {hasRecord
+            ? `${recordedDaysThisMonth}일 기록했어요`
+            : "아직 기록이 없어요"}
+        </ThemedText>
+      </View>
+      <View className="gap-2">
+        <View className="flex-row">
+          {WEEKDAY_LABELS.map((label, index) => (
+            <View className="flex-1 items-center" key={label}>
+              <ThemedText
+                className={
+                  index === 0
+                    ? "text-status-negative-normal"
+                    : index === 6
+                      ? "text-[#1b64da]"
+                      : undefined
+                }
+                themeColor={
+                  index === 0 || index === 6 ? undefined : "textDisabled"
+                }
+                typography="caption-2-bold"
+              >
+                {label}
+              </ThemedText>
+            </View>
+          ))}
+        </View>
+        {weeks.map((week, weekIndex) => (
+          <View className="flex-row" key={weekIndex}>
+            {week.map((level, dayIndex) => (
+              <View className="flex-1 items-center" key={dayIndex}>
+                <HeatmapCell level={level} />
+              </View>
+            ))}
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function RecentActivityCard() {
+  return (
+    <View
+      className={`gap-4 rounded-[20px] bg-background-normal p-6 ${CARD_SHADOW}`}
+    >
+      <View className="gap-0.5">
+        <ThemedText themeColor="textSecondary" typography="caption-1-medium">
+          최근 활동
+        </ThemedText>
+        <ThemedText typography="title-3-bold">
+          최근 기록한 활동을 모아봤어요
+        </ThemedText>
+      </View>
+      <View className="gap-3">
+        {MOCK_RECENT_ACTIVITY.map((row, index) => (
+          <View
+            className={`h-[76px] flex-row items-center gap-4 rounded-[20px] bg-fill-subtle px-4 ${CARD_SHADOW}`}
+            key={index}
+          >
+            <View className="size-[52px] overflow-hidden rounded-full bg-background-normal">
+              <Image
+                contentFit="cover"
+                source={RECENT_ACTIVITY_ICON}
+                style={{ height: "100%", width: "100%" }}
+              />
+            </View>
+            <View className="flex-1 gap-0.5">
+              <ThemedText typography="body-1-bold">{row.category}</ThemedText>
+              <ThemedText className="text-charcoal-5" typography="body-1-bold">
+                {row.detail}
+              </ThemedText>
+            </View>
+            <View className="rounded-xl border border-[#c9e2ff] bg-background-normal px-2.5 py-1">
+              <ThemedText typography="caption-1-medium">{row.date}</ThemedText>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
 }
 
 export function StreakTab() {
   const now = new Date();
-  const [{ year, month }, setDate] = useState({
-    year: now.getFullYear(),
-    month: now.getMonth() + 1,
-  });
-
-  const { currentStreakDays, thisMonthPercent, lastMonthPercent, weeks } =
-    getStreakDataForMonth(year, month);
+  const { currentStreakDays, bestStreakDays, recordedDaysThisMonth, weeks } =
+    getStreakDataForMonth(now.getFullYear(), now.getMonth() + 1);
 
   return (
-    <View className="gap-4">
-      <View className="flex-row items-center justify-between rounded-[20px] border border-line-subtle bg-background-normal px-4 py-4">
-        <View className="gap-1">
-          <ThemedText themeColor="textSecondary" typography="caption-1-regular">
-            현재 연속 기록
-          </ThemedText>
-          <ThemedText typography="title-1-bold">
-            {currentStreakDays}일
-          </ThemedText>
-        </View>
-        <View className="size-11 items-center justify-center rounded-full bg-fill-strong">
-          <Ionicons
-            color={semanticColors["primary-strong"]}
-            name="flame"
-            size={22}
-          />
-        </View>
-      </View>
-
-      <View className="rounded-[20px] border border-line-subtle bg-background-normal">
-        <View className="flex-row items-center justify-between border-b border-fill-normal px-4 py-3">
-          <Pressable
-            accessibilityLabel="이전 달"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => setDate(shiftMonth(year, month, -1))}
-          >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="chevron-back"
-              size={16}
-            />
-          </Pressable>
-          <ThemedText typography="body-2-bold">
-            {year}년 {month}월
-          </ThemedText>
-          <Pressable
-            accessibilityLabel="다음 달"
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={() => setDate(shiftMonth(year, month, 1))}
-          >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="chevron-forward"
-              size={16}
-            />
-          </Pressable>
-        </View>
-
-        <View className="items-center gap-4 px-4 py-5">
-          <StreakRingChart
-            lastMonthPercent={lastMonthPercent}
-            thisMonthPercent={thisMonthPercent}
-          />
-          <View className="flex-row gap-6">
-            <View className="flex-row items-center gap-1.5">
-              <View className="size-2 rounded-full bg-primary-strong" />
-              <ThemedText
-                themeColor="textSecondary"
-                typography="caption-2-regular"
-              >
-                이번달 {thisMonthPercent}%
-              </ThemedText>
-            </View>
-            <View className="flex-row items-center gap-1.5">
-              <View className="size-2 rounded-full bg-line-strong" />
-              <ThemedText
-                themeColor="textSecondary"
-                typography="caption-2-regular"
-              >
-                저번달 {lastMonthPercent}%
-              </ThemedText>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      <View className="gap-4 rounded-[20px] border border-line-subtle bg-background-normal p-4">
-        <ThemedText typography="body-2-bold">이번달 기록</ThemedText>
-        <StreakDotMatrix weeks={weeks} />
-      </View>
+    <View className="gap-5">
+      <StreakCard
+        bestStreakDays={bestStreakDays}
+        currentStreakDays={currentStreakDays}
+      />
+      <MonthlyRecordCard
+        recordedDaysThisMonth={recordedDaysThisMonth}
+        weeks={weeks}
+      />
+      <RecentActivityCard />
     </View>
   );
 }
