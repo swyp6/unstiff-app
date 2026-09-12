@@ -1,4 +1,5 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
+import { router } from "expo-router";
 import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 
@@ -15,6 +16,7 @@ import {
   ImageUploadError,
   logImageUploadError,
 } from "@/features/upload/cloudinary";
+import { usePhotoAdjustResultStore } from "@/features/upload/photo-adjust-result";
 import { pickImage } from "@/features/upload/use-image-upload";
 
 const PREVIEW_SIZE = 88;
@@ -50,13 +52,25 @@ export function ProfileImagePickerSheet({
 
   async function handleUploadPress() {
     try {
-      // ponytail: no crop step here (unlike onboarding's profile-photo-
-      // adjust) — that screen is wired to signup-store specifically. Skips
-      // straight to the picked photo; add cropping back once that screen
-      // takes a generic destination instead of the signup store.
       const asset = await pickImage("library");
       if (!asset) return;
-      setPending({ type: "photo", uri: asset.uri });
+      // profile-photo-adjust.tsx defaults to writing straight into the
+      // onboarding signup store — this flags the crop as coming from here
+      // instead, so its "완료" hands the result to edit-profile.tsx's own
+      // focus-effect (below) rather than this sheet's `pending` state,
+      // which a push+back round trip isn't guaranteed to preserve. Closing
+      // the sheet first also avoids stacking a pushed screen behind its
+      // still-open Modal.
+      usePhotoAdjustResultStore.getState().beginExternalRequest();
+      onClose();
+      router.push({
+        params: {
+          height: String(asset.height),
+          uri: asset.uri,
+          width: String(asset.width),
+        },
+        pathname: "/profile-photo-adjust",
+      });
     } catch (error) {
       logImageUploadError("mypage avatar pick failed", error);
       Alert.alert(

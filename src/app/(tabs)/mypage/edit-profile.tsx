@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { router } from "expo-router";
-import { useRef, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -34,6 +34,7 @@ import {
   ImageUploadError,
   logImageUploadError,
 } from "@/features/upload/cloudinary";
+import { usePhotoAdjustResultStore } from "@/features/upload/photo-adjust-result";
 import { uploadImageFromUri } from "@/features/upload/upload-image";
 
 const AVATAR_SIZE = 120;
@@ -55,6 +56,18 @@ export default function EditProfileScreen() {
   // failed PUT doesn't re-upload the same picked photo to Cloudinary again.
   const uploadedPhotoRef = useRef<{ uri: string; secureUrl: string } | null>(
     null,
+  );
+
+  // Picks up a cropped photo from profile-photo-adjust.tsx once this screen
+  // regains focus after the picker sheet pushed it there and closed itself
+  // (see profile-image-picker-sheet.tsx's handleUploadPress) — consume()
+  // no-ops when nothing's waiting, so this is safe on every unrelated focus
+  // too (e.g. just navigating back from settings).
+  useFocusEffect(
+    useCallback(() => {
+      const uri = usePhotoAdjustResultStore.getState().consume();
+      if (uri) setDraftAvatar({ type: "photo", uri });
+    }, []),
   );
 
   const nicknameChanged = draftNickname !== storedNickname;
@@ -98,10 +111,11 @@ export default function EditProfileScreen() {
 
     setIsSaving(true);
     try {
-      // A preset (solid-color) avatar has no server representation — the
-      // API only accepts a real Cloudinary/workers.dev image URL — so it's
-      // never uploaded/sent, and (below) never confirmed into the local
-      // store as if it had been saved. Only a "photo" pick is persistable.
+      // A preset (bundled sticker) avatar has no server representation —
+      // the API only accepts a real Cloudinary/workers.dev image URL — so
+      // it's never uploaded/sent, and (below) never confirmed into the
+      // local store as if it had been saved. Only a "photo" pick is
+      // persistable.
       const avatarSavable = avatarChanged && draftAvatar?.type === "photo";
 
       let profileImageUrl: string | undefined;
