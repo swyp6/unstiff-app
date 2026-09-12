@@ -134,12 +134,14 @@ export default function ManualRecordScreen() {
       });
       // 홈이 오늘의 운동/캘린더를 서버에서 다시 읽도록 알린다.
       useRecordFlowStore.getState().markRecordSaved();
+      // 성공하면 lock/isSubmitting을 풀지 않는다 — 화면 전환이 끝나기 전에
+      // 풀리면 그 사이 CTA를 다시 눌러 같은 요청이 한 번 더 나갈 수 있다.
+      // 이 화면은 곧 unmount되므로 그때 함께 사라지게 둔다.
       router.replace("/record-complete");
     } catch {
-      setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");
-    } finally {
       submissionLockRef.current = false;
       setIsSubmitting(false);
+      setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");
     }
   }
 
