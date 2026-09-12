@@ -60,6 +60,10 @@ export default function RootLayout() {
               name="record-complete"
               options={{ presentation: "fullScreenModal" }}
             />
+            <Stack.Screen
+              name="day-record"
+              options={{ presentation: "fullScreenModal" }}
+            />
             <Stack.Screen name="test" />
           </Stack>
         </ThemeProvider>

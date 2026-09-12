@@ -9,7 +9,7 @@ const MEASURE_ORDER: (keyof ExerciseMeasuresDto)[] = [
   "sets",
 ];
 
-function formatMeasureValue(
+export function formatMeasureValue(
   key: keyof ExerciseMeasuresDto,
   value: number,
 ): string {

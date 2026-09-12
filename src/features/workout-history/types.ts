@@ -22,3 +22,12 @@ export type WorkoutHistoryResponse = {
 export type WorkoutHistoryListResponse = {
   workouts: WorkoutHistoryResponse[];
 };
+
+// PUT /api/v1/workouts/{id} — 보내지 않은 선택 항목(intensity/imageUrl/memo)은
+// null로 덮어써진다. 유지하려면 기존 값을 그대로 함께 보내야 한다.
+export type WorkoutHistoryUpdateRequest = {
+  measures: ExerciseMeasuresDto;
+  intensity?: IntensityDto;
+  imageUrl?: string;
+  memo?: string;
+};
