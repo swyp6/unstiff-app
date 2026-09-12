@@ -89,7 +89,7 @@ export function RecordEditorScreen() {
   );
   const [values, setValues] = useState<Record<GoalType, number>>(() => ({
     time: 1,
-    distance: 0,
+    distance: 0.1,
     reps: 1,
     sets: 1,
     ...(target?.mode === "LINKED" ? target.initialGoalValues : null),
