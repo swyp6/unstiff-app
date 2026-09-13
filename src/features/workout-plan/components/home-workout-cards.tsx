@@ -259,8 +259,16 @@ export function TodayWorkoutCard({
     <View className="rounded-[24px] bg-background-normal shadow-[0px_4px_12px_0px_rgba(92,23,5,0.04)]">
       <View className="h-[60px] flex-row items-center justify-between px-5">
         <View className="items-start gap-0.5">
-          <ThemedText typography="body-2-bold">{title}</ThemedText>
-          <ThemedText typography="caption-1-medium" themeColor="textSecondary">
+          <ThemedText
+            typography="heading-1-bold"
+            style={{ color: primitiveColors.charcoal["11"] }}
+          >
+            {title}
+          </ThemedText>
+          <ThemedText
+            typography="body-2-regular"
+            style={{ color: primitiveColors.charcoal["5"] }}
+          >
             {dateLabel}
           </ThemedText>
         </View>
@@ -277,7 +285,10 @@ export function TodayWorkoutCard({
         <View className="py-2">
           {todayWorkouts.length === 0 ? (
             <View className="items-center py-6">
-              <ThemedText typography="body-3-medium" themeColor="textSecondary">
+              <ThemedText
+                typography="body-1-medium"
+                style={{ color: primitiveColors.charcoal["5"] }}
+              >
                 {emptyStateLabel}
               </ThemedText>
             </View>
@@ -321,7 +332,10 @@ export function TodayWorkoutCard({
           className="flex-row items-center justify-between py-1.5 pt-3"
           onPress={onToggleExpanded}
         >
-          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+          <ThemedText
+            typography="body-1-bold"
+            style={{ color: primitiveColors.charcoal["5"] }}
+          >
             루틴
           </ThemedText>
           <Ionicons
