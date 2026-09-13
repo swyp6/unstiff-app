@@ -1,3 +1,4 @@
+import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -10,15 +11,32 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { radius, semanticColors, typography } from "@/constants/tokens";
+import { typography } from "@/constants/tokens";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import {
+  OnboardingContent,
+  OnboardingFooter,
+} from "@/features/auth/components/onboarding-layout";
+import {
+  NICKNAME_ALREADY_USED_TEXT,
+  NICKNAME_FORMAT_ERROR_TEXT,
+  NICKNAME_FORMAT_GUIDE_TEXT,
+  NICKNAME_FORMAT_PATTERN,
   NICKNAME_MAX_LENGTH,
   sanitizeNickname,
 } from "@/features/auth/nickname-validation";
+import { signupColors } from "@/features/auth/signup-ui";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
 import { useSignupStore } from "@/store/signup-store";
+
+// Figma "Field"(3326:9022 포커스 / 3326:9034 오류) — 52 높이, radius 12,
+// 안쪽 left 15 / right 17. Figma는 stroke가 padding 안쪽에 겹치므로 RN
+// border 두께만큼 padding을 줄여 텍스트 시작 위치를 같게 맞춘다.
+const FIELD_PADDING_LEFT = 15;
+const FIELD_PADDING_RIGHT = 17;
+const FIELD_FOCUS_BORDER_WIDTH = 1.5;
+const FIELD_ERROR_BORDER_WIDTH = 1.4;
 
 function handleBack() {
   if (router.canGoBack()) {
@@ -28,10 +46,13 @@ function handleBack() {
   router.replace("/login");
 }
 
+type NicknameFieldStatus = "default" | "success" | "format-error" | "duplicate";
+
 export default function NicknameScreen() {
   const storedNickname = useSignupStore((state) => state.nickname);
   const setStoredNickname = useSignupStore((state) => state.setNickname);
   const [nickname, setNickname] = useState(storedNickname);
+  const [isFocused, setIsFocused] = useState(false);
 
   // Guard against reaching this screen out of order — two distinct cases,
   // not conflated: (1) this isn't a new-user onboarding session at all
@@ -55,8 +76,6 @@ export default function NicknameScreen() {
       router.replace("/terms-agreement");
     }
   }, []);
-
-  const hasInput = nickname.length > 0;
 
   // Bumped on every focus so a nickname already marked "available" gets
   // re-checked if the user is sent back here after it was rejected as
@@ -84,15 +103,32 @@ export default function NicknameScreen() {
     router.push("/profile-photo");
   }
 
-  // Figma only designed two helper-text states: this default guidance copy
-  // and "사용 가능한 닉네임이에요." (shown once the duplicate-check confirms
-  // availability). There's no designed copy for "unavailable"/"checking"/
-  // "error" — those states are only communicated via the CTA staying
-  // disabled, not by changing this text.
-  const helperText =
-    availability === "available"
-      ? "사용 가능한 닉네임이에요."
-      : "영문, 숫자, 특수기호(. _) 포함 2~20자까지 가능해요.";
+  // Figma가 그린 네 상태: 기본 안내(4501:44699), 성공(4501:44714), 형식
+  // 오류(4501:44879), 중복(4501:44862). 중복은 기존 duplicate-check 훅의
+  // "unavailable" 결과를 그대로 쓴다 — 별도 요청을 추가하지 않는다.
+  // "checking"/"error"(네트워크 실패는 훅이 Alert로 알림)는 디자인된 문구가
+  // 없어 기본 안내를 유지하고 CTA만 비활성으로 둔다.
+  const hasFormatError =
+    nickname.length > 0 && !NICKNAME_FORMAT_PATTERN.test(nickname);
+  const status: NicknameFieldStatus = hasFormatError
+    ? "format-error"
+    : availability === "unavailable"
+      ? "duplicate"
+      : availability === "available"
+        ? "success"
+        : "default";
+  const hasError = status === "format-error" || status === "duplicate";
+
+  // 포커스(빈값 포함)는 charcoal/9 1.5px, 오류는 neg/normal 1.4px, 그 외
+  // (성공 포함)는 테두리 없음.
+  const borderWidth = hasError
+    ? FIELD_ERROR_BORDER_WIDTH
+    : isFocused
+      ? FIELD_FOCUS_BORDER_WIDTH
+      : 0;
+  const borderColor = hasError
+    ? signupColors.negative
+    : signupColors.fieldFocusBorder;
 
   return (
     <SafeAreaView
@@ -104,37 +140,83 @@ export default function NicknameScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={styles.flex}
       >
-        <View style={styles.content}>
-          <ThemedText style={styles.title} typography="title-3-bold">
-            사용할 닉네임을 입력해주세요.
-          </ThemedText>
+        <OnboardingContent style={styles.content}>
+          <View style={styles.titleAndField}>
+            <ThemedText style={styles.title} typography="title-3-bold">
+              사용할 닉네임을 입력해주세요.
+            </ThemedText>
 
-          <View style={[styles.inputBox, hasInput && styles.inputBoxFilled]}>
-            <TextInput
-              autoCapitalize="none"
-              autoCorrect={false}
-              maxLength={NICKNAME_MAX_LENGTH}
-              onChangeText={handleChangeText}
-              placeholder="닉네임 입력"
-              placeholderTextColor={semanticColors["label-disabled"]}
-              style={[styles.input, hasInput && styles.inputFilled]}
-              value={nickname}
-            />
-            {hasInput && (
-              <ThemedText style={styles.counter} typography="caption-1-regular">
-                {nickname.length}/{NICKNAME_MAX_LENGTH}
+            <View
+              style={[
+                styles.field,
+                {
+                  borderColor,
+                  borderWidth,
+                  paddingLeft: FIELD_PADDING_LEFT - borderWidth,
+                  paddingRight: FIELD_PADDING_RIGHT - borderWidth,
+                },
+              ]}
+            >
+              <TextInput
+                autoCapitalize="none"
+                autoCorrect={false}
+                maxLength={NICKNAME_MAX_LENGTH}
+                onBlur={() => setIsFocused(false)}
+                onChangeText={handleChangeText}
+                onFocus={() => setIsFocused(true)}
+                placeholder="닉네임 입력"
+                placeholderTextColor={signupColors.textSubtle}
+                style={styles.input}
+                value={nickname}
+              />
+              <ThemedText
+                style={[styles.counter, hasError && styles.counterError]}
+                typography="caption-1-regular"
+              >
+                {nickname.length} / {NICKNAME_MAX_LENGTH}
               </ThemedText>
-            )}
+            </View>
           </View>
 
-          <ThemedText style={styles.helper} typography="caption-1-regular">
-            {helperText}
-          </ThemedText>
-        </View>
+          {status === "default" && (
+            <ThemedText style={styles.helper} typography="body-3-regular">
+              {NICKNAME_FORMAT_GUIDE_TEXT}
+            </ThemedText>
+          )}
+          {status === "success" && (
+            <View style={styles.statusRow}>
+              <Image
+                contentFit="contain"
+                source={require("@/assets/signup/icon-status-success.svg")}
+                style={styles.statusIcon}
+              />
+              <ThemedText
+                style={styles.successText}
+                typography="caption-1-regular"
+              >
+                사용 가능한 닉네임이에요.
+              </ThemedText>
+            </View>
+          )}
+          {hasError && (
+            <View style={styles.statusRow}>
+              <Image
+                contentFit="contain"
+                source={require("@/assets/signup/icon-status-error.svg")}
+                style={styles.statusIcon}
+              />
+              <ThemedText style={styles.errorText} typography="body-3-regular">
+                {status === "duplicate"
+                  ? `${NICKNAME_ALREADY_USED_TEXT}.`
+                  : NICKNAME_FORMAT_ERROR_TEXT}
+              </ThemedText>
+            </View>
+          )}
+        </OnboardingContent>
 
-        <View style={styles.footer}>
+        <OnboardingFooter>
           <OnboardingCtaButton disabled={!canSubmit} onPress={handleNext} />
-        </View>
+        </OnboardingFooter>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -142,56 +224,66 @@ export default function NicknameScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["fill-subtle"],
+    backgroundColor: signupColors.white,
     flex: 1,
   },
   flex: {
     flex: 1,
   },
+  // Figma 콘텐츠(4501:44709) top 112 = status bar 44 + TopNav 52 + 16,
+  // 제목+필드 묶음과 안내 문구 사이 gap 8.
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 18,
+    gap: 8,
+    paddingTop: 16,
+  },
+  titleAndField: {
+    gap: 20,
   },
   title: {
-    color: semanticColors["label-normal"],
-    marginBottom: 18,
+    color: signupColors.text,
   },
-  inputBox: {
+  field: {
     alignItems: "center",
-    backgroundColor: semanticColors["fill-normal"],
-    borderRadius: radius.default,
+    backgroundColor: signupColors.fieldBackground,
+    borderRadius: 12,
     flexDirection: "row",
+    gap: 8,
     height: 52,
-    paddingHorizontal: 16,
-  },
-  inputBoxFilled: {
-    backgroundColor: semanticColors["background-normal"],
-    borderColor: semanticColors["line-normal"],
-    borderWidth: 1,
   },
   input: {
-    color: semanticColors["label-normal"],
+    color: signupColors.text,
     flex: 1,
-    fontFamily: typography["body-2-regular"].fontFamily,
-    fontSize: typography["body-2-regular"].fontSize,
-    lineHeight: typography["body-2-regular"].lineHeight,
+    fontFamily: typography["body-1-medium"].fontFamily,
+    fontSize: typography["body-1-medium"].fontSize,
+    lineHeight: typography["body-1-medium"].lineHeight,
     padding: 0,
   },
-  inputFilled: {
-    color: semanticColors["label-subtle"],
-    fontFamily: typography["body-2-bold"].fontFamily,
-  },
   counter: {
-    color: semanticColors["label-disabled"],
+    color: signupColors.textSubtle,
+  },
+  counterError: {
+    color: signupColors.negative,
   },
   helper: {
-    color: semanticColors["label-subtle"],
-    marginTop: 14,
+    color: signupColors.textSubtle,
   },
-  footer: {
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 8,
+  statusRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  // Icon / 상태 성공·오류는 16px 컴포넌트지만 이 화면에서는 14px로 놓였다.
+  statusIcon: {
+    height: 14,
+    width: 14,
+  },
+  successText: {
+    color: signupColors.positive,
+    flex: 1,
+  },
+  errorText: {
+    color: signupColors.negative,
+    flex: 1,
   },
 });

@@ -4,6 +4,10 @@ export const NICKNAME_MAX_LENGTH = 20;
 export const NICKNAME_FORMAT_GUIDE_TEXT =
   "영문과 숫자로 2~20자, 특수기호는 . _ 만 쓸 수 있어요";
 export const NICKNAME_ALREADY_USED_TEXT = "이미 사용 중인 닉네임이에요";
+// 온보딩 닉네임 화면(Figma 4501:44879)의 형식 오류 문구. Figma 원문은
+// "3~20자"지만 같은 화면의 안내 문구(4501:44713)와 NICKNAME_MIN_LENGTH가
+// 모두 2자라 숫자만 실제 정책에 맞췄다 — 최소 길이 자체는 여기서 바꾸지 않는다.
+export const NICKNAME_FORMAT_ERROR_TEXT = `영어, 숫자, 특수기호 . _ 만 ${NICKNAME_MIN_LENGTH}~${NICKNAME_MAX_LENGTH}자로 입력해주세요.`;
 
 // 영문(대소문자 구별)/숫자와 특수기호 `.` `_` 만 허용, 공백 및 그 외 문자(한글, `-` 포함)는 불허.
 // `g` flag is only safe here for `.replace` (sanitizeNickname) — `.test()` with a
