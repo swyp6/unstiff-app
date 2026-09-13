@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   formatStopwatchTime,
@@ -65,54 +66,36 @@ export function MissionCard({
   const isAccepted = status === "accepted" || status === "completed";
   const isCompleted = status === "completed";
 
+  // 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
+  // 있으면(canDismiss) 미션 카드를 닫을 수 있다.
+  const closeButton = canDismiss && (
+    <Pressable
+      accessibilityLabel="오늘의 미션 닫기"
+      accessibilityRole="button"
+      className="size-8 items-center justify-center"
+      hitSlop={8}
+      onPress={onDismiss}
+    >
+      <Ionicons color={semanticColors["label-subtle"]} name="close" size={20} />
+    </Pressable>
+  );
+
   return (
-    <View className="rounded-[24px] bg-background-normal px-5 py-[18px] shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
-      <View className="min-h-8 flex-row items-center justify-between">
-        <View>
-          {/* Figma node 3502:36610(scheduled)에는 이 라벨이 없다 — 대신
-              아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
-          {status !== "scheduled" && (
-            <ThemedText typography="caption-1-bold" themeColor="textSecondary">
-              오늘의 미션
-            </ThemedText>
-          )}
+    <View className="rounded-[24px] bg-background-normal p-5 shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
+      {/* accepted/completed만 좌측 라벨+우측 닫기의 헤더 줄을 쓴다 — Figma node
+          3502:36610(scheduled)·4305:33908(revealed)에는 이 줄 자체가 없고,
+          "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
+      {isAccepted && (
+        <View className="min-h-8 flex-row items-center justify-between">
+          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+            오늘의 미션
+          </ThemedText>
+          {closeButton}
         </View>
-        <View className="flex-row items-center gap-2">
-          {status === "revealed" && (
-            <View className="rounded-full bg-label-normal px-[9px] py-1">
-              <ThemedText
-                typography="caption-1-bold"
-                style={{
-                  color: semanticColors["label-inverse"],
-                  letterSpacing: 0.6,
-                }}
-              >
-                NEW
-              </ThemedText>
-            </View>
-          )}
-          {/* 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
-              있으면(canDismiss) 미션 카드를 닫을 수 있다. */}
-          {canDismiss && (
-            <Pressable
-              accessibilityLabel="오늘의 미션 닫기"
-              accessibilityRole="button"
-              className="size-8 items-center justify-center"
-              hitSlop={8}
-              onPress={onDismiss}
-            >
-              <Ionicons
-                color={semanticColors["label-subtle"]}
-                name="close"
-                size={20}
-              />
-            </Pressable>
-          )}
-        </View>
-      </View>
+      )}
 
       {status === "scheduled" && (
-        <View className="items-center gap-4 pt-3">
+        <View className="items-center gap-4">
           <View className="items-center gap-1">
             <ThemedText
               typography="caption-1-bold"
@@ -127,14 +110,32 @@ export function MissionCard({
             style={{ width: 120, height: 120, borderRadius: 16 }}
             contentFit="cover"
           />
-          <MissionActionButton label="미리 받기" onPress={onReveal} soft />
+          <ActionButton label="미리 받기" onPress={onReveal} soft />
         </View>
       )}
 
       {status === "revealed" && (
-        <View className="gap-5 pt-3">
-          <ThemedText typography="title-3-bold">{title}</ThemedText>
-          <MissionActionButton label="미션 수락하기" onPress={onAccept} />
+        <View className="items-center gap-4">
+          <View className="items-center gap-1">
+            <ThemedText
+              typography="body-3-bold"
+              style={{ color: primitiveColors.orange["500"] }}
+            >
+              오늘의 미션
+            </ThemedText>
+            <ThemedText
+              typography="title-2-bold"
+              style={{ color: primitiveColors.charcoal["11"] }}
+            >
+              {title}
+            </ThemedText>
+          </View>
+          <Image
+            source={MISSION_ILLUSTRATION}
+            style={{ width: 237, height: 120, borderRadius: 16 }}
+            contentFit="cover"
+          />
+          <ActionButton label="미션 수락하기" onPress={onAccept} />
         </View>
       )}
 
@@ -183,42 +184,26 @@ export function MissionCard({
           </View>
         </View>
       )}
-    </View>
-  );
-}
 
-export function MissionActionButton({
-  label,
-  onPress,
-  soft = false,
-}: {
-  label: string;
-  onPress: () => void;
-  // Figma node 3502:36610의 "미리 받기" 버튼 스타일(연한 오렌지 배경 pill).
-  soft?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      className={
-        soft
-          ? "h-[50px] w-full items-center justify-center rounded-full bg-orange-50"
-          : "h-[50px] items-center justify-center rounded-2xl bg-label-normal"
-      }
-      style={({ pressed }) => pressed && { opacity: 0.7 }}
-    >
-      <ThemedText
-        typography="body-3-bold"
-        style={{
-          color: soft
-            ? primitiveColors.orange["700"]
-            : semanticColors["label-inverse"],
-        }}
-      >
-        {label}
-      </ThemedText>
-    </Pressable>
+      {/* Figma 4305:33908: NEW뱃지·닫기 버튼은 우상단에 절대 위치로 뜬다 —
+          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다.
+          isAccepted는 이미 자기 헤더 줄에 닫기 버튼이 있으니 여기서 또 띄우지 않는다. */}
+      {!isAccepted && (status === "revealed" || closeButton) && (
+        <View className="absolute right-5 top-5 flex-row items-center gap-2">
+          {status === "revealed" && (
+            <View className="rounded-full bg-orange-50 px-[9px] py-1">
+              <ThemedText
+                typography="caption-1-bold"
+                style={{ color: primitiveColors.orange["500"] }}
+              >
+                NEW
+              </ThemedText>
+            </View>
+          )}
+          {closeButton}
+        </View>
+      )}
+    </View>
   );
 }
 

@@ -7,6 +7,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { AddItemButton } from "@/components/ui/add-item-button";
 import { Spacing } from "@/constants/theme";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
@@ -39,7 +40,6 @@ import {
   updatePlanPreset,
 } from "@/features/workout-plan/api";
 import {
-  MissionActionButton,
   MissionCard,
   type MissionStatus,
   TodayWorkoutCard,
@@ -1174,10 +1174,7 @@ export default function HomeScreen() {
           )}
 
           {(isSelectedDateToday || isSelectedDateFuture) && (
-            <MissionActionButton
-              label="운동 추가하기"
-              onPress={openNewPlanSheet}
-            />
+            <AddItemButton label="운동 추가하기" onPress={openNewPlanSheet} />
           )}
         </ScrollView>
       </SafeAreaView>
