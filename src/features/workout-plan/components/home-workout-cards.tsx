@@ -87,7 +87,7 @@ export function MissionCard({
           "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
       {isAccepted && (
         <View className="min-h-8 flex-row items-center justify-between">
-          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+          <ThemedText typography="body-3-bold" themeColor="textSecondary">
             오늘의 미션
           </ThemedText>
           {closeButton}
@@ -130,10 +130,14 @@ export function MissionCard({
               {title}
             </ThemedText>
           </View>
+          {/* mission-illustration.png은 360x360 정사각형에 캐릭터가 여백 없이
+              꽉 차 있어서, 이 237x120(가로로 넓은) 박스에 cover로 채우면 귀·머리띠와
+              매트가 잘린다 — 배경이 투명이라 여백처럼 보이므로 contain으로 자르지
+              않고 그대로 보여준다. */}
           <Image
             source={MISSION_ILLUSTRATION}
             style={{ width: 237, height: 120, borderRadius: 16 }}
-            contentFit="cover"
+            contentFit="contain"
           />
           <ActionButton label="미션 수락하기" onPress={onAccept} />
         </View>
