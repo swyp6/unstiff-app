@@ -11,9 +11,9 @@ import type { WorkoutRefType } from "./types";
 // 패턴 — daily-photo-store 참고) 이 store를 거친다.
 //
 // LINKED(기존 PLAN/MISSION에 연결)와 MANUAL(신규 직접 입력)을 명확히
-// 구분한다 — MANUAL은 화면 진입 시점에는 연결 대상이 없고, 저장할 때 먼저
-// daily-plan을 만든 뒤 그 실제 id를 PLAN refId로 사용한다. 0/-1 같은 sentinel
-// refId는 만들거나 보내지 않는다.
+// 구분한다 — MANUAL은 연결 대상이 없어 저장 시 refId 없이 name/exerciseType/
+// targetDate를 보내고, 서버가 오늘의 운동(PLAN)을 만들어 기록까지 저장한다.
+// 0/-1 같은 sentinel refId는 만들거나 보내지 않는다.
 export type RecordFlowTarget =
   | {
       mode: "LINKED";

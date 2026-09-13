@@ -29,7 +29,6 @@ import {
   SectionLabel,
   SelectionRow,
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
-import { createDailyPlan } from "@/features/workout-plan/api";
 import {
   getIntensityLabel,
   GOAL_TYPES,
@@ -45,16 +44,6 @@ import { useRecordFlowStore } from "@/features/workout-record/record-flow-store"
 
 const TITLE_MAX_LENGTH = 20;
 const MEMO_MAX_LENGTH = 40;
-
-type ManualSubmission = {
-  title: string;
-  exerciseType: string;
-  measures: ReturnType<typeof toActualMeasuresDto>;
-  apiIntensity: ReturnType<typeof toApiIntensity>;
-  memo?: string;
-  imageUrl?: string;
-  submittedAt: Date;
-};
 
 // Figma 4173:30739 "2.2.2.1 신규 운동 기록 입력 -> 운동종류 선택시" — 기존
 // 오늘의 운동/미션에 연결하지 않고 사용자가 직접 운동명·종류·수행값을 적는
@@ -81,11 +70,10 @@ export default function ManualRecordScreen() {
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // STEP 1(daily-plan 생성)이 성공한 뒤 STEP 2(workout 생성)가 실패했을 때를
-  // 위한 값 — 재시도에서 daily-plan을 다시 만들지 않고, 이미 그 plan에 사용한
-  // 입력 스냅샷 그대로 workout만 다시 보내도록 id와 요청값을 함께 들고 있는다.
-  const createdDailyPlanIdRef = useRef<number | null>(null);
-  const pendingSubmissionRef = useRef<ManualSubmission | null>(null);
+  // isSubmitting은 setState라 같은 프레임의 연타에는 아직 false로 보인다 —
+  // refId 없는 MANUAL 요청이 두 번 나가면 서버가 오늘의 운동과 기록을 둘 다
+  // 중복 생성하므로, 응답이 오기 전까지 두 번째 진입을 동기적으로 막는다.
+  const submissionLockRef = useRef(false);
 
   const canSubmit =
     title.trim().length > 0 &&
@@ -103,91 +91,57 @@ export default function ManualRecordScreen() {
     );
   }
 
-  // MANUAL 저장은 요청 두 번이다:
-  //   1) POST /api/v1/daily-plans — 방금 한 운동을 오늘의 운동으로 만든다
-  //   2) POST /api/v1/workouts    — 그 daily-plan(refType "PLAN")에 실제 기록
-  // refType에 MANUAL 같은 값을 지어내지 않고, 기존 PLAN 경로를 그대로 쓴다.
+  // MANUAL 저장은 POST /api/v1/workouts 한 번이다 — refId를 보내지 않고
+  // name/exerciseType/targetDate를 대신 보내면 서버가 오늘의 운동(PLAN)을
+  // 만들어 기록까지 저장한다. 프론트가 daily-plan을 먼저 만들지 않으므로
+  // 생성된 plan id를 받아 후속 호출할 것도 없다. refType에 MANUAL 같은 값을
+  // 지어내지 않고 PLAN을 그대로 쓴다.
   //
-  // 1)의 targets와 2)의 measures에 같은 값이 들어간다. 일반적으로 targets는
-  // "목표", measures는 "실제 수행값"이라 다를 수 있지만, MANUAL은 미리 계획을
-  // 세우는 흐름이 아니라 "이미 한 운동을 지금 기록하는" 즉시 기록 흐름이고
-  // 화면에도 목표/실제를 따로 받는 입력이 없다(Figma 4173:30739). 그래서 이
-  // 화면에 한해 의도적으로 같은 값을 쓴다 — "목표와 실제는 늘 같다"는 일반
-  // 규칙으로 일반화하면 안 된다.
+  // 이 화면은 미리 계획을 세우는 흐름이 아니라 "이미 한 운동을 지금 기록하는"
+  // 즉시 기록 흐름이라 목표/실제를 따로 받는 입력이 없다(Figma 4173:30739).
+  // measures에는 화면에 입력한 실제 수행값 하나만 들어간다.
   async function handleSubmit() {
-    if (!canSubmit || isSubmitting) return;
+    if (submissionLockRef.current || !canSubmit) return;
+    submissionLockRef.current = true;
 
     setIsSubmitting(true);
     setError(null);
     try {
       const trimmedMemo = memo.trim();
-      const currentSubmission: ManualSubmission = {
-        title: title.trim(),
-        exerciseType,
-        measures: toActualMeasuresDto(selectedTypes, values),
-        apiIntensity: toApiIntensity(intensity),
-        ...(trimmedMemo ? { memo: trimmedMemo } : null),
-        ...(photo ? { imageUrl: photo.secureUrl } : null),
-        submittedAt: new Date(),
-      };
-      // STEP 1까지 성공한 재시도라면 사용자가 화면에서 값을 바꿨어도 기존 plan과
-      // 다른 workout을 연결하지 않고 첫 시도 때 확정한 입력을 그대로 재사용한다.
-      const submission = pendingSubmissionRef.current ?? currentSubmission;
+      const apiIntensity = toApiIntensity(intensity);
+      const measures = toActualMeasuresDto(selectedTypes, values);
+      const submittedAt = new Date();
+      const trimmedTitle = title.trim();
+      const imageUrl = photo?.secureUrl;
 
-      // STEP 2가 실패해 사용자가 다시 누르는 경우, 이미 만들어진 daily-plan을
-      // 재사용한다 — 재시도마다 오늘의 운동이 하나씩 늘어나면 안 된다.
-      // (실패했다고 방금 만든 daily-plan을 지우는 보상 삭제는 하지 않는다.)
-      let dailyPlanId = createdDailyPlanIdRef.current;
-      if (dailyPlanId == null) {
-        // startTime은 이 화면에 입력이 없어 보내지 않는다(현재 시각을 임의로
-        // 넣지 않는다). memo도 여기가 아니라 workout 쪽에만 저장한다.
-        const created = await createDailyPlan({
-          name: submission.title,
-          exerciseType: submission.exerciseType,
-          planDate: toPlanDateKey(submission.submittedAt),
-          targets: submission.measures,
-          // 서버 필수 필드 — 이 화면에 스톱워치 UI가 없어 false로 보낸다.
-          stopwatchEnabled: false,
-          ...(submission.apiIntensity
-            ? { intensity: submission.apiIntensity }
-            : null),
-        });
-        dailyPlanId = created.id;
-        createdDailyPlanIdRef.current = dailyPlanId;
-        pendingSubmissionRef.current = submission;
-      }
-
-      // 한 줄 기록은 "실제 수행 후 남기는 기록"이라 daily-plan이 아니라 이쪽에
-      // 저장한다(같은 memo를 두 API에 중복 저장하지 않는다).
       await saveWorkoutRecord({
         refType: "PLAN",
-        refId: dailyPlanId,
-        measures: submission.measures,
-        ...(submission.apiIntensity
-          ? { intensity: submission.apiIntensity }
-          : null),
-        ...(submission.imageUrl ? { imageUrl: submission.imageUrl } : null),
-        ...(submission.memo ? { memo: submission.memo } : null),
+        name: trimmedTitle,
+        exerciseType,
+        targetDate: toPlanDateKey(submittedAt),
+        measures,
+        ...(apiIntensity ? { intensity: apiIntensity } : null),
+        ...(imageUrl ? { imageUrl } : null),
+        ...(trimmedMemo ? { memo: trimmedMemo } : null),
       });
 
       useRecordFlowStore.getState().setConfirmed({
-        target: {
-          mode: "MANUAL",
-          title: submission.title,
-          exerciseType: submission.exerciseType,
-        },
-        secureUrl: submission.imageUrl,
-        measures: submission.measures,
-        memo: submission.memo,
-        date: submission.submittedAt,
+        target: { mode: "MANUAL", title: trimmedTitle, exerciseType },
+        secureUrl: imageUrl,
+        measures,
+        memo: trimmedMemo || undefined,
+        date: submittedAt,
       });
       // 홈이 오늘의 운동/캘린더를 서버에서 다시 읽도록 알린다.
       useRecordFlowStore.getState().markRecordSaved();
+      // 성공하면 lock/isSubmitting을 풀지 않는다 — 화면 전환이 끝나기 전에
+      // 풀리면 그 사이 CTA를 다시 눌러 같은 요청이 한 번 더 나갈 수 있다.
+      // 이 화면은 곧 unmount되므로 그때 함께 사라지게 둔다.
       router.replace("/record-complete");
     } catch {
-      setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");
-    } finally {
+      submissionLockRef.current = false;
       setIsSubmitting(false);
+      setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");
     }
   }
 
