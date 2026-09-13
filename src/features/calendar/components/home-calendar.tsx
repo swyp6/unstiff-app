@@ -21,15 +21,14 @@ import { MonthPickerSheet } from "./month-picker-sheet";
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 // Figma node 3502:36518 요일 헤더: 일=red/5, 토=blue/7, 나머지 charcoal/5.
-// tokens.ts의 label-subtle과 값이 달라(#4e5968 vs #8c8c92) 여기서만 직접 지정한다.
 const WEEKDAY_TEXT_COLORS = [
-  "#ff2e5d",
-  "#8c8c92",
-  "#8c8c92",
-  "#8c8c92",
-  "#8c8c92",
-  "#8c8c92",
-  "#008dd8",
+  primitiveColors.red["5"],
+  primitiveColors.charcoal["5"],
+  primitiveColors.charcoal["5"],
+  primitiveColors.charcoal["5"],
+  primitiveColors.charcoal["5"],
+  primitiveColors.charcoal["5"],
+  primitiveColors.blue["7"],
 ];
 const MONTH_SWIPE_THRESHOLD = 60;
 
