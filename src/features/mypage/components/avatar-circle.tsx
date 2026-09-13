@@ -4,7 +4,7 @@ import { View } from "react-native";
 import { semanticColors } from "@/constants/tokens";
 import {
   type AvatarSelection,
-  getAvatarPresetColor,
+  getAvatarPresetImage,
 } from "@/features/mypage/avatar-presets";
 
 type AvatarCircleProps = {
@@ -13,42 +13,51 @@ type AvatarCircleProps = {
 };
 
 export function AvatarCircle({ avatar, size }: AvatarCircleProps) {
+  const circleStyle = {
+    borderRadius: size / 2,
+    height: size,
+    overflow: "hidden" as const,
+    width: size,
+  };
+
   if (avatar?.type === "photo") {
     return (
       <Image
         contentFit="cover"
         source={{ uri: avatar.uri }}
-        style={{ height: size, width: size, borderRadius: size / 2 }}
+        style={circleStyle}
       />
     );
   }
 
-  const presetColor =
+  const presetImage =
     avatar?.type === "preset"
-      ? getAvatarPresetColor(avatar.presetId)
+      ? getAvatarPresetImage(avatar.presetId)
       : undefined;
+
+  if (presetImage) {
+    return (
+      <Image contentFit="cover" source={presetImage} style={circleStyle} />
+    );
+  }
 
   return (
     <View
       style={{
+        ...circleStyle,
         alignItems: "center",
-        backgroundColor: presetColor ?? semanticColors["fill-strong"],
-        borderRadius: size / 2,
-        height: size,
+        backgroundColor: semanticColors["fill-strong"],
         justifyContent: "center",
-        width: size,
       }}
     >
-      {!presetColor && (
-        <View
-          style={{
-            backgroundColor: semanticColors["line-strong"],
-            borderRadius: (size * 0.5) / 2,
-            height: size * 0.5,
-            width: size * 0.5,
-          }}
-        />
-      )}
+      <View
+        style={{
+          backgroundColor: semanticColors["line-strong"],
+          borderRadius: (size * 0.5) / 2,
+          height: size * 0.5,
+          width: size * 0.5,
+        }}
+      />
     </View>
   );
 }

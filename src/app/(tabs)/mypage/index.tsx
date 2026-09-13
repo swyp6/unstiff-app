@@ -76,18 +76,21 @@ export default function MyPageScreen() {
 
         <ScrollView
           className="flex-1 bg-fill-subtle"
-          contentContainerClassName="gap-4 p-5"
+          contentContainerClassName="gap-4 pb-5"
         >
           <ProfileCard
             avatar={avatar}
             nickname={nickname}
             onEditPress={() => router.push("/mypage/edit-profile")}
           />
-          <MyPageTabs onChange={setTab} value={tab} />
 
-          {tab === "streak" && <StreakTab />}
-          {tab === "badges" && <BadgesTab />}
-          {tab === "summary" && <ActivitySummaryTab />}
+          <View className="gap-4 px-5">
+            <MyPageTabs onChange={setTab} value={tab} />
+
+            {tab === "streak" && <StreakTab />}
+            {tab === "badges" && <BadgesTab />}
+            {tab === "summary" && <ActivitySummaryTab />}
+          </View>
         </ScrollView>
       </SafeAreaView>
     </ThemedView>

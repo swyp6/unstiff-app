@@ -13,6 +13,7 @@ import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
+import { usePhotoAdjustResultStore } from "@/features/upload/photo-adjust-result";
 import { useSignupStore } from "@/store/signup-store";
 
 // Figma node 1917:33189 — WF/Signup/CropGuide is a 337x337 circle centered
@@ -37,7 +38,10 @@ function clamp(value: number, min: number, max: number) {
 function handleBack() {
   // Cancel semantics: nothing in signup-store has been touched yet (that
   // only happens on "완료" below), so simply going back leaves whatever
-  // confirmedPhotoUri profile-photo already had untouched.
+  // confirmedPhotoUri profile-photo already had untouched. Also clears any
+  // external request flag a non-onboarding caller set, so it can't misfire
+  // on a later, unrelated onboarding crop pass.
+  usePhotoAdjustResultStore.getState().reset();
   router.back();
 }
 
@@ -103,8 +107,12 @@ export default function ProfilePhotoAdjustScreen() {
     "worklet";
     const dispW = baseWidth * userScale.value;
     const dispH = baseHeight * userScale.value;
-    const maxX = Math.max(0, (dispW - CROP_SIZE) / 2);
-    const maxY = Math.max(0, (dispH - CROP_SIZE) / 2);
+    // These bounds are on-screen (post-zoom) distances, but translateX/Y are
+    // applied *before* the `scale` transform (see imageAnimatedStyle below)
+    // — dividing by userScale converts back to the pre-scale units
+    // translateX/Y are actually stored in, same correction as handleConfirm.
+    const maxX = Math.max(0, (dispW - CROP_SIZE) / 2) / userScale.value;
+    const maxY = Math.max(0, (dispH - CROP_SIZE) / 2) / userScale.value;
     translateX.value = clamp(translateX.value, -maxX, maxX);
     translateY.value = clamp(translateY.value, -maxY, maxY);
     savedTranslateX.value = translateX.value;
@@ -168,12 +176,21 @@ export default function ProfilePhotoAdjustScreen() {
       // before this screen rendered the full dimmed photo) — the circle's
       // size/position relative to the image never changed, only what's
       // drawn outside it did, so this still crops the exact same region.
+      // `transform: [{scale}, {translateX}, {translateY}]` applies the pan
+      // BEFORE the zoom (rightmost-first, same as CSS) — so a raw
+      // translateX/Y value moves the image by `userScale.value` times as
+      // many screen pixels as its own number once zoomed in. Omitting that
+      // factor here under-corrects the crop origin at any zoom level other
+      // than exactly 1x, which is why a zoomed-in-then-panned photo used to
+      // crop a visibly different region than what the circle guide showed.
       const totalScale = baseScale * userScale.value;
       const dispW = naturalWidth * totalScale;
       const dispH = naturalHeight * totalScale;
       const cropSize = CROP_SIZE / totalScale;
-      const rawX = ((dispW - CROP_SIZE) / 2 - translateX.value) / totalScale;
-      const rawY = ((dispH - CROP_SIZE) / 2 - translateY.value) / totalScale;
+      const panScreenX = translateX.value * userScale.value;
+      const panScreenY = translateY.value * userScale.value;
+      const rawX = ((dispW - CROP_SIZE) / 2 - panScreenX) / totalScale;
+      const rawY = ((dispH - CROP_SIZE) / 2 - panScreenY) / totalScale;
       const originX = Math.round(
         clamp(rawX, 0, Math.max(0, naturalWidth - cropSize)),
       );
@@ -194,7 +211,15 @@ export default function ProfilePhotoAdjustScreen() {
         compress: 0.9,
       });
 
-      useSignupStore.getState().setConfirmedPhotoUri(saved.uri);
+      // A non-onboarding caller (e.g. mypage's avatar picker) flags itself
+      // via beginExternalRequest() right before pushing here — takes
+      // priority over the onboarding default so this screen stays generic
+      // to where it's pushed from.
+      if (usePhotoAdjustResultStore.getState().isExternalRequest) {
+        usePhotoAdjustResultStore.getState().resolve(saved.uri);
+      } else {
+        useSignupStore.getState().setConfirmedPhotoUri(saved.uri);
+      }
       router.back();
     } catch (cropError) {
       console.error("profile photo crop failed", cropError);

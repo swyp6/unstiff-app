@@ -1,5 +1,6 @@
-import { router } from "expo-router";
-import { useRef, useState } from "react";
+import Ionicons from "@expo/vector-icons/Ionicons";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -17,12 +18,14 @@ import {
   updateMyProfile,
 } from "@/features/auth/api";
 import {
-  NICKNAME_FORMAT_PATTERN,
+  NICKNAME_ALREADY_USED_TEXT,
+  NICKNAME_FORMAT_GUIDE_TEXT,
   NICKNAME_MAX_LENGTH,
+  getNicknameFormatError,
 } from "@/features/auth/nickname-validation";
 import type { UpdateProfileRequest } from "@/features/auth/types";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
-import type { AvatarSelection } from "@/features/mypage/avatar-presets";
+import { avatarsEqual } from "@/features/mypage/avatar-presets";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import { ProfileImagePickerSheet } from "@/features/mypage/components/profile-image-picker-sheet";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
@@ -31,19 +34,11 @@ import {
   ImageUploadError,
   logImageUploadError,
 } from "@/features/upload/cloudinary";
+import { usePhotoAdjustResultStore } from "@/features/upload/photo-adjust-result";
 import { uploadImageFromUri } from "@/features/upload/upload-image";
 
-const AVATAR_SIZE = 88;
-
-function avatarsEqual(a: AvatarSelection, b: AvatarSelection) {
-  if (a === b) return true;
-  if (a?.type !== b?.type) return false;
-  if (a?.type === "preset" && b?.type === "preset") {
-    return a.presetId === b.presetId;
-  }
-  if (a?.type === "photo" && b?.type === "photo") return a.uri === b.uri;
-  return false;
-}
+const AVATAR_SIZE = 120;
+const CAMERA_BADGE_SIZE = 40;
 
 export default function EditProfileScreen() {
   // null means profile setup was never completed server-side — treated the
@@ -63,7 +58,18 @@ export default function EditProfileScreen() {
     null,
   );
 
-  const isNicknameValid = NICKNAME_FORMAT_PATTERN.test(draftNickname);
+  // Picks up a cropped photo from profile-photo-adjust.tsx once this screen
+  // regains focus after the picker sheet pushed it there and closed itself
+  // (see profile-image-picker-sheet.tsx's handleUploadPress) — consume()
+  // no-ops when nothing's waiting, so this is safe on every unrelated focus
+  // too (e.g. just navigating back from settings).
+  useFocusEffect(
+    useCallback(() => {
+      const uri = usePhotoAdjustResultStore.getState().consume();
+      if (uri) setDraftAvatar({ type: "photo", uri });
+    }, []),
+  );
+
   const nicknameChanged = draftNickname !== storedNickname;
   const avatarChanged = !avatarsEqual(draftAvatar, storedAvatar);
   // Matching the stored nickname bypasses the availability check — an
@@ -73,27 +79,30 @@ export default function EditProfileScreen() {
   const availability = useNicknameAvailability(draftNickname, {
     skipValue: storedNickname || undefined,
   });
-  // Neither the format check nor the duplicate check blocks 저장 itself
-  // anymore — pressing it is what tells the user what's wrong (via the
-  // alerts below), rather than silently disabling the button with no
-  // explanation.
-  const canSave = !isSaving;
+  // Only evaluated once the nickname is actually being edited — an
+  // untouched nickname never shows an error, even if it predates the
+  // current format rules.
+  const nicknameFormatError = nicknameChanged
+    ? getNicknameFormatError(draftNickname)
+    : null;
+  const nicknameDuplicate =
+    nicknameChanged && !nicknameFormatError && availability === "unavailable";
+  const nicknameHelperText = nicknameFormatError
+    ? nicknameFormatError
+    : nicknameDuplicate
+      ? NICKNAME_ALREADY_USED_TEXT
+      : NICKNAME_FORMAT_GUIDE_TEXT;
+  const nicknameHasError = Boolean(nicknameFormatError) || nicknameDuplicate;
+  // 저장 stays disabled while an edited nickname is invalid/unchecked/taken,
+  // matching Figma's Button CTA 비활성 variant — an avatar-only change (or no
+  // change at all) is unaffected by nickname validity.
+  const canSave =
+    !isSaving &&
+    (!nicknameChanged ||
+      (!nicknameFormatError && availability === "available"));
 
   async function handleSave() {
     if (!canSave) return;
-
-    if (nicknameChanged && !isNicknameValid) {
-      Alert.alert(
-        "다시 입력해주세요.",
-        "영문과 숫자로 2~10자, 특수기호는 . _ 만 쓸 수 있어요",
-      );
-      return;
-    }
-
-    if (nicknameChanged && availability !== "available") {
-      Alert.alert("중복된 닉네임이에요", "다른 닉네임을 입력해주세요.");
-      return;
-    }
 
     if (!nicknameChanged && !avatarChanged) {
       router.back();
@@ -102,10 +111,11 @@ export default function EditProfileScreen() {
 
     setIsSaving(true);
     try {
-      // A preset (solid-color) avatar has no server representation — the
-      // API only accepts a real Cloudinary/workers.dev image URL — so it's
-      // never uploaded/sent, and (below) never confirmed into the local
-      // store as if it had been saved. Only a "photo" pick is persistable.
+      // A preset (bundled sticker) avatar has no server representation —
+      // the API only accepts a real Cloudinary/workers.dev image URL — so
+      // it's never uploaded/sent, and (below) never confirmed into the
+      // local store as if it had been saved. Only a "photo" pick is
+      // persistable.
       const avatarSavable = avatarChanged && draftAvatar?.type === "photo";
 
       let profileImageUrl: string | undefined;
@@ -164,34 +174,41 @@ export default function EditProfileScreen() {
       className="flex-1 bg-fill-subtle"
       edges={["top", "left", "right", "bottom"]}
     >
-      <SettingsHeader onBack={() => router.back()} title="프로필 수정화면" />
+      <SettingsHeader onBack={() => router.back()} title="프로필 수정" />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1 px-5 pt-4"
       >
-        <View className="items-center">
+        <View className="items-center py-6">
           <View>
             <AvatarCircle avatar={draftAvatar} size={AVATAR_SIZE} />
             <Pressable
               accessibilityLabel="프로필 이미지 변경"
               accessibilityRole="button"
-              className="absolute -bottom-1 -right-2 items-center justify-center rounded-full bg-fill-normal px-2.5 py-1.5"
+              className="absolute items-center justify-center rounded-full border-[3px] border-background-normal bg-orange-500"
               onPress={() => setIsPickerOpen(true)}
+              style={{
+                bottom: 0,
+                height: CAMERA_BADGE_SIZE,
+                right: 0,
+                width: CAMERA_BADGE_SIZE,
+              }}
             >
-              <ThemedText
-                themeColor="textSecondary"
-                typography="caption-1-regular"
-              >
-                변경
-              </ThemedText>
+              <Ionicons color="white" name="camera" size={18} />
             </Pressable>
           </View>
         </View>
 
-        <View className="mt-8 gap-2">
+        <View className="gap-2">
           <ThemedText typography="body-2-bold">닉네임</ThemedText>
-          <View className="h-[52px] flex-row items-center justify-between rounded-default bg-fill-normal px-4">
+          <View
+            className={`h-[52px] flex-row items-center justify-between rounded-default bg-fill-subtle px-4 ${
+              nicknameHasError
+                ? "border-[1.4px] border-status-negative-normal"
+                : ""
+            }`}
+          >
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
@@ -208,14 +225,25 @@ export default function EditProfileScreen() {
               value={draftNickname}
             />
             <ThemedText
-              themeColor="textDisabled"
+              style={{
+                color: nicknameHasError
+                  ? semanticColors["status-negative-normal"]
+                  : semanticColors["label-disabled"],
+              }}
               typography="caption-1-regular"
             >
               {draftNickname.length}/{NICKNAME_MAX_LENGTH}
             </ThemedText>
           </View>
-          <ThemedText themeColor="textSecondary" typography="caption-1-regular">
-            영문과 숫자로 2~10자, 특수기호는 . _ 만 쓸 수 있어요
+          <ThemedText
+            style={{
+              color: nicknameHasError
+                ? semanticColors["status-negative-normal"]
+                : semanticColors["label-subtle"],
+            }}
+            typography="caption-1-regular"
+          >
+            {nicknameHelperText}
           </ThemedText>
         </View>
 
@@ -225,13 +253,18 @@ export default function EditProfileScreen() {
           accessibilityLabel="저장"
           accessibilityRole="button"
           accessibilityState={{ disabled: !canSave }}
-          className={`mb-6 h-[52px] items-center justify-center rounded-[20px] border border-line-subtle bg-background-normal ${
+          className={`mb-6 h-[52px] items-center justify-center rounded-full bg-charcoal-11 ${
             canSave ? "" : "opacity-40"
           }`}
           disabled={!canSave}
           onPress={handleSave}
         >
-          <ThemedText typography="body-2-bold">저장</ThemedText>
+          <ThemedText
+            style={{ color: semanticColors["label-inverse"] }}
+            typography="body-1-bold"
+          >
+            저장
+          </ThemedText>
         </Pressable>
       </KeyboardAvoidingView>
 

@@ -3,15 +3,17 @@
 // these) — this file stands in for that data until the real endpoints
 // land.
 
-// true/false = recorded/unrecorded day; null = outside the selected month
-// (a leading/trailing calendar cell), rendered blank rather than as a dot.
-export type DayCell = boolean | null;
+// 0 = unrecorded day, 1-5 = recorded-day intensity (matches the Figma
+// heatmap's 5 Orange shades); null = outside the selected month (a
+// leading/trailing calendar cell), rendered blank rather than as a dot.
+export type HeatmapLevel = 0 | 1 | 2 | 3 | 4 | 5;
+export type DayCell = HeatmapLevel | null;
 export type WeekDots = DayCell[]; // 7 entries, Sun–Sat
 
 export type StreakMonthData = {
   currentStreakDays: number;
-  thisMonthPercent: number;
-  lastMonthPercent: number;
+  bestStreakDays: number;
+  recordedDaysThisMonth: number;
   weeks: WeekDots[];
 };
 
@@ -19,6 +21,16 @@ export type StreakMonthData = {
 // the user navigates to shows *some* data, without a real backend to ask.
 function seededPercent(seed: number) {
   return (Math.abs(Math.sin(seed) * 10000) % 100) | 0;
+}
+
+function seededLevel(seed: number): HeatmapLevel {
+  const pct = seededPercent(seed);
+  if (pct > 85) return 5;
+  if (pct > 70) return 4;
+  if (pct > 55) return 3;
+  if (pct > 40) return 2;
+  if (pct > 25) return 1;
+  return 0;
 }
 
 export function getStreakDataForMonth(
@@ -34,16 +46,17 @@ export function getStreakDataForMonth(
     Array.from({ length: 7 }, (_, dayIndex) => {
       const dayOfMonth = weekIndex * 7 + dayIndex - firstWeekday + 1;
       if (dayOfMonth < 1 || dayOfMonth > daysInMonth) return null;
-      return seededPercent(seed + dayOfMonth) > 40;
+      return seededLevel(seed + dayOfMonth);
     }),
   );
-  const thisMonthPercent = seededPercent(seed);
-  const lastMonthPercent = seededPercent(seed - 1);
+  const recordedDaysThisMonth = weeks
+    .flat()
+    .filter((level) => level !== null && level > 0).length;
 
   return {
     currentStreakDays: 1,
-    thisMonthPercent,
-    lastMonthPercent,
+    bestStreakDays: 12,
+    recordedDaysThisMonth,
     weeks,
   };
 }

@@ -14,8 +14,10 @@ type ProfileCardProps = {
   onEditPress?: () => void;
 };
 
-const AVATAR_SIZE = 56;
-const COVER_HEIGHT = 64;
+const AVATAR_SIZE = 72;
+const AVATAR_BORDER_WIDTH = 4;
+const AVATAR_OUTER_SIZE = AVATAR_SIZE + AVATAR_BORDER_WIDTH * 2;
+const COVER_HEIGHT = 84;
 
 export function ProfileCard({
   nickname,
@@ -23,16 +25,20 @@ export function ProfileCard({
   onEditPress,
 }: ProfileCardProps) {
   return (
-    <View className="overflow-hidden rounded-default border border-line-subtle bg-background-normal">
-      <View className="bg-fill-normal" style={{ height: COVER_HEIGHT }} />
+    <View className="overflow-hidden bg-background-normal">
+      <View className="bg-orange-500" style={{ height: COVER_HEIGHT }} />
       <View
         className="items-center pb-4"
-        style={{ marginTop: -AVATAR_SIZE / 2 }}
+        style={{ marginTop: -AVATAR_OUTER_SIZE / 2 }}
       >
         <View>
           <View
-            className="overflow-hidden rounded-full border-2 border-background-normal"
-            style={{ height: AVATAR_SIZE, width: AVATAR_SIZE }}
+            className="overflow-hidden rounded-full border-background-normal"
+            style={{
+              borderWidth: AVATAR_BORDER_WIDTH,
+              height: AVATAR_OUTER_SIZE,
+              width: AVATAR_OUTER_SIZE,
+            }}
           >
             <AvatarCircle avatar={avatar} size={AVATAR_SIZE} />
           </View>
