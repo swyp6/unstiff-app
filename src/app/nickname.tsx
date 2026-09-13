@@ -20,11 +20,9 @@ import {
 } from "@/features/auth/components/onboarding-layout";
 import {
   NICKNAME_ALREADY_USED_TEXT,
-  NICKNAME_FORMAT_ERROR_TEXT,
   NICKNAME_FORMAT_GUIDE_TEXT,
-  NICKNAME_FORMAT_PATTERN,
   NICKNAME_MAX_LENGTH,
-  sanitizeNickname,
+  validateNickname,
 } from "@/features/auth/nickname-validation";
 import { signupColors } from "@/features/auth/signup-ui";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
@@ -93,8 +91,12 @@ export default function NicknameScreen() {
   const availability = useNicknameAvailability(nickname, { refreshKey });
   const canSubmit = availability === "available";
 
+  // 사용자가 친 문자열을 그대로 보관한다 — 한글/공백/허용하지 않는 기호나 20자
+  // 초과분을 지우거나 잘라내지 않고, 아래 validateNickname 결과로만 오류를
+  // 안내한다. 서버에는 로컬 검증 + 중복 확인을 모두 통과한 값만 저장된다
+  // (handleNext는 canSubmit일 때만 store에 쓴다).
   function handleChangeText(text: string) {
-    setNickname(sanitizeNickname(text));
+    setNickname(text);
   }
 
   function handleNext() {
@@ -103,14 +105,15 @@ export default function NicknameScreen() {
     router.push("/profile-photo");
   }
 
-  // Figma가 그린 네 상태: 기본 안내(4501:44699), 성공(4501:44714), 형식
-  // 오류(4501:44879), 중복(4501:44862). 중복은 기존 duplicate-check 훅의
-  // "unavailable" 결과를 그대로 쓴다 — 별도 요청을 추가하지 않는다.
+  // Figma가 그린 상태: 기본 안내(4501:44699), 성공(4501:44714), 로컬 검증
+  // 오류(4501:44879 + 마이페이지와 공유하는 Field/닉네임 variant별 문구), 중복
+  // (4501:44862). 우선순위는 validateNickname의 로컬 규칙(길이 → 문자 → 기호
+  // 위치)이 먼저고, 로컬 검증을 통과한 값만 중복 확인 훅이 서버에 물어본다 —
+  // 훅은 invalid 값에 대해 "idle"을 돌려주므로 별도 요청이 나가지 않는다.
   // "checking"/"error"(네트워크 실패는 훅이 Alert로 알림)는 디자인된 문구가
   // 없어 기본 안내를 유지하고 CTA만 비활성으로 둔다.
-  const hasFormatError =
-    nickname.length > 0 && !NICKNAME_FORMAT_PATTERN.test(nickname);
-  const status: NicknameFieldStatus = hasFormatError
+  const validation = validateNickname(nickname);
+  const status: NicknameFieldStatus = validation.message
     ? "format-error"
     : availability === "unavailable"
       ? "duplicate"
@@ -118,6 +121,10 @@ export default function NicknameScreen() {
         ? "success"
         : "default";
   const hasError = status === "format-error" || status === "duplicate";
+  const errorMessage =
+    status === "duplicate"
+      ? `${NICKNAME_ALREADY_USED_TEXT}.`
+      : validation.message;
 
   // 포커스(빈값 포함)는 charcoal/9 1.5px, 오류는 neg/normal 1.4px, 그 외
   // (성공 포함)는 테두리 없음.
@@ -160,7 +167,6 @@ export default function NicknameScreen() {
               <TextInput
                 autoCapitalize="none"
                 autoCorrect={false}
-                maxLength={NICKNAME_MAX_LENGTH}
                 onBlur={() => setIsFocused(false)}
                 onChangeText={handleChangeText}
                 onFocus={() => setIsFocused(true)}
@@ -206,9 +212,7 @@ export default function NicknameScreen() {
                 style={styles.statusIcon}
               />
               <ThemedText style={styles.errorText} typography="body-3-regular">
-                {status === "duplicate"
-                  ? `${NICKNAME_ALREADY_USED_TEXT}.`
-                  : NICKNAME_FORMAT_ERROR_TEXT}
+                {errorMessage}
               </ThemedText>
             </View>
           )}
