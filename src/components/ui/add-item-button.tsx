@@ -17,7 +17,7 @@ export function AddItemButton({
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      className="h-[60px] w-full flex-row items-center justify-center gap-2 rounded-[18px] border border-dashed border-line-normal bg-background-normal"
+      className="h-[60px] w-full flex-row items-center justify-center gap-2 rounded-[18px] border border-dashed border-line-normal bg-white"
       style={({ pressed }) => pressed && { opacity: 0.7 }}
     >
       <Ionicons name="add" size={14} color={semanticColors["label-normal"]} />
