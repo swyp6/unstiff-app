@@ -18,14 +18,17 @@ export type UserProfile = {
   updatedAt: string;
 };
 
-export type TermsType = "SERVICE" | "PRIVACY" | "MARKETING";
+// 서버 TermsType enum 그대로 (unstiff-api docs/api/auth.md). MARKETING은
+// 서버에서 제거됐고, 민감정보/외부 AI 약관 type은 아직 서버에 없다.
+export type TermsType = "AGE_14" | "SERVICE" | "PRIVACY";
 
 export type Term = {
   id: number;
   type: TermsType;
   title: string;
   required: boolean;
-  contentUrl: string;
+  // 절대 주소. 전문이 없는 약관은 null — 이때는 링크 없이 체크박스만 보여준다.
+  contentUrl: string | null;
   agreed: boolean;
   reagreementRequired: boolean;
   agreedAt: string | null;

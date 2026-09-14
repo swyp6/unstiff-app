@@ -6,7 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
-import { LEGAL_URLS } from "@/constants/legal-urls";
+import { LEGAL_DOCUMENTS } from "@/constants/legal-urls";
 import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
 import {
@@ -21,10 +21,9 @@ const ACCOUNT_ITEMS = [
   { title: "앱 권한 및 연동", href: "/mypage/settings/permissions" },
 ] as const;
 
-const SERVICE_ITEMS = [
-  { title: "이용약관", url: LEGAL_URLS.terms },
-  { title: "개인정보 처리방침", url: LEGAL_URLS.privacy },
-] as const;
+// 온보딩 약관과 같은 문서 4종. 설정 row는 기존 항목처럼 [필수]/[선택]
+// 접두어 없이 문서명만 보여준다.
+const SERVICE_ITEMS = LEGAL_DOCUMENTS;
 
 async function openLegalDocument(url: string) {
   try {

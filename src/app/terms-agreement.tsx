@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { LEGAL_DOCUMENTS } from "@/constants/legal-urls";
 import { radius, semanticColors } from "@/constants/tokens";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
@@ -135,52 +136,40 @@ function TermRow({
 }
 
 // 화면에 그려지는 약관은 전부 GET /api/v1/terms 응답이고, 로컬에서 만들어내는
-// 약관은 없다. 이 배열은 Figma(AC-01-04)가 정의하는 표시 계층 — 노출 순서, 문구,
-// chevron(상세 진입) 노출 여부 — 만 담당한다. id·type·required·contentUrl·agreed
-// 같은 실제 약관 상태는 서버 응답이 source of truth다.
+// 약관은 없다. 이 배열은 표시 계층 — 노출 순서와 문구 — 만 담당한다.
+// id·type·required·contentUrl·agreed 같은 실제 약관 상태는 서버 응답이
+// source of truth다. 4종 모두 배포된 문서(LEGAL_DOCUMENTS)가 있으므로 chevron은
+// 서버가 contentUrl을 내려주는지만 보고 정한다.
 //
-// SERVICE 타입 약관이 둘(만 14세 / 이용약관)이라 type만으로는 구분되지 않아
-// 그 둘은 title로, 타입이 유일한 MARKETING은 title 변경에 흔들리지 않도록
-// type으로 매칭한다. title 매칭은 서버가 "동의" 접미사를 붙여 내려주든 아니든
-// 걸리도록 접미사를 떼고 비교한다.
+// 민감정보/외부 AI 약관의 서버 type은 아직 정해지지 않아 type이 아니라 문서명으로
+// 매칭한다. 서버가 "[필수] " 접두어나 "동의" 접미사를 붙여 내려주든 아니든
+// 걸리도록 둘 다 떼고 비교한다.
 type TermDisplaySpec = {
   match: (term: Term) => boolean;
   title: string;
-  hasDetail: boolean;
 };
 
-function byTitle(title: string) {
-  return (term: Term) => term.title.replace(/\s*동의$/, "") === title;
+function normalizeTermTitle(title: string) {
+  return title
+    .replace(/^\[(필수|선택)\]\s*/, "")
+    .replace(/\s+/g, " ")
+    .replace(/\s*동의$/, "")
+    .trim();
 }
 
-const TERM_DISPLAY: TermDisplaySpec[] = [
-  {
-    match: byTitle("만 14세 이상 가입"),
-    title: "만 14세 이상 가입 동의",
-    // 법적 고지 문서가 아니라 가입 자격 확인이라 Figma에 상세 진입이 없다.
-    hasDetail: false,
-  },
-  {
-    match: byTitle("찌뿌두둥 이용약관"),
-    title: "찌뿌두둥 이용약관 동의",
-    hasDetail: true,
-  },
-  {
-    match: byTitle("개인정보 수집 및 이용"),
-    title: "개인정보 수집 및 이용 동의",
-    hasDetail: true,
-  },
-  {
-    match: (term) => term.type === "MARKETING",
-    title: "Push 알림 동의",
-    // 서버가 contentUrl을 내려주더라도 Figma에는 chevron이 없다.
-    hasDetail: false,
-  },
-];
+function byTitle(title: string) {
+  const expected = normalizeTermTitle(title);
+  return (term: Term) => normalizeTermTitle(term.title) === expected;
+}
+
+const TERM_DISPLAY: TermDisplaySpec[] = LEGAL_DOCUMENTS.map((document) => ({
+  match: byTitle(document.title),
+  title: document.title,
+}));
 
 function termOrderIndex(term: Term) {
   const index = TERM_DISPLAY.findIndex((spec) => spec.match(term));
-  // Figma에 없는 약관이 서버에 추가되면 알려진 항목 뒤에 서버 순서대로 붙는다.
+  // 목록에 없는 약관이 서버에 추가되면 알려진 항목 뒤에 서버 순서대로 붙는다.
   return index === -1 ? TERM_DISPLAY.length : index;
 }
 
@@ -225,14 +214,14 @@ export default function TermsAgreementScreen() {
     [terms],
   );
 
-  // 선택 약관(MARKETING)까지 포함한다.
+  // 선택 약관(외부 AI 동의)까지 포함한다.
   const allAgreed = useMemo(
     () => terms !== null && terms.every((term) => agreements[term.id]),
     [terms, agreements],
   );
 
-  // required 약관만 본다 — MARKETING은 required=false라 미동의여도 다음 단계로
-  // 진행할 수 있다.
+  // required 약관만 본다 — 선택 약관(외부 AI 동의)은 required=false라 미동의여도
+  // 다음 단계로 진행할 수 있다.
   const requiredAgreed = useMemo(() => {
     if (terms === null) return false;
     const requiredTerms = terms.filter((term) => term.required);
@@ -359,10 +348,9 @@ export default function TermsAgreementScreen() {
           {orderedTerms.map((term) => {
             const display = TERM_DISPLAY.find((spec) => spec.match(term));
             const title = display?.title ?? term.title;
-            // chevron 노출은 Figma 정책이 먼저고, 서버 contentUrl은 실제로 열
-            // 페이지가 있는지 확인하는 용도로만 쓴다.
-            const hasDetail =
-              (display?.hasDetail ?? true) && isValidHttpUrl(term.contentUrl);
+            // 4종 모두 상세 문서가 있어 열 수 있는 contentUrl이 오면 chevron을
+            // 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만 둔다.
+            const hasDetail = isValidHttpUrl(term.contentUrl);
             return (
               <TermRow
                 checked={agreements[term.id] ?? false}
