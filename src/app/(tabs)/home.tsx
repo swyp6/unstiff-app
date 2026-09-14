@@ -3,11 +3,10 @@ import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Alert, Pressable, ScrollView, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
 import { AddItemButton } from "@/components/ui/add-item-button";
+import { Screen } from "@/components/ui/screen";
 import { Spacing } from "@/constants/theme";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
@@ -1076,108 +1075,106 @@ export default function HomeScreen() {
   }
 
   return (
-    <ThemedView style={{ flex: 1 }}>
-      <SafeAreaView style={{ flex: 1 }}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{
-            paddingHorizontal: Spacing.three,
-            paddingBottom: Spacing.four,
-            gap: Spacing.four,
-          }}
-        >
-          <HomeCalendar
-            viewedMonth={viewedMonth}
-            onViewedMonthChange={setViewedMonth}
-            today={today}
-            onSelectDate={setSelectedCalendarDate}
-            onDayWithRecordPress={(dateKey) =>
+    <Screen>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingHorizontal: Spacing.three,
+          paddingBottom: Spacing.four,
+          gap: Spacing.four,
+        }}
+      >
+        <HomeCalendar
+          viewedMonth={viewedMonth}
+          onViewedMonthChange={setViewedMonth}
+          today={today}
+          onSelectDate={setSelectedCalendarDate}
+          onDayWithRecordPress={(dateKey) =>
+            router.push({
+              pathname: "/day-record",
+              params: { date: dateKey, index: "0" },
+            })
+          }
+          daysByDate={daysByDate}
+          isTodayRecorded={isTodayRecorded}
+          hasLocalScheduledWorkout={(date) =>
+            getWorkoutsForDate(date).length > 0
+          }
+          streakDays={streakDays}
+          calendarError={calendarError}
+          unreadPushCount={unreadPushCount}
+          onPressNotifications={() => router.push("/notifications")}
+        />
+
+        {isSelectedDateToday && (
+          <MissionCard
+            arrivalLabel={missionArrivalLabel}
+            canDismiss={hasCompletedTodayWorkout}
+            description={missionDescription}
+            onAccept={handleMissionAccept}
+            onDismiss={handleMissionDismiss}
+            onReveal={handleMissionReveal}
+            onToggleComplete={handleMissionCompletePress}
+            status={missionStatus}
+            title={missionTitle}
+          />
+        )}
+
+        {isSelectedDateToday || isSelectedDateFuture ? (
+          <TodayWorkoutCard
+            dateLabel={isSelectedDateToday ? todayLabel : selectedDateLabel}
+            emptyStateLabel={
+              isSelectedDateToday
+                ? "오늘 담은 운동이 없어요"
+                : "담은 운동이 없어요"
+            }
+            expanded={isTodayCardExpanded}
+            onAddSavedPlan={(plan) =>
+              addSavedPlanToDate(plan, selectedCalendarDate)
+            }
+            onOpenSavedPlan={(planId) =>
+              setPlanDetailTarget({ kind: "saved", planId })
+            }
+            onOpenWorkoutDetail={(instanceId) =>
+              setPlanDetailTarget({ kind: "instance", instanceId })
+            }
+            onToggleExpanded={() =>
+              setIsTodayCardExpanded((expanded) => !expanded)
+            }
+            onStopwatchFinish={finishStopwatch}
+            onStopwatchReset={resetStopwatch}
+            onStopwatchToggleRun={toggleStopwatchRun}
+            onToggleTodayWorkout={toggleTodayWorkoutDone}
+            readOnly={!isSelectedDateToday}
+            savedWorkoutPlans={savedWorkoutPlans}
+            title={isSelectedDateToday ? "오늘의 운동" : "예정된 운동"}
+            todayWorkouts={selectedDateWorkouts}
+          />
+        ) : (
+          <DayRecordCard
+            dateLabel={selectedDateLabel}
+            record={selectedDayRecord}
+            serverRecordCount={selectedDayServerRecordCount}
+            expanded={isTodayCardExpanded}
+            onToggleExpanded={() =>
+              setIsTodayCardExpanded((expanded) => !expanded)
+            }
+            onSelectRecord={(index) =>
               router.push({
                 pathname: "/day-record",
-                params: { date: dateKey, index: "0" },
+                params: {
+                  date: toDateKey(selectedCalendarDate),
+                  index: String(index),
+                },
               })
             }
-            daysByDate={daysByDate}
-            isTodayRecorded={isTodayRecorded}
-            hasLocalScheduledWorkout={(date) =>
-              getWorkoutsForDate(date).length > 0
-            }
-            streakDays={streakDays}
-            calendarError={calendarError}
-            unreadPushCount={unreadPushCount}
-            onPressNotifications={() => router.push("/notifications")}
           />
+        )}
 
-          {isSelectedDateToday && (
-            <MissionCard
-              arrivalLabel={missionArrivalLabel}
-              canDismiss={hasCompletedTodayWorkout}
-              description={missionDescription}
-              onAccept={handleMissionAccept}
-              onDismiss={handleMissionDismiss}
-              onReveal={handleMissionReveal}
-              onToggleComplete={handleMissionCompletePress}
-              status={missionStatus}
-              title={missionTitle}
-            />
-          )}
-
-          {isSelectedDateToday || isSelectedDateFuture ? (
-            <TodayWorkoutCard
-              dateLabel={isSelectedDateToday ? todayLabel : selectedDateLabel}
-              emptyStateLabel={
-                isSelectedDateToday
-                  ? "오늘 담은 운동이 없어요"
-                  : "담은 운동이 없어요"
-              }
-              expanded={isTodayCardExpanded}
-              onAddSavedPlan={(plan) =>
-                addSavedPlanToDate(plan, selectedCalendarDate)
-              }
-              onOpenSavedPlan={(planId) =>
-                setPlanDetailTarget({ kind: "saved", planId })
-              }
-              onOpenWorkoutDetail={(instanceId) =>
-                setPlanDetailTarget({ kind: "instance", instanceId })
-              }
-              onToggleExpanded={() =>
-                setIsTodayCardExpanded((expanded) => !expanded)
-              }
-              onStopwatchFinish={finishStopwatch}
-              onStopwatchReset={resetStopwatch}
-              onStopwatchToggleRun={toggleStopwatchRun}
-              onToggleTodayWorkout={toggleTodayWorkoutDone}
-              readOnly={!isSelectedDateToday}
-              savedWorkoutPlans={savedWorkoutPlans}
-              title={isSelectedDateToday ? "오늘의 운동" : "예정된 운동"}
-              todayWorkouts={selectedDateWorkouts}
-            />
-          ) : (
-            <DayRecordCard
-              dateLabel={selectedDateLabel}
-              record={selectedDayRecord}
-              serverRecordCount={selectedDayServerRecordCount}
-              expanded={isTodayCardExpanded}
-              onToggleExpanded={() =>
-                setIsTodayCardExpanded((expanded) => !expanded)
-              }
-              onSelectRecord={(index) =>
-                router.push({
-                  pathname: "/day-record",
-                  params: {
-                    date: toDateKey(selectedCalendarDate),
-                    index: String(index),
-                  },
-                })
-              }
-            />
-          )}
-
-          {(isSelectedDateToday || isSelectedDateFuture) && (
-            <AddItemButton label="운동 추가하기" onPress={openNewPlanSheet} />
-          )}
-        </ScrollView>
-      </SafeAreaView>
+        {(isSelectedDateToday || isSelectedDateFuture) && (
+          <AddItemButton label="운동 추가하기" onPress={openNewPlanSheet} />
+        )}
+      </ScrollView>
 
       {detailPlan && isFocused && (
         <WorkoutPlanDetailBottomSheet
@@ -1227,6 +1224,6 @@ export default function HomeScreen() {
           visible
         />
       )}
-    </ThemedView>
+    </Screen>
   );
 }

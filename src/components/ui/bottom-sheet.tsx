@@ -23,11 +23,7 @@ import {
   View,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import {
-  type Edge,
-  SafeAreaView,
-  useSafeAreaInsets,
-} from "react-native-safe-area-context";
+import { type Edge, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
@@ -335,10 +331,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             }
             style={hasConstrainedHeight ? styles.flex : undefined}
           >
-            <SafeAreaView
-              edges={safeAreaEdges}
-              style={hasConstrainedHeight ? styles.flex : undefined}
-            >
+            <View style={hasConstrainedHeight ? styles.flex : undefined}>
               {/* 손잡이(20px)만 잡히면 너무 좁아서 놓치기 쉬우니, 그 아래
                   제목 줄까지 한 덩어리로 드래그 영역을 넓힌다. */}
               <View {...panResponder.panHandlers}>
@@ -370,11 +363,12 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                   styles.content,
                   hasConstrainedHeight && styles.constrainedContent,
                   contentMaxHeight != null && { maxHeight: contentMaxHeight },
+                  safeAreaEdges.includes("bottom") && styles.contentBottomInset,
                 ]}
               >
                 {children}
               </View>
-            </SafeAreaView>
+            </View>
           </KeyboardAvoidingView>
         </Animated.View>
         {overlay}
@@ -448,6 +442,12 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 16,
     paddingHorizontal: 20,
+  },
+  // useSafeAreaInsets()가 이 중첩된 embedded 오버레이 구조에서는 실제 홈
+  // 인디케이터 높이(34)보다 훨씬 큰 값을 반환해서(기기별로 다르게 어긋남),
+  // insets.bottom을 그대로 쓰는 대신 고정값으로 안전 여백만 살짝 더한다.
+  contentBottomInset: {
+    paddingBottom: 24,
   },
   constrainedContent: {
     flex: 1,
