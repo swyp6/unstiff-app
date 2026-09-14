@@ -11,7 +11,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { EXERCISE_TYPES } from "@/features/workout-plan/model";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -68,8 +68,9 @@ export function WorkoutTypeBottomSheet({
     };
   }, []);
   const customValue = customDraft.trim();
+  const isCustomTooLong = customDraft.length > MAX_CUSTOM_LENGTH;
   const canConfirm = isCustomMode
-    ? customValue.length > 0
+    ? customValue.length > 0 && !isCustomTooLong
     : selectedType !== null;
 
   const selectDefaultType = (type: string) => {
@@ -122,7 +123,9 @@ export function WorkoutTypeBottomSheet({
                       pointerEvents="none"
                       style={[styles.option, pressed && styles.pressed]}
                     >
-                      <ThemedText typography="body-2-bold">{type}</ThemedText>
+                      <ThemedText typography="heading-1-medium">
+                        {type}
+                      </ThemedText>
                       <SelectionCircle selected={selected} />
                     </View>
                   )}
@@ -142,7 +145,7 @@ export function WorkoutTypeBottomSheet({
                 pointerEvents="none"
                 style={[styles.option, pressed && styles.pressed]}
               >
-                <ThemedText typography="body-2-bold">직접 입력</ThemedText>
+                <ThemedText typography="heading-1-medium">직접 입력</ThemedText>
                 <Ionicons
                   color={semanticColors["label-subtle"]}
                   name={isCustomMode ? "remove" : "add"}
@@ -154,37 +157,61 @@ export function WorkoutTypeBottomSheet({
         </ScrollView>
 
         {isCustomMode && (
-          <View style={styles.customInputRow}>
-            <TextInput
-              accessibilityLabel="직접 입력 운동 종류"
-              autoFocus={shouldAutoFocusCustom}
-              maxLength={MAX_CUSTOM_LENGTH}
-              onChangeText={setCustomDraft}
-              placeholder="운동 종류를 입력해 주세요"
-              placeholderTextColor={semanticColors["label-disabled"]}
-              returnKeyType="done"
-              style={styles.input}
-              value={customDraft}
-            />
-            <ThemedText style={styles.count} typography="caption-1-medium">
-              {customDraft.length} / {MAX_CUSTOM_LENGTH}
-            </ThemedText>
-            {customDraft.length > 0 && (
-              <Pressable
-                accessibilityLabel="직접 입력 내용 지우기"
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={() => setCustomDraft("")}
-                style={styles.clearButton}
+          <>
+            <View
+              style={[
+                styles.customInputRow,
+                isCustomTooLong && styles.customInputRowError,
+              ]}
+            >
+              <TextInput
+                accessibilityLabel="직접 입력 운동 종류"
+                autoFocus={shouldAutoFocusCustom}
+                onChangeText={setCustomDraft}
+                placeholder="운동 종류를 입력해 주세요"
+                placeholderTextColor={semanticColors["label-disabled"]}
+                returnKeyType="done"
+                style={styles.input}
+                value={customDraft}
+              />
+              <ThemedText
+                style={[styles.count, isCustomTooLong && styles.errorText]}
+                typography="caption-1-medium"
               >
+                {customDraft.length} / {MAX_CUSTOM_LENGTH}
+              </ThemedText>
+              {customDraft.length > 0 && (
+                <Pressable
+                  accessibilityLabel="직접 입력 내용 지우기"
+                  accessibilityRole="button"
+                  hitSlop={8}
+                  onPress={() => setCustomDraft("")}
+                  style={styles.clearButton}
+                >
+                  <Ionicons
+                    color={semanticColors["label-subtle"]}
+                    name="close-circle"
+                    size={20}
+                  />
+                </Pressable>
+              )}
+            </View>
+            {isCustomTooLong && (
+              <View style={styles.errorRow}>
                 <Ionicons
-                  color={semanticColors["label-subtle"]}
-                  name="close-circle"
-                  size={20}
+                  color={primitiveColors.red["6"]}
+                  name="alert-circle"
+                  size={14}
                 />
-              </Pressable>
+                <ThemedText
+                  style={styles.errorText}
+                  typography="caption-1-regular"
+                >
+                  {MAX_CUSTOM_LENGTH}자까지 쓸 수 있어요
+                </ThemedText>
+              </View>
             )}
-          </View>
+          </>
         )}
 
         <View style={styles.actionArea}>
@@ -278,12 +305,26 @@ const styles = StyleSheet.create({
   customInputRow: {
     alignItems: "center",
     backgroundColor: semanticColors["fill-subtle"],
+    borderColor: "transparent",
     borderRadius: 12,
+    borderWidth: 1,
     flexDirection: "row",
     marginTop: 16,
     minHeight: 54,
     paddingLeft: 16,
     paddingRight: 10,
+  },
+  customInputRowError: {
+    borderColor: primitiveColors.red["6"],
+  },
+  errorRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 6,
+  },
+  errorText: {
+    color: primitiveColors.red["6"],
   },
   input: {
     color: semanticColors["label-normal"],
