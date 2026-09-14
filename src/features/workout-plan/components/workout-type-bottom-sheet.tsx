@@ -13,6 +13,7 @@ import {
 import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { getExerciseTypes } from "@/features/workout-plan/api";
 import { EXERCISE_TYPES } from "@/features/workout-plan/model";
 
 import { BottomSheet } from "@/components/ui/bottom-sheet";
@@ -34,7 +35,29 @@ export function WorkoutTypeBottomSheet({
   onClose,
   onConfirm,
 }: WorkoutTypeBottomSheetProps) {
-  const isDefaultType = EXERCISE_TYPES.some((type) => type === value);
+  // 서버가 미리 정한 종류 + 유저가 예전에 직접 입력했던 종류를 함께
+  // 내려준다(GET /api/v1/exercise-types). 응답이 오기 전까지는 로컬
+  // 기본값으로 보여준다.
+  const [exerciseTypeOptions, setExerciseTypeOptions] =
+    useState<readonly string[]>(EXERCISE_TYPES);
+
+  useEffect(() => {
+    let cancelled = false;
+    getExerciseTypes()
+      .then(({ exerciseTypes }) => {
+        if (!cancelled) {
+          setExerciseTypeOptions(exerciseTypes.map((type) => type.name));
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load exercise types", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const isDefaultType = exerciseTypeOptions.some((type) => type === value);
   const [selectedType, setSelectedType] = useState<string | null>(
     isDefaultType ? value : null,
   );
@@ -109,7 +132,7 @@ export function WorkoutTypeBottomSheet({
           showsVerticalScrollIndicator={false}
           style={styles.options}
         >
-          {EXERCISE_TYPES.map((type) => {
+          {exerciseTypeOptions.map((type) => {
             const selected = !isCustomMode && selectedType === type;
             return (
               <Fragment key={type}>
