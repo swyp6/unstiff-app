@@ -65,18 +65,6 @@ export const EXTERNAL_AI_CONSENT_TITLE = "AI 개인화 기능 이용 동의";
 export const EXTERNAL_AI_CONSENT_DESCRIPTION =
   "미동의 시, 개인형 맞춤 미션·AI 대화를 이용할 수 없습니다";
 
-// 문서 상세 WebView 첫 줄 meta(Figma 4953:59947 "시행일 2026.09.12 · 운영 주체
-// 8% 운영팀"). GET /terms에도 static HTML에도 시행일이 없어 Figma 값을 한 곳의
-// 상수로 둔다 — 문서별 시행일이 갈리면 type별 map으로 바꾼다.
-export const LEGAL_DOCUMENT_META = {
-  effectiveDate: "2026.09.12",
-  operator: "8% 운영팀",
-} as const;
-
-export function formatLegalDocumentMeta() {
-  return `시행일 ${LEGAL_DOCUMENT_META.effectiveDate} · 운영 주체 ${LEGAL_DOCUMENT_META.operator}`;
-}
-
 export function findTerm(terms: readonly Term[], type: TermsType) {
   return terms.find((term) => term.type === type) ?? null;
 }
