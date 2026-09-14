@@ -16,6 +16,7 @@ import ReanimatedAnimated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import {
   BottomSheet,
   type BottomSheetHandle,
@@ -35,11 +36,7 @@ import { GoalTypeSelector } from "./goal-type-selector";
 import { IntensityBottomSheet } from "./intensity-bottom-sheet";
 import { TimePickerBottomSheet } from "./time-picker-bottom-sheet";
 import { WorkoutTypeBottomSheet } from "./workout-type-bottom-sheet";
-import {
-  PrimaryActionButton,
-  SectionLabel,
-  SelectionRow,
-} from "./workout-plan-screen-ui";
+import { SectionLabel, SelectionRow } from "./workout-plan-screen-ui";
 
 type WorkoutPlanEditSheetProps = {
   visible: boolean;
@@ -401,7 +398,7 @@ export function WorkoutPlanEditSheet({
         )}
 
         <View style={styles.actions}>
-          <PrimaryActionButton
+          <ActionButton
             disabled={!canSubmit}
             label={displayedSaveLabel}
             onPress={() =>
@@ -442,6 +439,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: 20,
+    paddingBottom: 12,
   },
   textInputWrapper: {
     justifyContent: "center",

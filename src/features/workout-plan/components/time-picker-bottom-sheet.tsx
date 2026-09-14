@@ -9,6 +9,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import { semanticColors } from "@/constants/tokens";
 import type { StartTime } from "@/features/workout-plan/model";
 
@@ -108,17 +109,9 @@ export function TimePickerBottomSheet({
         </View>
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onConfirm(draft)}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        <View style={styles.confirmButton}>
-          <ThemedText style={styles.confirmText} typography="body-2-bold">
-            확인
-          </ThemedText>
-        </View>
-      </Pressable>
+      <View style={styles.confirmButtonWrapper}>
+        <ActionButton label="선택 완료" onPress={() => onConfirm(draft)} />
+      </View>
 
       <Pressable
         accessibilityLabel="시작 시간 설정 안함"
@@ -127,7 +120,7 @@ export function TimePickerBottomSheet({
         style={({ pressed }) => pressed && styles.pressed}
       >
         <View style={styles.unsetLink}>
-          <ThemedText typography="body-3-medium" themeColor="textSecondary">
+          <ThemedText typography="body-2-bold" themeColor="textSecondary">
             설정 안함
           </ThemedText>
         </View>
@@ -251,7 +244,7 @@ function PickerColumn({
                   distance === 1 && styles.nearbyOptionText,
                   distance >= 2 && styles.farOptionText,
                 ]}
-                typography={isSelected ? "title-3-bold" : "body-1-regular"}
+                typography={isSelected ? "title-3-bold" : "heading-1-medium"}
               >
                 {item.label}
               </ThemedText>
@@ -350,16 +343,8 @@ const styles = StyleSheet.create({
     marginTop: 4,
     width: "100%",
   },
-  confirmButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["label-normal"],
-    borderRadius: 14,
-    justifyContent: "center",
-    marginTop: 16,
-    height: 54,
-  },
-  confirmText: {
-    color: semanticColors["label-inverse"],
+  confirmButtonWrapper: {
+    marginTop: 30,
   },
   pressed: {
     opacity: 0.7,

@@ -90,6 +90,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const { height: windowHeight } = useWindowDimensions();
     const insets = useSafeAreaInsets();
     const [translateY] = useState(() => new Animated.Value(windowHeight));
+    // 손잡이+제목 영역 높이 — expandedHeightRatio가 있는 시트는 이 값을 빼서
+    // 실제로 화면에 보이는 만큼만 스크롤 영역을 잡아야 한다(아래 참고).
+    const [headerHeight, setHeaderHeight] = useState(0);
     const dragStartTranslateY = useRef(0);
     const currentTranslateY = useRef(windowHeight);
     const snapPoint = useRef<"collapsed" | "expanded">(
@@ -110,6 +113,16 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       fullHeight && expandedHeightRatio != null
         ? Math.max(0, fullSheetHeight - windowHeight * expandedHeightRatio)
         : 0;
+    // Animated.View 자체는 항상 fullSheetHeight로 고정돼 있고 translateY로
+    // 얼마나 보일지만 바꾸는 구조라, expandedHeightRatio로 화면 전체보다
+    // 작게 펼치는 시트는 시트 안쪽(스크롤 영역) 아래쪽 (fullSheetHeight -
+    // 보이는 높이)만큼이 화면 밖으로 밀려나 잘린다. 스크롤 영역 높이를 실제
+    // 보이는 높이로 제한해서, 넘치는 내용이 화면 밖에 숨는 대신 스크롤로
+    // 닿을 수 있게 한다.
+    const contentMaxHeight =
+      fullHeight && expandedHeightRatio != null
+        ? Math.max(0, windowHeight * expandedHeightRatio - headerHeight)
+        : undefined;
 
     const animateTo = useCallback(
       (
@@ -334,7 +347,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                     TouchableWithoutFeedback으로 한 번 감싸는 게 커뮤니티에서
                     확인된 우회법이다. */}
                 <TouchableWithoutFeedback onPress={() => {}}>
-                  <View>
+                  <View
+                    onLayout={(event) =>
+                      setHeaderHeight(event.nativeEvent.layout.height)
+                    }
+                  >
                     <View style={styles.dragArea}>
                       <View style={styles.handle} />
                     </View>
@@ -352,6 +369,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                 style={[
                   styles.content,
                   hasConstrainedHeight && styles.constrainedContent,
+                  contentMaxHeight != null && { maxHeight: contentMaxHeight },
                 ]}
               >
                 {children}
