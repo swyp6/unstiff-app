@@ -315,8 +315,8 @@ export function HomeCalendar({
                   isToday
                     ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
                         isTodayRecorded
-                          ? "border-solid border-label-normal bg-fill-normal"
-                          : "border-dashed border-label-normal"
+                          ? "border-solid border-orange-500 bg-fill-normal"
+                          : "border-dashed border-orange-500"
                       }`
                     : hasPhoto
                       ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
@@ -332,7 +332,14 @@ export function HomeCalendar({
                           crop: "fill",
                         }),
                       }}
-                      style={{ position: "absolute", inset: 0 }}
+                      // Figma 4305:34251: 사진 자체에 6px 라운드가 들어간다 —
+                      // isToday가 아닌 셀은 부모에 overflow-hidden이 없어서,
+                      // 컨테이너 클리핑에 기대지 않고 이미지에 직접 라운드를 준다.
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        borderRadius: 6,
+                      }}
                       contentFit="cover"
                     />
                     {isToday && (
@@ -362,7 +369,7 @@ export function HomeCalendar({
                   {day}
                 </ThemedText>
                 {hasScheduledWorkout && (
-                  <View className="absolute bottom-1.5 left-5 h-1 w-1 rounded-full bg-label-normal" />
+                  <View className="absolute bottom-2.5 left-[18px] h-1.5 w-1.5 rounded-full bg-charcoal-5" />
                 )}
               </View>
             </Pressable>
