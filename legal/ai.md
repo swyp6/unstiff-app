@@ -1,8 +1,6 @@
 ---
 layout: base.njk
-title: "[선택] 외부 AI를 통한 개인정보 처리 동의"
-version: "1.0"
-updatedAt: "2026.09.13"
+title: 외부 AI를 통한 개인정보 처리 동의
 description: 찌뿌두둥 외부 AI를 통한 개인정보 처리 동의
 permalink: /ai/index.html
 ---

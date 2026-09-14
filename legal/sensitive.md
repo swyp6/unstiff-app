@@ -1,8 +1,6 @@
 ---
 layout: base.njk
-title: "[필수] 민감정보 수집·이용 동의"
-version: "1.0"
-updatedAt: "2026.09.13"
+title: 민감정보 수집·이용 동의
 description: 찌뿌두둥 민감정보 수집·이용 동의
 permalink: /sensitive/index.html
 ---

@@ -1,8 +1,6 @@
 ---
 layout: base.njk
-title: "[필수] 만 14세 이상 확인 및 개인정보 수집·이용 동의"
-version: "1.1"
-updatedAt: "2026.09.13"
+title: 만 14세 이상 확인 및 개인정보 수집·이용 동의
 description: 찌뿌두둥 만 14세 이상 확인 및 개인정보 수집·이용 동의
 permalink: /privacy/index.html
 ---

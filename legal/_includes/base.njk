@@ -13,13 +13,14 @@
   </head>
   <body>
     <main class="legal-page">
-      {# Figma "WebView / Document" (4576:39975, 4576:40001): 제목·메타·구분선과
-         본문이 하나의 카드 안에 들어간다. 문서 본문 typography는
-         styles/input.css의 .legal-document 규칙이 담당한다. #}
+      {# Figma "WebView / Document" (4576:39975, 4576:40001): 제목·구분선·본문이
+         하나의 카드 안에 들어간다. Figma의 "웹페이지 · 배포 URL 연결"은 개발
+         설명 placeholder라 실제 페이지에는 두지 않고, 버전/시행일도 확정값이
+         없어 표시하지 않는다. 문서 본문 typography는 styles/input.css의
+         .legal-document 규칙이 담당한다. #}
       <article class="legal-document">
         <header class="legal-document-header">
           <h1>{{ title }}</h1>
-          <p>v{{ version }} · {{ updatedAt }} 시행</p>
         </header>
 
         <div class="legal-document-body">

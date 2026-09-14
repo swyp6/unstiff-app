@@ -1,8 +1,6 @@
 ---
 layout: base.njk
-title: "[필수] 찌뿌두둥 서비스 이용약관"
-version: "1.1"
-updatedAt: "2026.09.13"
+title: 찌뿌두둥 서비스 이용약관
 description: 찌뿌두둥 서비스 이용약관
 permalink: /terms/index.html
 ---
