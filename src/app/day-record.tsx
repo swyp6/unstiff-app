@@ -17,6 +17,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   ImageUploadError,
@@ -308,64 +309,17 @@ export default function DayRecordScreen() {
       )}
 
       {/* Figma 4501:32621-32622 "사진을 삭제할까요?" 확인 모달. */}
-      <Modal
-        animationType="fade"
-        onRequestClose={() => setIsDeleteConfirmVisible(false)}
-        transparent
+      <ConfirmModal
+        cancelLabel="취소하기"
+        confirmColor={semanticColors["status-negative-normal"]}
+        confirmLabel="삭제하기"
+        description="기록은 남고 스티커로 바뀌어요"
+        onCancel={() => setIsDeleteConfirmVisible(false)}
+        onConfirm={handleConfirmDeletePhoto}
+        swapButtons
+        title="사진을 삭제할까요?"
         visible={isDeleteConfirmVisible}
-      >
-        <View
-          className="flex-1 items-center justify-center"
-          style={{ backgroundColor: "rgba(23, 23, 25, 0.45)" }}
-        >
-          <View
-            className="items-center gap-5 rounded-[20px] bg-background-normal px-5 pb-[18px] pt-[26px]"
-            style={{ width: 300 }}
-          >
-            <View className="items-center gap-2">
-              <ThemedText typography="title-3-bold">
-                사진을 삭제할까요?
-              </ThemedText>
-              <ThemedText
-                typography="caption-1-regular"
-                style={{ color: "#8c8c92" }}
-              >
-                기록은 남고 스티커로 바뀌어요
-              </ThemedText>
-            </View>
-            <View className="flex-row items-stretch gap-2.5">
-              <Pressable
-                accessibilityRole="button"
-                className="items-center justify-center rounded-[42px]"
-                onPress={handleConfirmDeletePhoto}
-                style={{
-                  width: 125,
-                  backgroundColor: semanticColors["status-negative-normal"],
-                }}
-              >
-                <ThemedText
-                  typography="body-2-bold"
-                  style={{ color: semanticColors["label-inverse"] }}
-                >
-                  삭제하기
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                className="items-center justify-center rounded-[42px] border"
-                onPress={() => setIsDeleteConfirmVisible(false)}
-                style={{
-                  width: 125,
-                  height: 50,
-                  borderColor: "#dddddf",
-                }}
-              >
-                <ThemedText typography="body-2-bold">취소하기</ThemedText>
-              </Pressable>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      />
 
       {workouts !== null && workouts.length > 0 && (
         <WorkoutHistoryEditSheet

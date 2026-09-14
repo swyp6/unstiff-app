@@ -1,9 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   formatStopwatchTime,
@@ -65,54 +67,36 @@ export function MissionCard({
   const isAccepted = status === "accepted" || status === "completed";
   const isCompleted = status === "completed";
 
+  // 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
+  // 있으면(canDismiss) 미션 카드를 닫을 수 있다.
+  const closeButton = canDismiss && (
+    <Pressable
+      accessibilityLabel="오늘의 미션 닫기"
+      accessibilityRole="button"
+      className="size-8 items-center justify-center"
+      hitSlop={8}
+      onPress={onDismiss}
+    >
+      <Ionicons color={semanticColors["label-subtle"]} name="close" size={20} />
+    </Pressable>
+  );
+
   return (
-    <View className="rounded-[24px] bg-background-normal px-5 py-[18px] shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
-      <View className="min-h-8 flex-row items-center justify-between">
-        <View>
-          {/* Figma node 3502:36610(scheduled)에는 이 라벨이 없다 — 대신
-              아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
-          {status !== "scheduled" && (
-            <ThemedText typography="caption-1-bold" themeColor="textSecondary">
-              오늘의 미션
-            </ThemedText>
-          )}
+    <View className="rounded-[24px] bg-background-normal p-5 shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
+      {/* accepted/completed만 좌측 라벨+우측 닫기의 헤더 줄을 쓴다 — Figma node
+          3502:36610(scheduled)·4305:33908(revealed)에는 이 줄 자체가 없고,
+          "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
+      {isAccepted && (
+        <View className="min-h-8 flex-row items-center justify-between">
+          <ThemedText typography="body-3-bold" themeColor="textSecondary">
+            오늘의 미션
+          </ThemedText>
+          {closeButton}
         </View>
-        <View className="flex-row items-center gap-2">
-          {status === "revealed" && (
-            <View className="rounded-full bg-label-normal px-[9px] py-1">
-              <ThemedText
-                typography="caption-1-bold"
-                style={{
-                  color: semanticColors["label-inverse"],
-                  letterSpacing: 0.6,
-                }}
-              >
-                NEW
-              </ThemedText>
-            </View>
-          )}
-          {/* 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
-              있으면(canDismiss) 미션 카드를 닫을 수 있다. */}
-          {canDismiss && (
-            <Pressable
-              accessibilityLabel="오늘의 미션 닫기"
-              accessibilityRole="button"
-              className="size-8 items-center justify-center"
-              hitSlop={8}
-              onPress={onDismiss}
-            >
-              <Ionicons
-                color={semanticColors["label-subtle"]}
-                name="close"
-                size={20}
-              />
-            </Pressable>
-          )}
-        </View>
-      </View>
+      )}
 
       {status === "scheduled" && (
-        <View className="items-center gap-4 pt-3">
+        <View className="items-center gap-4">
           <View className="items-center gap-1">
             <ThemedText
               typography="caption-1-bold"
@@ -127,14 +111,36 @@ export function MissionCard({
             style={{ width: 120, height: 120, borderRadius: 16 }}
             contentFit="cover"
           />
-          <MissionActionButton label="미리 받기" onPress={onReveal} soft />
+          <ActionButton label="미리 받기" onPress={onReveal} soft />
         </View>
       )}
 
       {status === "revealed" && (
-        <View className="gap-5 pt-3">
-          <ThemedText typography="title-3-bold">{title}</ThemedText>
-          <MissionActionButton label="미션 수락하기" onPress={onAccept} />
+        <View className="items-center gap-4">
+          <View className="items-center gap-1">
+            <ThemedText
+              typography="body-3-bold"
+              style={{ color: primitiveColors.orange["500"] }}
+            >
+              오늘의 미션
+            </ThemedText>
+            <ThemedText
+              typography="title-2-bold"
+              style={{ color: primitiveColors.charcoal["11"] }}
+            >
+              {title}
+            </ThemedText>
+          </View>
+          {/* mission-illustration.png은 360x360 정사각형에 캐릭터가 여백 없이
+              꽉 차 있어서, 이 237x120(가로로 넓은) 박스에 cover로 채우면 귀·머리띠와
+              매트가 잘린다 — 배경이 투명이라 여백처럼 보이므로 contain으로 자르지
+              않고 그대로 보여준다. */}
+          <Image
+            source={MISSION_ILLUSTRATION}
+            style={{ width: 237, height: 120, borderRadius: 16 }}
+            contentFit="contain"
+          />
+          <ActionButton label="미션 수락하기" onPress={onAccept} />
         </View>
       )}
 
@@ -183,42 +189,26 @@ export function MissionCard({
           </View>
         </View>
       )}
-    </View>
-  );
-}
 
-export function MissionActionButton({
-  label,
-  onPress,
-  soft = false,
-}: {
-  label: string;
-  onPress: () => void;
-  // Figma node 3502:36610의 "미리 받기" 버튼 스타일(연한 오렌지 배경 pill).
-  soft?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      className={
-        soft
-          ? "h-[50px] w-full items-center justify-center rounded-full bg-orange-50"
-          : "h-[50px] items-center justify-center rounded-2xl bg-label-normal"
-      }
-      style={({ pressed }) => pressed && { opacity: 0.7 }}
-    >
-      <ThemedText
-        typography="body-3-bold"
-        style={{
-          color: soft
-            ? primitiveColors.orange["700"]
-            : semanticColors["label-inverse"],
-        }}
-      >
-        {label}
-      </ThemedText>
-    </Pressable>
+      {/* Figma 4305:33908: NEW뱃지·닫기 버튼은 우상단에 절대 위치로 뜬다 —
+          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다.
+          isAccepted는 이미 자기 헤더 줄에 닫기 버튼이 있으니 여기서 또 띄우지 않는다. */}
+      {!isAccepted && (status === "revealed" || closeButton) && (
+        <View className="absolute right-5 top-5 flex-row items-center gap-2">
+          {status === "revealed" && (
+            <View className="rounded-full bg-orange-50 px-[9px] py-1">
+              <ThemedText
+                typography="caption-1-bold"
+                style={{ color: primitiveColors.orange["500"] }}
+              >
+                NEW
+              </ThemedText>
+            </View>
+          )}
+          {closeButton}
+        </View>
+      )}
+    </View>
   );
 }
 
@@ -270,8 +260,16 @@ export function TodayWorkoutCard({
     <View className="rounded-[24px] bg-background-normal shadow-[0px_4px_12px_0px_rgba(92,23,5,0.04)]">
       <View className="h-[60px] flex-row items-center justify-between px-5">
         <View className="items-start gap-0.5">
-          <ThemedText typography="body-2-bold">{title}</ThemedText>
-          <ThemedText typography="caption-1-medium" themeColor="textSecondary">
+          <ThemedText
+            typography="heading-1-bold"
+            style={{ color: primitiveColors.charcoal["11"] }}
+          >
+            {title}
+          </ThemedText>
+          <ThemedText
+            typography="body-2-regular"
+            style={{ color: primitiveColors.charcoal["5"] }}
+          >
             {dateLabel}
           </ThemedText>
         </View>
@@ -288,7 +286,10 @@ export function TodayWorkoutCard({
         <View className="py-2">
           {todayWorkouts.length === 0 ? (
             <View className="items-center py-6">
-              <ThemedText typography="body-3-medium" themeColor="textSecondary">
+              <ThemedText
+                typography="body-1-medium"
+                style={{ color: primitiveColors.charcoal["5"] }}
+              >
                 {emptyStateLabel}
               </ThemedText>
             </View>
@@ -332,7 +333,10 @@ export function TodayWorkoutCard({
           className="flex-row items-center justify-between py-1.5 pt-3"
           onPress={onToggleExpanded}
         >
-          <ThemedText typography="caption-1-bold" themeColor="textSecondary">
+          <ThemedText
+            typography="body-1-bold"
+            style={{ color: primitiveColors.charcoal["5"] }}
+          >
             루틴
           </ThemedText>
           <Ionicons
@@ -356,96 +360,6 @@ export function TodayWorkoutCard({
         )}
       </View>
     </View>
-  );
-}
-
-// Figma 4331:25730/4331:25611의 "모달-캡션O" — RN 기본 Alert 대신 디자인
-// 그대로(흰 카드+알약 버튼 2개)로 맞춘 확인창. 확정 버튼 색만 상황에 따라
-// 다르다(종료=브랜드 오렌지, 리셋=경고 빨강).
-function ConfirmModal({
-  visible,
-  title,
-  description,
-  cancelLabel,
-  confirmLabel,
-  confirmColor,
-  onCancel,
-  onConfirm,
-}: {
-  visible: boolean;
-  title: string;
-  description: string;
-  cancelLabel: string;
-  confirmLabel: string;
-  confirmColor: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  if (!visible) return null;
-
-  return (
-    <Modal animationType="fade" onRequestClose={onCancel} transparent visible>
-      <View
-        className="flex-1 items-center justify-center px-6"
-        style={{ backgroundColor: "rgba(23, 23, 25, 0.45)" }}
-      >
-        <Pressable
-          accessibilityLabel="닫기"
-          accessibilityRole="button"
-          className="absolute inset-0"
-          onPress={onCancel}
-        />
-        <View className="w-[300px] items-center gap-5 rounded-[20px] bg-white px-5 pb-[18px] pt-[26px]">
-          <View className="items-center gap-2">
-            <ThemedText
-              style={{
-                color: primitiveColors.charcoal[11],
-                textAlign: "center",
-              }}
-              typography="title-3-bold"
-            >
-              {title}
-            </ThemedText>
-            <ThemedText
-              style={{
-                color: primitiveColors.charcoal[5],
-                textAlign: "center",
-              }}
-              typography="caption-1-regular"
-            >
-              {description}
-            </ThemedText>
-          </View>
-          <View className="flex-row gap-2.5">
-            <Pressable
-              accessibilityRole="button"
-              className="h-[50px] w-[125px] items-center justify-center rounded-full border border-charcoal-3 bg-white"
-              onPress={onCancel}
-            >
-              <ThemedText
-                style={{ color: primitiveColors.charcoal[11] }}
-                typography="body-3-bold"
-              >
-                {cancelLabel}
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              className="h-[50px] w-[125px] items-center justify-center rounded-full"
-              onPress={onConfirm}
-              style={{ backgroundColor: confirmColor }}
-            >
-              <ThemedText
-                style={{ color: semanticColors["label-inverse"] }}
-                typography="body-3-bold"
-              >
-                {confirmLabel}
-              </ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -557,6 +471,7 @@ function StopwatchBar({
           setConfirmDialog(null);
           onReset();
         }}
+        swapButtons
         title="기록을 리셋할까요?"
         visible={confirmDialog === "reset"}
       />

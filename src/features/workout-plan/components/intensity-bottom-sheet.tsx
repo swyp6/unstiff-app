@@ -3,13 +3,14 @@ import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import { semanticColors } from "@/constants/tokens";
 import {
   INTENSITY_OPTIONS,
   type Intensity,
 } from "@/features/workout-plan/model";
 
-import { WorkoutPlanBottomSheet } from "./workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 type IntensityBottomSheetProps = {
   visible: boolean;
@@ -29,7 +30,7 @@ export function IntensityBottomSheet({
   const [selected, setSelected] = useState(value);
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       embedded={embedded}
       onClose={onClose}
       title="강도"
@@ -53,14 +54,10 @@ export function IntensityBottomSheet({
               {({ pressed }) => (
                 <View
                   pointerEvents="none"
-                  style={[
-                    styles.option,
-                    isSelected && styles.selectedOption,
-                    pressed && styles.pressed,
-                  ]}
+                  style={[styles.option, pressed && styles.pressed]}
                 >
                   <View style={styles.copy}>
-                    <ThemedText typography="body-2-bold">
+                    <ThemedText typography="body-1-bold">
                       {option.label}
                     </ThemedText>
                     <ThemedText
@@ -77,7 +74,7 @@ export function IntensityBottomSheet({
                       <Ionicons
                         color={semanticColors["label-inverse"]}
                         name="checkmark"
-                        size={14}
+                        size={16}
                       />
                     )}
                   </View>
@@ -88,18 +85,10 @@ export function IntensityBottomSheet({
         })}
       </View>
 
-      <Pressable
-        accessibilityRole="button"
-        onPress={() => onConfirm(selected)}
-        style={({ pressed }) => pressed && styles.pressed}
-      >
-        <View style={styles.confirmButton}>
-          <ThemedText style={styles.confirmText} typography="body-2-bold">
-            확인
-          </ThemedText>
-        </View>
-      </Pressable>
-    </WorkoutPlanBottomSheet>
+      <View style={styles.confirmButtonWrapper}>
+        <ActionButton label="선택 완료" onPress={() => onConfirm(selected)} />
+      </View>
+    </BottomSheet>
   );
 }
 
@@ -108,22 +97,16 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   optionPressable: {
-    minHeight: 76,
+    height: 60,
     width: "100%",
   },
   option: {
     alignItems: "center",
-    borderColor: semanticColors["line-normal"],
-    borderRadius: 16,
-    borderWidth: 1,
-    flexDirection: "row",
-    minHeight: 76,
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  selectedOption: {
     backgroundColor: semanticColors["fill-subtle"],
-    borderColor: semanticColors["label-normal"],
+    borderRadius: 16,
+    flexDirection: "row",
+    height: 60,
+    paddingHorizontal: 16,
   },
   copy: {
     flex: 1,
@@ -135,27 +118,18 @@ const styles = StyleSheet.create({
   radio: {
     alignItems: "center",
     borderColor: semanticColors["line-strong"],
-    borderRadius: 11,
+    borderRadius: 15,
     borderWidth: 1.5,
-    height: 22,
+    height: 30,
     justifyContent: "center",
-    width: 22,
+    width: 30,
   },
   selectedRadio: {
     backgroundColor: semanticColors["label-normal"],
     borderColor: semanticColors["label-normal"],
   },
-  confirmButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["label-normal"],
-    borderRadius: 16,
-    justifyContent: "center",
-    marginBottom: 8,
-    marginTop: 20,
-    minHeight: 56,
-  },
-  confirmText: {
-    color: semanticColors["label-inverse"],
+  confirmButtonWrapper: {
+    marginTop: 16,
   },
   pressed: {
     opacity: 0.7,

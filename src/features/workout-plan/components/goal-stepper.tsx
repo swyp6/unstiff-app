@@ -28,7 +28,7 @@ export function GoalStepper({ type, value, onChange }: GoalStepperProps) {
 
   return (
     <View style={styles.container}>
-      <ThemedText typography="body-2-bold">{config.label}</ThemedText>
+      <ThemedText typography="body-1-bold">{config.label}</ThemedText>
       <View style={styles.controls}>
         <Pressable
           accessibilityLabel={`${config.label} 줄이기`}
