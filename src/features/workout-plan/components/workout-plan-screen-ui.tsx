@@ -48,28 +48,34 @@ export function WorkoutPlanHeader({
 export function SectionLabel({
   children,
   optional = false,
+  trailing,
 }: {
   children: ReactNode;
   // Figma node 4640:17123 등 — 필수 아닌 필드(예상 시작 시간/강도/한 줄 메모)만
   // 라벨 옆에 회색 "선택" 표시가 붙는다.
   optional?: boolean;
+  // 글자수 카운터 등, 라벨과 같은 줄 오른쪽에 붙는 내용(예: 한 줄 메모의 "0/50").
+  trailing?: ReactNode;
 }) {
   return (
     <View style={styles.sectionLabelRow}>
-      <ThemedText
-        style={{ color: primitiveColors.charcoal["11"] }}
-        typography="body-1-bold"
-      >
-        {children}
-      </ThemedText>
-      {optional && (
+      <View style={styles.sectionLabelMain}>
         <ThemedText
-          style={{ color: primitiveColors.charcoal["5"] }}
-          typography="caption-1-regular"
+          style={{ color: primitiveColors.charcoal["11"] }}
+          typography="body-1-bold"
         >
-          선택
+          {children}
         </ThemedText>
-      )}
+        {optional && (
+          <ThemedText
+            style={{ color: primitiveColors.charcoal["5"] }}
+            typography="caption-1-regular"
+          >
+            선택
+          </ThemedText>
+        )}
+      </View>
+      {trailing}
     </View>
   );
 }
@@ -187,8 +193,13 @@ const styles = StyleSheet.create({
   sectionLabelRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "space-between",
     marginBottom: 6,
+  },
+  sectionLabelMain: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
   selectionRow: {
     alignItems: "center",

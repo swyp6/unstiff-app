@@ -88,9 +88,13 @@ export function WorkoutPlanEditSheet({
   // saveLabel 그대로 쓴다.
   const displayedSaveLabel =
     showAddToTodayToggle && saveAsRoutine ? "루틴으로 추가하기" : saveLabel;
+  const isTitleTooLong = draft.title.length > 20;
+  const isMemoTooLong = draft.memo.length > 50;
   // 운동명·운동 종류·기록할 항목(4개 중 하나 이상) 셋 다 있어야 저장 가능.
   const canSubmit =
     draft.title.trim().length > 0 &&
+    !isTitleTooLong &&
+    !isMemoTooLong &&
     draft.exerciseType.trim().length > 0 &&
     draft.selectedGoalTypes.length > 0;
   const [isWorkoutTypeSheetVisible, setIsWorkoutTypeSheetVisible] =
@@ -180,18 +184,44 @@ export function WorkoutPlanEditSheet({
       >
         <View>
           <SectionLabel>운동명</SectionLabel>
-          <TextInput
-            accessibilityLabel="운동명"
-            maxLength={20}
-            onChangeText={(title) =>
-              setDraft((current) => ({ ...current, title }))
-            }
-            placeholder="운동명을 입력해 주세요"
-            placeholderTextColor={semanticColors["label-disabled"]}
-            returnKeyType="done"
-            style={styles.textInput}
-            value={draft.title}
-          />
+          <View style={styles.textInputWrapper}>
+            <TextInput
+              accessibilityLabel="운동명"
+              onChangeText={(title) =>
+                setDraft((current) => ({ ...current, title }))
+              }
+              placeholder="운동명을 입력해 주세요"
+              placeholderTextColor={semanticColors["label-disabled"]}
+              returnKeyType="done"
+              style={[
+                styles.textInput,
+                styles.textInputWithCounter,
+                isTitleTooLong && styles.textInputError,
+              ]}
+              value={draft.title}
+            />
+            <ThemedText
+              style={[styles.charCount, isTitleTooLong && styles.errorText]}
+              typography="caption-1-regular"
+            >
+              {draft.title.length} / 20
+            </ThemedText>
+          </View>
+          {isTitleTooLong && (
+            <View style={styles.errorRow}>
+              <Ionicons
+                color={primitiveColors.red["6"]}
+                name="alert-circle"
+                size={14}
+              />
+              <ThemedText
+                style={styles.errorText}
+                typography="caption-1-regular"
+              >
+                20자까지 쓸 수 있어요
+              </ThemedText>
+            </View>
+          )}
         </View>
 
         <View>
@@ -282,10 +312,25 @@ export function WorkoutPlanEditSheet({
         </View>
 
         <View>
-          <SectionLabel optional>한 줄 메모</SectionLabel>
+          <SectionLabel
+            optional
+            trailing={
+              <ThemedText
+                style={[
+                  styles.labelCharCount,
+                  isMemoTooLong && styles.errorText,
+                ]}
+                typography="caption-1-regular"
+              >
+                {draft.memo.length} / 50
+              </ThemedText>
+            }
+          >
+            한 줄 메모
+          </SectionLabel>
           <TextInput
             accessibilityLabel="한 줄 메모"
-            maxLength={20}
+            multiline
             onChangeText={(memo) =>
               setDraft((current) => ({ ...current, memo }))
             }
@@ -302,9 +347,28 @@ export function WorkoutPlanEditSheet({
             placeholder="메모를 입력해 주세요"
             placeholderTextColor={semanticColors["label-disabled"]}
             returnKeyType="done"
-            style={styles.textInput}
+            style={[
+              styles.textInput,
+              styles.memoTextInput,
+              isMemoTooLong && styles.textInputError,
+            ]}
             value={draft.memo}
           />
+          {isMemoTooLong && (
+            <View style={styles.errorRow}>
+              <Ionicons
+                color={primitiveColors.red["6"]}
+                name="alert-circle"
+                size={14}
+              />
+              <ThemedText
+                style={styles.errorText}
+                typography="caption-1-regular"
+              >
+                50자까지 쓸 수 있어요
+              </ThemedText>
+            </View>
+          )}
         </View>
 
         {showAddToTodayToggle && (
@@ -379,14 +443,49 @@ const styles = StyleSheet.create({
   content: {
     gap: 20,
   },
+  textInputWrapper: {
+    justifyContent: "center",
+  },
+  textInputWithCounter: {
+    paddingRight: 64,
+  },
+  charCount: {
+    color: semanticColors["label-disabled"],
+    position: "absolute",
+    right: 16,
+  },
+  labelCharCount: {
+    color: semanticColors["label-disabled"],
+    paddingRight: 4,
+  },
   textInput: {
     backgroundColor: semanticColors["fill-subtle"],
+    borderColor: "transparent",
     borderRadius: 12,
+    borderWidth: 1,
     color: semanticColors["label-normal"],
     fontFamily: "Pretendard-Medium",
     fontSize: 16,
     minHeight: 50,
     paddingHorizontal: 16,
+  },
+  textInputError: {
+    borderColor: primitiveColors.red["6"],
+  },
+  memoTextInput: {
+    lineHeight: 24,
+    paddingBottom: 14,
+    paddingTop: 10,
+    textAlignVertical: "top",
+  },
+  errorRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 4,
+    marginTop: 6,
+  },
+  errorText: {
+    color: primitiveColors.red["6"],
   },
   steppers: {
     gap: 8,
