@@ -31,6 +31,10 @@ import { semanticColors } from "@/constants/tokens";
 type BottomSheetProps = PropsWithChildren<{
   visible: boolean;
   title?: string;
+  // title(고정 문자열) 대신/추가로 손잡이 아래 드래그 영역에 넣을 커스텀
+  // 헤더(예: 인라인 편집 가능한 이름) — panResponder.panHandlers가 걸린
+  // 영역 안에 렌더돼서 그 부분을 스와이프해도 시트가 열리고 닫힌다.
+  headerExtra?: ReactNode;
   fullHeight?: boolean;
   fixedHeightRatio?: number;
   embedded?: boolean;
@@ -67,6 +71,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     {
       visible,
       title,
+      headerExtra,
       fullHeight = false,
       fixedHeightRatio,
       embedded = false,
@@ -355,6 +360,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                         </ThemedText>
                       </View>
                     )}
+                    {headerExtra}
                   </View>
                 </TouchableWithoutFeedback>
               </View>

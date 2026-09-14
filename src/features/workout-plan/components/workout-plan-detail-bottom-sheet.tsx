@@ -239,35 +239,18 @@ export function WorkoutPlanDetailBottomSheet({
     <BottomSheet
       expanded={isParentExpanded}
       fullHeight
-      // 713/814는 이 시트의 원래(축소 상태) 콘텐츠 높이 비율이다. 그 아래
-      // "계획 삭제하기" 링크(paddingTop 16 + gap 16 + 높이 18 = 50)가 나중에
-      // 추가됐는데 이 비율을 안 늘려서, 축소 상태에서 그 링크가 화면 아래로
-      // 밀려나 안 보였다 — 시트를 펼쳐야만(translateY 0) 보이던 상태.
-      initialHeightRatio={(713 + 50) / 814}
-      keyboardAvoiding={false}
-      onClose={onClose}
-      onExpanded={handleParentExpanded}
-      onExpandedChange={setIsParentExpanded}
-      overlay={childOverlay}
-      ref={sheetRef}
-      visible
-    >
-      <ScrollView
-        bounces={false}
-        contentContainerStyle={[
-          styles.content,
-          // 완료/삭제 버튼이 이제 스크롤 밖에서 화면 아래에 떠 있으므로,
-          // 마지막 필드(한 줄 메모)가 그 뒤에 가리지 않도록 그 바의 높이만큼
-          // 여백을 더 확보한다.
-          { paddingBottom: 20 + actionsHeight + actionsBarBottomPadding },
-        ]}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        style={styles.scrollView}
-      >
+      // 운동 추가하기 시트(workout-plan-edit-sheet.tsx)와 같은 2단계
+      // 스와이프: 처음엔 화면 절반만 올라오고, 위로 스와이프하거나 필드(운동
+      // 종류·시간·강도)를 눌러 자식 시트를 열면(openChildSheet) 이 시트의
+      // 원래 콘텐츠 높이 비율(713/814) + "계획 삭제하기" 링크(paddingTop 16
+      // + gap 16 + 높이 18 = 50)까지 펼쳐진다.
+      expandedHeightRatio={(713 + 50) / 814}
+      // 손잡이만이 아니라 운동 추가하기 시트처럼 헤더(여기선 루틴명 영역)를
+      // 잡고도 스와이프로 열고 닫을 수 있게, 루틴명을 스크롤 콘텐츠가 아니라
+      // panResponder가 걸린 헤더 쪽에 렌더한다. PanResponder는 세로 이동이
+      // 있어야만 반응하므로(shouldStartDrag) 이름 수정 탭/입력은 그대로
+      // 동작한다.
+      headerExtra={
         <View style={styles.titleEditArea}>
           <View style={styles.titleRow}>
             <View style={styles.titleTextArea}>
@@ -312,7 +295,13 @@ export function WorkoutPlanDetailBottomSheet({
               }
               accessibilityRole="button"
               hitSlop={8}
-              onPress={() => setIsEditingTitle((editing) => !editing)}
+              onPress={() => {
+                // 반높이(collapsed)에서 이름 입력을 시작하면 키보드가 그
+                // 절반 영역을 그대로 덮어버려 시트가 안 보이게 된다 — 다른
+                // 필드(운동 종류·시간·강도)를 열 때처럼 먼저 펼친다.
+                if (!isEditingTitle) setIsParentExpanded(true);
+                setIsEditingTitle((editing) => !editing);
+              }}
               style={styles.iconButton}
             >
               <Ionicons
@@ -323,7 +312,32 @@ export function WorkoutPlanDetailBottomSheet({
             </Pressable>
           </View>
         </View>
-
+      }
+      initialHeightRatio={0.5}
+      keyboardAvoiding={false}
+      onClose={onClose}
+      onExpanded={handleParentExpanded}
+      onExpandedChange={setIsParentExpanded}
+      overlay={childOverlay}
+      ref={sheetRef}
+      visible
+    >
+      <ScrollView
+        bounces={false}
+        contentContainerStyle={[
+          styles.content,
+          // 완료/삭제 버튼이 이제 스크롤 밖에서 화면 아래에 떠 있으므로,
+          // 마지막 필드(한 줄 메모)가 그 뒤에 가리지 않도록 그 바의 높이만큼
+          // 여백을 더 확보한다.
+          { paddingBottom: 20 + actionsHeight + actionsBarBottomPadding },
+        ]}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+      >
         <View>
           <SectionLabel>운동 종류</SectionLabel>
           <SelectionRow
@@ -428,6 +442,7 @@ export function WorkoutPlanDetailBottomSheet({
             // 여백이 다 안 잡혀 있을 수 있어, 키보드 애니메이션이 끝날
             // 즈음(iOS 기본 250ms) 한 번 더 끝까지 스크롤한다.
             onFocus={() => {
+              if (!isParentExpanded) setIsParentExpanded(true);
               scrollRef.current?.scrollToEnd({ animated: true });
               setTimeout(
                 () => scrollRef.current?.scrollToEnd({ animated: true }),
@@ -460,6 +475,9 @@ const styles = StyleSheet.create({
     height: 64,
     marginBottom: -11,
     maxWidth: "100%",
+    // 이제 BottomSheet의 content(paddingHorizontal 20)가 아니라 헤더 쪽에
+    // 렌더되므로 좌우 여백을 직접 챙겨야 한다.
+    paddingHorizontal: 20,
     paddingTop: 22,
   },
   titleRow: {
