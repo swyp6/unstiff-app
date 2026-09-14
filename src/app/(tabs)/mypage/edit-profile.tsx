@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   isNicknameAlreadyUsedError,
   updateMyProfile,
@@ -21,7 +21,7 @@ import {
   NICKNAME_ALREADY_USED_TEXT,
   NICKNAME_FORMAT_GUIDE_TEXT,
   NICKNAME_MAX_LENGTH,
-  getNicknameFormatError,
+  validateNickname,
 } from "@/features/auth/nickname-validation";
 import type { UpdateProfileRequest } from "@/features/auth/types";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
@@ -81,9 +81,13 @@ export default function EditProfileScreen() {
   });
   // Only evaluated once the nickname is actually being edited — an
   // untouched nickname never shows an error, even if it predates the
-  // current format rules.
+  // current format rules. The draft is the raw string the user typed (no
+  // sanitizing/truncation — see onChangeText below); validateNickname
+  // (shared with onboarding) decides length → character → symbol-position
+  // errors in that order, and the availability hook only asks the server
+  // once it passes. An emptied field shows no error, just a disabled 저장.
   const nicknameFormatError = nicknameChanged
-    ? getNicknameFormatError(draftNickname)
+    ? validateNickname(draftNickname).message
     : null;
   const nicknameDuplicate =
     nicknameChanged && !nicknameFormatError && availability === "unavailable";
@@ -200,27 +204,41 @@ export default function EditProfileScreen() {
           </View>
         </View>
 
+        {/* Figma "Field / 닉네임"(4273:17741, 4573:35691~35727): 라벨
+            caption/1/bold, 필드 bg charcoal/0 #FAFAFA · radius 12 · min-h 50 ·
+            pl 15 / pr 17 / py 15 · 오류 시 1.4px neg/normal(stroke가 padding
+            안쪽에 겹치므로 border 두께만큼 padding을 줄인다), 입력 body/2/
+            regular, 카운터·안내 caption/1/regular. 오류 아이콘은 없다. */}
         <View className="gap-2">
-          <ThemedText typography="body-2-bold">닉네임</ThemedText>
+          <ThemedText
+            style={{ color: primitiveColors.charcoal["11"] }}
+            typography="caption-1-bold"
+          >
+            닉네임
+          </ThemedText>
           <View
-            className={`h-[52px] flex-row items-center justify-between rounded-default bg-fill-subtle px-4 ${
+            className={`min-h-[50px] flex-row items-center gap-2 rounded-[12px] bg-[#fafafa] ${
               nicknameHasError
-                ? "border-[1.4px] border-status-negative-normal"
-                : ""
+                ? "border-[1.4px] border-status-negative-normal py-[13.6px] pl-[13.6px] pr-[15.6px]"
+                : "py-[15px] pl-[15px] pr-[17px]"
             }`}
           >
             <TextInput
               autoCapitalize="none"
               autoCorrect={false}
-              maxLength={NICKNAME_MAX_LENGTH}
+              // Raw input is kept as typed: no maxLength, no sanitizing —
+              // a too-long or invalid value stays visible and is reported
+              // via nicknameHelperText; 저장 stays disabled until it's valid.
               onChangeText={setDraftNickname}
               placeholder="닉네임을 입력해주세요"
               placeholderTextColor={semanticColors["label-disabled"]}
               style={{
                 flex: 1,
-                fontFamily: "Pretendard-Bold",
+                fontFamily: "Pretendard-Regular",
                 fontSize: 14,
-                color: semanticColors["label-normal"],
+                lineHeight: 19,
+                padding: 0,
+                color: primitiveColors.charcoal["11"],
               }}
               value={draftNickname}
             />
@@ -232,7 +250,7 @@ export default function EditProfileScreen() {
               }}
               typography="caption-1-regular"
             >
-              {draftNickname.length}/{NICKNAME_MAX_LENGTH}
+              {draftNickname.length} / {NICKNAME_MAX_LENGTH}
             </ThemedText>
           </View>
           <ThemedText

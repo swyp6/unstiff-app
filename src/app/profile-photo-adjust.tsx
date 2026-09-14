@@ -13,6 +13,7 @@ import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
+import { OnboardingFooter } from "@/features/auth/components/onboarding-layout";
 import { usePhotoAdjustResultStore } from "@/features/upload/photo-adjust-result";
 import { useSignupStore } from "@/store/signup-store";
 
@@ -294,13 +295,13 @@ export default function ProfilePhotoAdjustScreen() {
         </ThemedText>
       </View>
 
-      <View style={styles.footer}>
+      <OnboardingFooter style={styles.footer}>
         <OnboardingCtaButton
           disabled={isSaving}
           label="완료"
           onPress={handleConfirm}
         />
-      </View>
+      </OnboardingFooter>
     </SafeAreaView>
   );
 }
@@ -338,9 +339,9 @@ const styles = StyleSheet.create({
     color: semanticColors["label-subtle"],
     textAlign: "center",
   },
+  // 이 화면은 이번 Figma 세트에 없어 CTA만 다른 온보딩 화면과 같은 335 폭
+  // 가운데 정렬(OnboardingFooter)로 맞춘다.
   footer: {
-    paddingBottom: 24,
-    paddingHorizontal: 20,
     paddingTop: 8,
   },
 });

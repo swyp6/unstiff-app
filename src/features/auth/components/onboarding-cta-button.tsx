@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { SIGNUP_CTA_HEIGHT, signupColors } from "@/features/auth/signup-ui";
 
 type OnboardingCtaButtonProps = {
   label?: string;
@@ -9,8 +9,10 @@ type OnboardingCtaButtonProps = {
   onPress: () => void;
 };
 
-// Shared bottom CTA for the SNS-signup screen stack — WF/Signup/CTA in
-// Figma, identical enabled/disabled styling on all three screens.
+// Shared bottom CTA for the SNS-signup screen stack — Figma "Button / CTA"
+// (3326:9001 기본 / 3326:9003 비활성): 335 폭, py 16 + body/1/bold(16/22) =
+// 54 높이, radius 999. 기본은 charcoal/11 위 white, 비활성은 charcoal/1 위
+// charcoal/5.
 export function OnboardingCtaButton({
   label = "다음",
   disabled,
@@ -27,7 +29,7 @@ export function OnboardingCtaButton({
     >
       <ThemedText
         style={[styles.text, disabled && styles.textDisabled]}
-        typography="body-2-bold"
+        typography="body-1-bold"
       >
         {label}
       </ThemedText>
@@ -38,19 +40,20 @@ export function OnboardingCtaButton({
 const styles = StyleSheet.create({
   button: {
     alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: 20,
-    height: 52,
+    backgroundColor: signupColors.text,
+    borderRadius: 999,
+    height: SIGNUP_CTA_HEIGHT,
     justifyContent: "center",
+    paddingHorizontal: 20,
     width: "100%",
   },
   buttonDisabled: {
-    backgroundColor: semanticColors["fill-strong"],
+    backgroundColor: signupColors.fill,
   },
   text: {
-    color: semanticColors["primary-on"],
+    color: signupColors.white,
   },
   textDisabled: {
-    color: semanticColors["label-disabled"],
+    color: signupColors.textSubtle,
   },
 });

@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -13,10 +12,15 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { LEGAL_DOCUMENTS } from "@/constants/legal-urls";
-import { radius, semanticColors } from "@/constants/tokens";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
+import { CheckCircle } from "@/features/auth/components/check-circle";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
+import {
+  OnboardingContent,
+  OnboardingFooter,
+} from "@/features/auth/components/onboarding-layout";
+import { signupColors } from "@/features/auth/signup-ui";
 import type { Term } from "@/features/auth/types";
 import { useSignupStore } from "@/store/signup-store";
 
@@ -57,29 +61,6 @@ function handleBack() {
   router.replace("/login");
 }
 
-type CheckboxProps = {
-  checked: boolean;
-};
-
-function Checkbox({ checked }: CheckboxProps) {
-  return (
-    <View
-      style={[
-        styles.checkbox,
-        checked ? styles.checkboxChecked : styles.checkboxUnchecked,
-      ]}
-    >
-      {checked && (
-        <Ionicons
-          color={semanticColors["primary-on"]}
-          name="checkmark"
-          size={16}
-        />
-      )}
-    </View>
-  );
-}
-
 type TermRowProps = {
   title: string;
   required: boolean;
@@ -89,6 +70,9 @@ type TermRowProps = {
   onPressDetail?: () => void;
 };
 
+// Figma "약관 행"(4501:44659) — py 14, 24px Circle, gap 12, body/2/regular
+// 본문, 열 수 있는 contentUrl이 있는 행은 오른쪽에 body/3/regular 밑줄
+// "보기"(charcoal/5).
 function TermRow({
   title,
   required,
@@ -106,30 +90,23 @@ function TermRow({
         onPress={onToggle}
         style={styles.termCheckArea}
       >
-        <Checkbox checked={checked} />
+        <CheckCircle checked={checked} />
         <ThemedText style={styles.termText} typography="body-2-regular">
           {required ? "[필수] " : "[선택] "}
           {title}
         </ThemedText>
       </Pressable>
-      {hasDetail ? (
+      {hasDetail && (
         <Pressable
           accessibilityLabel={`${title} 상세 보기`}
           accessibilityRole="button"
-          hitSlop={10}
+          hitSlop={12}
           onPress={onPressDetail}
-          style={styles.chevronButton}
         >
-          <Ionicons
-            color={semanticColors["label-subtle"]}
-            name="chevron-forward"
-            size={18}
-          />
+          <ThemedText style={styles.detailText} typography="body-3-regular">
+            보기
+          </ThemedText>
         </Pressable>
-      ) : (
-        // Keeps the same-width column so rows without a detail page still
-        // align their checkbox/text with rows that have a chevron.
-        <View style={styles.chevronButton} />
       )}
     </View>
   );
@@ -138,8 +115,8 @@ function TermRow({
 // 화면에 그려지는 약관은 전부 GET /api/v1/terms 응답이고, 로컬에서 만들어내는
 // 약관은 없다. 이 배열은 표시 계층 — 노출 순서와 문구 — 만 담당한다.
 // id·type·required·contentUrl·agreed 같은 실제 약관 상태는 서버 응답이
-// source of truth다. 4종 모두 배포된 문서(LEGAL_DOCUMENTS)가 있으므로 chevron은
-// 서버가 contentUrl을 내려주는지만 보고 정한다.
+// source of truth다. 4종 모두 배포된 문서(LEGAL_DOCUMENTS)가 있으므로 "보기"는
+// 서버가 열 수 있는 contentUrl을 내려주는지만 보고 정한다.
 //
 // 민감정보/외부 AI 약관의 서버 type은 아직 정해지지 않아 type이 아니라 문서명으로
 // 매칭한다. 서버가 "[필수] " 접두어나 "동의" 접미사를 붙여 내려주든 아니든
@@ -216,8 +193,11 @@ export default function TermsAgreementScreen() {
 
   // 선택 약관(외부 AI 동의)까지 포함한다.
   const allAgreed = useMemo(
-    () => terms !== null && terms.every((term) => agreements[term.id]),
-    [terms, agreements],
+    () =>
+      orderedTerms !== null &&
+      orderedTerms.length > 0 &&
+      orderedTerms.every((term) => agreements[term.id]),
+    [orderedTerms, agreements],
   );
 
   // required 약관만 본다 — 선택 약관(외부 AI 동의)은 required=false라 미동의여도
@@ -234,8 +214,11 @@ export default function TermsAgreementScreen() {
   }, [terms, agreements]);
 
   function toggleAll(value: boolean) {
-    if (!terms) return;
-    setAgreements(Object.fromEntries(terms.map((term) => [term.id, value])));
+    if (!orderedTerms) return;
+    setAgreements((current) => ({
+      ...current,
+      ...Object.fromEntries(orderedTerms.map((term) => [term.id, value])),
+    }));
   }
 
   async function handleSubmit() {
@@ -307,7 +290,7 @@ export default function TermsAgreementScreen() {
       >
         <OnboardingHeader onBack={handleBack} title="회원가입" />
         <View style={styles.loadingScreen}>
-          <ActivityIndicator color={semanticColors["label-normal"]} />
+          <ActivityIndicator color={signupColors.text} />
         </View>
       </SafeAreaView>
     );
@@ -322,7 +305,7 @@ export default function TermsAgreementScreen() {
     >
       <OnboardingHeader onBack={handleBack} title="회원가입" />
 
-      <View style={styles.content}>
+      <OnboardingContent style={styles.content}>
         <ThemedText style={styles.title} typography="title-3-bold">
           이용약관 동의
         </ThemedText>
@@ -332,63 +315,66 @@ export default function TermsAgreementScreen() {
           accessibilityRole="checkbox"
           accessibilityState={{ checked: allAgreed }}
           onPress={() => toggleAll(!allAgreed)}
-          style={styles.allAgreeCard}
+          style={styles.allAgreeRow}
         >
-          <Checkbox checked={allAgreed} />
-          <ThemedText style={styles.allAgreeText} typography="body-2-bold">
+          <CheckCircle checked={allAgreed} />
+          <ThemedText style={styles.allAgreeText} typography="body-1-bold">
             약관 전체 동의
           </ThemedText>
         </Pressable>
 
-        <ThemedText style={styles.sectionLabel} typography="caption-1-regular">
-          찌뿌둥 이용약관
-        </ThemedText>
+        <View style={styles.divider} />
 
-        <View style={styles.termsList}>
-          {orderedTerms.map((term) => {
-            const display = TERM_DISPLAY.find((spec) => spec.match(term));
-            const title = display?.title ?? term.title;
-            // 4종 모두 상세 문서가 있어 열 수 있는 contentUrl이 오면 chevron을
-            // 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만 둔다.
-            const hasDetail = isValidHttpUrl(term.contentUrl);
-            return (
-              <TermRow
-                checked={agreements[term.id] ?? false}
-                hasDetail={hasDetail}
-                key={term.id}
-                onPressDetail={
-                  hasDetail
-                    ? () => openTermContent(title, term.contentUrl)
-                    : undefined
-                }
-                onToggle={() =>
-                  setAgreements((current) => ({
-                    ...current,
-                    [term.id]: !current[term.id],
-                  }))
-                }
-                required={term.required}
-                title={title}
-              />
-            );
-          })}
+        <View style={styles.sectionLabelArea}>
+          <ThemedText style={styles.sectionLabel} typography="body-3-bold">
+            약관 동의
+          </ThemedText>
         </View>
-      </View>
 
-      <View style={styles.footer}>
+        {orderedTerms.map((term) => {
+          const display = TERM_DISPLAY.find((spec) => spec.match(term));
+          const title = display?.title ?? term.title;
+          // 4종 모두 상세 문서가 있어 열 수 있는 contentUrl이 오면 "보기"를
+          // 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만 둔다.
+          const hasDetail = isValidHttpUrl(term.contentUrl);
+          return (
+            <TermRow
+              checked={agreements[term.id] ?? false}
+              hasDetail={hasDetail}
+              key={term.id}
+              onPressDetail={
+                hasDetail
+                  ? () => openTermContent(title, term.contentUrl)
+                  : undefined
+              }
+              onToggle={() =>
+                setAgreements((current) => ({
+                  ...current,
+                  [term.id]: !current[term.id],
+                }))
+              }
+              required={term.required}
+              title={title}
+            />
+          );
+        })}
+      </OnboardingContent>
+
+      <OnboardingFooter>
         <OnboardingCtaButton disabled={!canSubmit} onPress={handleSubmit} />
-      </View>
+      </OnboardingFooter>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["fill-subtle"],
+    backgroundColor: signupColors.white,
     flex: 1,
   },
   loadingScreen: {
     alignItems: "center",
+    flex: 1,
     gap: 16,
     justifyContent: "center",
     paddingHorizontal: 24,
@@ -398,50 +384,51 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: radius.default,
+    backgroundColor: signupColors.text,
+    borderRadius: 999,
     height: 44,
     justifyContent: "center",
     paddingHorizontal: 24,
   },
   retryButtonText: {
-    color: semanticColors["primary-on"],
+    color: signupColors.white,
   },
+  // Figma 콘텐츠 top 108 = status bar 44 + TopNav 52 + 12.
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingTop: 12,
   },
   title: {
-    color: semanticColors["label-normal"],
-    marginBottom: 18,
+    color: signupColors.text,
   },
-  allAgreeCard: {
+  allAgreeRow: {
     alignItems: "center",
-    backgroundColor: semanticColors["background-normal"],
-    borderColor: semanticColors["line-normal"],
-    borderRadius: radius.default,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
-    height: 52,
-    marginBottom: 14,
-    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 24,
   },
   allAgreeText: {
-    color: semanticColors["label-normal"],
+    color: signupColors.text,
+    flex: 1,
+  },
+  divider: {
+    backgroundColor: signupColors.fill,
+    height: 1,
+    width: "100%",
+  },
+  sectionLabelArea: {
+    paddingBottom: 4,
+    paddingTop: 24,
   },
   sectionLabel: {
-    color: semanticColors["label-subtle"],
-    marginBottom: 18,
-  },
-  termsList: {
-    gap: 14,
+    color: signupColors.textSubtle,
   },
   termRow: {
     alignItems: "center",
     flexDirection: "row",
-    height: 44,
+    gap: 12,
+    paddingVertical: 14,
   },
   termCheckArea: {
     alignItems: "center",
@@ -450,33 +437,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   termText: {
-    color: semanticColors["label-normal"],
-    flexShrink: 1,
+    color: signupColors.text,
+    flex: 1,
   },
-  chevronButton: {
-    alignItems: "center",
-    height: 44,
-    justifyContent: "center",
-    width: 24,
-  },
-  checkbox: {
-    alignItems: "center",
-    borderRadius: 6,
-    height: 24,
-    justifyContent: "center",
-    width: 24,
-  },
-  checkboxChecked: {
-    backgroundColor: semanticColors["primary-normal"],
-  },
-  checkboxUnchecked: {
-    backgroundColor: semanticColors["background-normal"],
-    borderColor: semanticColors["line-strong"],
-    borderWidth: 1,
-  },
-  footer: {
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 8,
+  detailText: {
+    color: signupColors.textSubtle,
+    textDecorationLine: "underline",
   },
 });

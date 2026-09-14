@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Alert } from "react-native";
 
 import { checkNicknameAvailability } from "./api";
-import { NICKNAME_FORMAT_PATTERN } from "./nickname-validation";
+import { validateNickname } from "./nickname-validation";
 
 export type NicknameAvailabilityStatus =
   "idle" | "checking" | "available" | "unavailable" | "error";
@@ -62,7 +62,9 @@ export function useNicknameAvailability(
   }
 
   const isSkipped = skipValue !== undefined && nickname === skipValue;
-  const isFormatValid = NICKNAME_FORMAT_PATTERN.test(nickname);
+  // 로컬 검증(길이·문자·기호 위치)을 통과한 값만 서버에 묻는다 — 화면과 같은
+  // validateNickname을 써서 두 판정이 갈라지지 않게 한다.
+  const isFormatValid = validateNickname(nickname).isValid;
   const shouldCheck = !isSkipped && isFormatValid;
 
   useEffect(() => {
