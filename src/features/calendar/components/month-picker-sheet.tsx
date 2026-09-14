@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
-import { WorkoutPlanBottomSheet } from "@/features/workout-plan/components/workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1);
 const MONTH_ROWS = [
@@ -42,7 +42,7 @@ export function MonthPickerSheet({
   }
 
   return (
-    <WorkoutPlanBottomSheet onClose={onClose} visible={visible}>
+    <BottomSheet onClose={onClose} visible={visible}>
       <View style={styles.header}>
         <Pressable
           accessibilityLabel="이전 연도"
@@ -103,7 +103,7 @@ export function MonthPickerSheet({
           </View>
         ))}
       </View>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
 

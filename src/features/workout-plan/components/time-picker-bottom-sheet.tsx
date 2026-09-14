@@ -12,7 +12,7 @@ import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import type { StartTime } from "@/features/workout-plan/model";
 
-import { WorkoutPlanBottomSheet } from "./workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 const HOURS = Array.from({ length: 12 }, (_, index) => index + 1);
 const MINUTES = Array.from({ length: 12 }, (_, index) => index * 5);
@@ -60,7 +60,7 @@ export function TimePickerBottomSheet({
   const [draft, setDraft] = useState(() => createTimeDraft(value));
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       embedded={embedded}
       onClose={onClose}
       title="예상 시작 시간"
@@ -132,7 +132,7 @@ export function TimePickerBottomSheet({
           </ThemedText>
         </View>
       </Pressable>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
 

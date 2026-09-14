@@ -9,7 +9,7 @@ import {
   type Intensity,
 } from "@/features/workout-plan/model";
 
-import { WorkoutPlanBottomSheet } from "./workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 type IntensityBottomSheetProps = {
   visible: boolean;
@@ -29,7 +29,7 @@ export function IntensityBottomSheet({
   const [selected, setSelected] = useState(value);
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       embedded={embedded}
       onClose={onClose}
       title="강도"
@@ -99,7 +99,7 @@ export function IntensityBottomSheet({
           </ThemedText>
         </View>
       </Pressable>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
 

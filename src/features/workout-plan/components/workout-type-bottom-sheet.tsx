@@ -12,7 +12,7 @@ import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { EXERCISE_TYPES } from "@/features/workout-plan/model";
 
-import { WorkoutPlanBottomSheet } from "./workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 
 const MAX_CUSTOM_LENGTH = 10;
 
@@ -63,7 +63,7 @@ export function WorkoutTypeBottomSheet({
   };
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       embedded={embedded}
       fixedHeightRatio={682 / 814}
       onClose={onClose}
@@ -181,7 +181,7 @@ export function WorkoutTypeBottomSheet({
           )}
         </Pressable>
       </View>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
 

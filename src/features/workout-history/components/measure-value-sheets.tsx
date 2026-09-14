@@ -3,7 +3,7 @@ import { Pressable, TextInput, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
-import { WorkoutPlanBottomSheet } from "@/features/workout-plan/components/workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { PrimaryActionButton } from "@/features/workout-plan/components/workout-plan-screen-ui";
 import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 
@@ -33,7 +33,7 @@ export function TimeValueInputSheet({
   const keyboardHeight = useKeyboardHeight();
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       embedded
       keyboardAvoiding={false}
       onClose={onClose}
@@ -77,7 +77,7 @@ export function TimeValueInputSheet({
           }
         />
       </View>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
 
@@ -102,7 +102,7 @@ export function NumberValueInputSheet({
   const keyboardHeight = useKeyboardHeight();
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       embedded
       keyboardAvoiding={false}
       onClose={onClose}
@@ -152,6 +152,6 @@ export function NumberValueInputSheet({
           onPress={() => onConfirm(Math.max(0, Number(text) || 0))}
         />
       </View>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
