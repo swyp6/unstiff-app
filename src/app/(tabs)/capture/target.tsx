@@ -59,7 +59,7 @@ export default function RecordTargetScreen() {
   // 넘어간다 — 사진은 그대로 두고 이 목록만 사라지는 전환이라, 무엇을 골랐는지
   // 확인할 짧은 여유를 준다.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  // workout-plan-bottom-sheet.tsx와 같은 방식 — useRef().current를 렌더 중에
+  // bottom-sheet.tsx와 같은 방식 — useRef().current를 렌더 중에
   // 읽으면 lint(react-hooks)가 막아서 useState 초기화로 값을 만든다.
   const [listOpacity] = useState(() => new Animated.Value(1));
   const selectionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

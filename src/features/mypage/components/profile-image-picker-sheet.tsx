@@ -11,7 +11,7 @@ import {
   avatarsEqual,
 } from "@/features/mypage/avatar-presets";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
-import { WorkoutPlanBottomSheet } from "@/features/workout-plan/components/workout-plan-bottom-sheet";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import {
   ImageUploadError,
   logImageUploadError,
@@ -118,11 +118,7 @@ export function ProfileImagePickerSheet({
   ];
 
   return (
-    <WorkoutPlanBottomSheet
-      onClose={onClose}
-      title="프로필 이미지 선택"
-      visible={visible}
-    >
+    <BottomSheet onClose={onClose} title="프로필 이미지 선택" visible={visible}>
       <View className="items-center gap-4 pb-2">
         <AvatarCircle avatar={pending} size={PREVIEW_SIZE} />
 
@@ -171,6 +167,6 @@ export function ProfileImagePickerSheet({
           </Pressable>
         </View>
       </View>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }

@@ -17,6 +17,10 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
+import {
+  BottomSheet,
+  type BottomSheetHandle,
+} from "@/components/ui/bottom-sheet";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   canUseStopwatch,
@@ -33,10 +37,6 @@ import { GoalStepper } from "./goal-stepper";
 import { GoalTypeSelector } from "./goal-type-selector";
 import { IntensityBottomSheet } from "./intensity-bottom-sheet";
 import { TimePickerBottomSheet } from "./time-picker-bottom-sheet";
-import {
-  WorkoutPlanBottomSheet,
-  type WorkoutPlanBottomSheetHandle,
-} from "./workout-plan-bottom-sheet";
 import {
   PrimaryActionButton,
   SectionLabel,
@@ -76,7 +76,7 @@ export function WorkoutPlanDetailBottomSheet({
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const titleInputRef = useRef<TextInput>(null);
   const pendingChildSheet = useRef<Exclude<ChildSheet, null> | null>(null);
-  const sheetRef = useRef<WorkoutPlanBottomSheetHandle>(null);
+  const sheetRef = useRef<BottomSheetHandle>(null);
   const scrollRef = useRef<ScrollView>(null);
   const insets = useSafeAreaInsets();
   // KeyboardAvoidingView는 이 시트(Modal + 애니메이션 transform으로 겹겹이
@@ -236,7 +236,7 @@ export function WorkoutPlanDetailBottomSheet({
   );
 
   return (
-    <WorkoutPlanBottomSheet
+    <BottomSheet
       expanded={isParentExpanded}
       fullHeight
       // 713/814는 이 시트의 원래(축소 상태) 콘텐츠 높이 비율이다. 그 아래
@@ -442,7 +442,7 @@ export function WorkoutPlanDetailBottomSheet({
           />
         </View>
       </ScrollView>
-    </WorkoutPlanBottomSheet>
+    </BottomSheet>
   );
 }
 
