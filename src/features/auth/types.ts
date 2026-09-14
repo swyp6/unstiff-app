@@ -18,9 +18,10 @@ export type UserProfile = {
   updatedAt: string;
 };
 
-// 서버 TermsType enum 그대로 (unstiff-api docs/api/auth.md). MARKETING은
-// 서버에서 제거됐고, 민감정보/외부 AI 약관 type은 아직 서버에 없다.
-export type TermsType = "AGE_14" | "SERVICE" | "PRIVACY";
+// 서버 TermsType enum 그대로 (unstiff-api terms/TermsType.java, 선언 순서 =
+// GET /terms 응답 순서). EXTERNAL_AI만 선택 약관이라 동의 철회(DELETE)의
+// 대상이 된다.
+export type TermsType = "PRIVACY" | "SERVICE" | "SENSITIVE" | "EXTERNAL_AI";
 
 export type Term = {
   id: number;
@@ -31,6 +32,8 @@ export type Term = {
   contentUrl: string | null;
   agreed: boolean;
   reagreementRequired: boolean;
+  // 서버 LocalDateTime("2026-09-12T13:20:00", timezone 없음). agreed가 true일
+  // 때만 내려온다.
   agreedAt: string | null;
 };
 

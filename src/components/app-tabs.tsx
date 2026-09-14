@@ -14,13 +14,21 @@ export default function AppTabs() {
   // 옮기지 않고 탭바 표시 여부만 바꾸므로 nested Stack 구조는 그대로다.
   const segments = useSegments();
   const isCameraCaptureScreen = segments[segments.length - 1] === "capture";
+  // 설정 > 약관 및 개인정보(/mypage/settings/legal)와 그 문서 상세(legal/[type])
+  // 는 Figma(4953:59928, 4953:59947 등)에 탭바가 없어 숨긴다. 마이 탭의 다른
+  // 화면(settings 메인·계정·알림 등)은 그대로 탭바를 보여준다.
+  // typed routes의 useSegments()는 길이 1짜리 tuple도 포함하는 union이라
+  // segments[1] 같은 index 접근은 컴파일되지 않는다 — 경로 문자열로 비교한다.
+  const isSettingsLegalScreen = segments
+    .join("/")
+    .includes("mypage/settings/legal");
   // Figma node 3502:36518 (Nav / 하단 탭): selected tab uses brand/primary
   // orange instead of the default textSecondary.
   const selectedColor = primitiveColors.orange["500"];
 
   return (
     <NativeTabs
-      hidden={isCameraCaptureScreen}
+      hidden={isCameraCaptureScreen || isSettingsLegalScreen}
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
       // shadowColor is iOS-only (react-native-screens has no Android tab bar

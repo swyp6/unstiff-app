@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -23,44 +24,57 @@ import {
   SERVICE_PUSH_CONFIG_TYPES,
   type ServicePushConfigType,
 } from "@/features/notifications/types";
-import { NotificationToggle } from "@/features/settings/components/notification-toggle";
-import { SettingsHeader } from "@/features/settings/components/settings-header";
+import { MissionReceiveTimeRow } from "@/features/settings/components/mission-receive-time-row";
+import {
+  SETTINGS_CHROME_BACKGROUND,
+  SettingsHeader,
+} from "@/features/settings/components/settings-header";
 import {
   SettingsSectionLabel,
-  SettingsValueRow,
-  SETTINGS_DIVIDER_COLOR,
+  SettingsToggleRow,
+  type SettingsDividerProps,
 } from "@/features/settings/components/settings-list";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
 type PushConfigMap = Record<ServicePushConfigType, boolean>;
 
-type NotificationSettingRowProps = {
+type NotificationSettingRowProps = SettingsDividerProps & {
   title: string;
   value: boolean;
   disabled?: boolean;
   onValueChange: (value: boolean) => void;
 };
 
+// Figma 4953:59838 / 4953:59859의 toggle 행 구분선은 0.5px charcoal/1이고 행마다
+// 다르다: 전체 알림·오늘의 질문·운동 계획은 top+bottom, 기록 리마인드는 bottom만.
+// 미션 수신 시간 행은 List Row 기본값(bottom 1px)을 쓴다.
+const NOTIFICATION_DIVIDER_WIDTH = 0.5;
+const DIVIDER_TOP_AND_BOTTOM: SettingsDividerProps = {
+  dividerTop: true,
+  dividerWidth: NOTIFICATION_DIVIDER_WIDTH,
+};
+const DIVIDER_BOTTOM: SettingsDividerProps = {
+  dividerWidth: NOTIFICATION_DIVIDER_WIDTH,
+};
+
+// Figma 4953:59838 — 56 높이의 toggle 행이 상하 4px 여백을 가진 64 높이
+// "항목 영역" 안에 놓인다(미션 수신 시간 행만 여백 없이 64/120 그대로).
 function NotificationSettingRow({
   title,
   value,
   disabled = false,
   onValueChange,
+  ...dividerProps
 }: NotificationSettingRowProps) {
   return (
-    <View style={styles.row}>
-      <View style={styles.rowTitle}>
-        <ThemedText style={styles.rowText} typography="body-2-medium">
-          {title}
-        </ThemedText>
-      </View>
-      <NotificationToggle
-        accessibilityLabel={title}
+    <View style={styles.rowArea}>
+      <SettingsToggleRow
         disabled={disabled}
         onValueChange={onValueChange}
+        title={title}
         value={value}
+        {...dividerProps}
       />
-      <View style={styles.divider} />
     </View>
   );
 }
@@ -193,13 +207,13 @@ export default function NotificationSettingsScreen() {
   const allEnabled = configs
     ? SERVICE_PUSH_CONFIG_TYPES.every((type) => configs[type])
     : false;
-  const isDailyMissionEnabled = configs?.DAILY_MISSION ?? false;
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
       <SettingsHeader
         onBack={() => goBackOrReplace("/mypage/settings")}
-        title="알림설정"
+        title="알림 설정"
+        variant="settingsNav"
       />
 
       {loadError ? (
@@ -230,10 +244,15 @@ export default function NotificationSettingsScreen() {
           <ActivityIndicator color={semanticColors["label-normal"]} />
         </View>
       ) : (
-        <View style={styles.content}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
+        >
           <View style={styles.section}>
-            <SettingsSectionLabel label="알림" />
+            <SettingsSectionLabel label="알림" variant="subheading" />
             <NotificationSettingRow
+              {...DIVIDER_TOP_AND_BOTTOM}
               disabled={pendingTypes.size > 0}
               onValueChange={handleToggleAll}
               title="전체 알림"
@@ -242,9 +261,10 @@ export default function NotificationSettingsScreen() {
           </View>
 
           <View style={styles.section}>
-            <SettingsSectionLabel label="서비스 알림" />
+            <SettingsSectionLabel label="서비스 알림" variant="subheading" />
             <View>
               <NotificationSettingRow
+                {...DIVIDER_TOP_AND_BOTTOM}
                 disabled={pendingTypes.has("DAILY_DISCOVERY")}
                 onValueChange={(value) =>
                   handleToggle("DAILY_DISCOVERY", value)
@@ -253,32 +273,30 @@ export default function NotificationSettingsScreen() {
                 value={configs.DAILY_DISCOVERY}
               />
               <NotificationSettingRow
+                {...DIVIDER_TOP_AND_BOTTOM}
                 disabled={pendingTypes.has("DAILY_PLAN")}
                 onValueChange={(value) => handleToggle("DAILY_PLAN", value)}
                 title={SERVICE_PUSH_CONFIG_LABELS.DAILY_PLAN}
                 value={configs.DAILY_PLAN}
               />
-              <NotificationSettingRow
-                disabled={pendingTypes.has("DAILY_MISSION")}
-                onValueChange={(value) => handleToggle("DAILY_MISSION", value)}
-                title={SERVICE_PUSH_CONFIG_LABELS.DAILY_MISSION}
-                value={configs.DAILY_MISSION}
-              />
-              <SettingsValueRow
-                disabled={!isDailyMissionEnabled}
-                onPress={
-                  isDailyMissionEnabled
-                    ? () => router.push("/mypage/settings/mission-time")
-                    : undefined
-                }
-                title="미션 수신 시간"
-                value={
+              {/* DAILY_MISSION 푸시는 서버가 offerTime에 보내는 "오늘의 미션이
+                  도착했어" 알림이라, 그 수신 동의가 곧 이 행의 toggle이다
+                  (Figma 4953:59838 / 4953:59859 — 별도 "데일리 미션" 행 없음).
+                  offerTime 자체는 mission setting API의 별개 값이라 toggle을
+                  꺼도 그대로 두고, 켜면 저장돼 있던 시간을 다시 보여준다. */}
+              <MissionReceiveTimeRow
+                enabled={configs.DAILY_MISSION}
+                onTimePress={() => router.push("/mypage/settings/mission-time")}
+                onToggle={(value) => handleToggle("DAILY_MISSION", value)}
+                timeLabel={
                   missionOfferTime
                     ? formatOfferTimeLabel(missionOfferTime)
-                    : "시간 설정"
+                    : null
                 }
+                toggleDisabled={pendingTypes.has("DAILY_MISSION")}
               />
               <NotificationSettingRow
+                {...DIVIDER_BOTTOM}
                 disabled={pendingTypes.has("REMIND_PLAN")}
                 onValueChange={(value) => handleToggle("REMIND_PLAN", value)}
                 title={SERVICE_PUSH_CONFIG_LABELS.REMIND_PLAN}
@@ -286,7 +304,7 @@ export default function NotificationSettingsScreen() {
               />
             </View>
           </View>
-        </View>
+        </ScrollView>
       )}
     </SafeAreaView>
   );
@@ -294,14 +312,20 @@ export default function NotificationSettingsScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["background-normal"],
+    backgroundColor: SETTINGS_CHROME_BACKGROUND,
     flex: 1,
   },
+  scroll: {
+    backgroundColor: semanticColors["background-normal"],
+  },
   content: {
-    paddingHorizontal: 24,
+    gap: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
   },
   centerContent: {
     alignItems: "center",
+    backgroundColor: semanticColors["background-normal"],
     flex: 1,
     gap: 16,
     justifyContent: "center",
@@ -323,30 +347,9 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: 8,
-    marginBottom: 32,
+    paddingTop: 20,
   },
-  row: {
-    alignItems: "center",
-    flexDirection: "row",
-    gap: 12,
-    height: 56,
-    paddingHorizontal: 16,
-    position: "relative",
-    width: "100%",
-  },
-  rowTitle: {
-    flex: 1,
-    minWidth: 0,
-  },
-  rowText: {
-    color: semanticColors["label-normal"],
-  },
-  divider: {
-    backgroundColor: SETTINGS_DIVIDER_COLOR,
-    bottom: 0,
-    height: 1,
-    left: 0,
-    position: "absolute",
-    right: 0,
+  rowArea: {
+    paddingVertical: 4,
   },
 });

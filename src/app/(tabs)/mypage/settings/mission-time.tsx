@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { radius, semanticColors } from "@/constants/tokens";
+import { primitiveColors, radius, semanticColors } from "@/constants/tokens";
 import {
   getMissionSetting,
   updateMissionSetting,
@@ -20,7 +20,10 @@ import {
   parseOfferTime,
   type OfferTimeParts,
 } from "@/features/missions/offer-time";
-import { SettingsHeader } from "@/features/settings/components/settings-header";
+import {
+  SETTINGS_CHROME_BACKGROUND,
+  SettingsHeader,
+} from "@/features/settings/components/settings-header";
 import { goBackOrReplace } from "@/features/settings/navigation";
 
 export default function MissionTimeScreen() {
@@ -72,7 +75,8 @@ export default function MissionTimeScreen() {
     >
       <SettingsHeader
         onBack={() => goBackOrReplace("/mypage/settings/notification")}
-        title="미션 수신 시간 설정"
+        title="미션 수신 시간"
+        variant="settingsNav"
       />
 
       {loadError ? (
@@ -105,7 +109,7 @@ export default function MissionTimeScreen() {
       ) : (
         <View style={styles.content}>
           <View style={styles.intro}>
-            <ThemedText typography="body-1-bold">
+            <ThemedText style={styles.title} typography="body-1-bold">
               미션을 받을 시간을 선택해 주세요
             </ThemedText>
             <ThemedText
@@ -136,7 +140,7 @@ export default function MissionTimeScreen() {
             ) : (
               <ThemedText
                 style={styles.submitButtonText}
-                typography="body-1-bold"
+                typography="body-2-bold"
               >
                 선택 완료
               </ThemedText>
@@ -150,17 +154,23 @@ export default function MissionTimeScreen() {
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["background-normal"],
+    backgroundColor: SETTINGS_CHROME_BACKGROUND,
     flex: 1,
   },
+  // Figma 4953:59828 — 흰 콘텐츠 영역, 좌우 20, 상단 24. 버튼(콘텐츠 top 601,
+  // 높이 50)은 812 기준 홈 인디케이터 영역 바로 위 11에 놓이므로 safe-area
+  // 하단(탭바가 있으면 탭바 위) 기준 paddingBottom 11로 두고, 그 위 남는
+  // 공간은 spacer가 채워 기기 높이가 달라도 하단에 붙는다.
   content: {
+    backgroundColor: semanticColors["background-normal"],
     flex: 1,
-    paddingBottom: 24,
-    paddingHorizontal: 24,
+    paddingBottom: 11,
+    paddingHorizontal: 20,
     paddingTop: 24,
   },
   centerContent: {
     alignItems: "center",
+    backgroundColor: semanticColors["background-normal"],
     flex: 1,
     gap: 16,
     justifyContent: "center",
@@ -181,10 +191,14 @@ const styles = StyleSheet.create({
     color: semanticColors["primary-on"],
   },
   intro: {
-    gap: 8,
+    gap: 4,
+    marginBottom: 20,
+  },
+  title: {
+    color: primitiveColors.charcoal["12"],
   },
   description: {
-    color: semanticColors["label-subtle"],
+    color: primitiveColors.charcoal["5"],
   },
   spacer: {
     flex: 1,
@@ -192,11 +206,10 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: radius.default,
-    height: 52,
+    backgroundColor: primitiveColors.charcoal["11"],
+    borderRadius: 25,
+    height: 50,
     justifyContent: "center",
-    marginTop: 24,
     width: "100%",
   },
   submitButtonDisabled: {

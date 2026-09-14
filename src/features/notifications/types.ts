@@ -15,7 +15,9 @@ export type PushConfigsResponse = {
 };
 
 // The 4 types shown as individual toggles on the notification settings
-// screen, in display order. `TEST` is intentionally omitted.
+// screen, in display order. `TEST` is intentionally omitted. DAILY_MISSION은
+// 화면에서 "미션 수신 시간" 행(Figma 4953:59838)의 toggle로 쓰인다 — 서버가
+// offerTime에 보내는 DAILY_MISSION 푸시의 수신 여부가 곧 그 toggle이다.
 export const SERVICE_PUSH_CONFIG_TYPES = [
   "DAILY_DISCOVERY",
   "DAILY_PLAN",
@@ -29,7 +31,7 @@ export const SERVICE_PUSH_CONFIG_LABELS: Record<ServicePushConfigType, string> =
   {
     DAILY_DISCOVERY: "오늘의 질문",
     DAILY_PLAN: "운동 계획",
-    DAILY_MISSION: "데일리 미션",
+    DAILY_MISSION: "미션 수신 시간",
     REMIND_PLAN: "기록 리마인드",
   };
 
