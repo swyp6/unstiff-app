@@ -1,8 +1,8 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { SIGNUP_HEADER_HEIGHT, signupColors } from "@/features/auth/signup-ui";
 
 type OnboardingHeaderProps = {
   title: string;
@@ -11,57 +11,70 @@ type OnboardingHeaderProps = {
   onBack?: () => void;
 };
 
-// Shared TopNav for the SNS-signup screen stack (terms → nickname →
-// profile photo → photo-adjust → signup-complete) — WF/Signup/TopNav in
-// Figma, identical across all of them.
+// Figma WF/Signup/TopNav (예: 4501:44640) — 52px 높이, 왼쪽 8px에 48x48
+// BackTouch(top 2), 그 안 (19, 15.5)에 10x17 Icon/Back, 제목은 화면 가운데
+// heading/1/bold(18/24)로 top 15. 화면 폭(375/402)과 무관하게 동일하다.
+const BACK_TOUCH_SIZE = 48;
+const BACK_ICON_WIDTH = 10;
+const BACK_ICON_HEIGHT = 17;
+const TITLE_TOP = 15;
+const TITLE_LINE_HEIGHT = 24;
+
 export function OnboardingHeader({ title, onBack }: OnboardingHeaderProps) {
   return (
     <View style={styles.header}>
-      {onBack ? (
+      <ThemedText
+        numberOfLines={1}
+        style={styles.headerTitle}
+        typography="heading-1-bold"
+      >
+        {title}
+      </ThemedText>
+      {onBack && (
         <Pressable
           accessibilityLabel="뒤로가기"
           accessibilityRole="button"
-          hitSlop={8}
           onPress={onBack}
           style={styles.backButton}
         >
-          <Ionicons
-            color={semanticColors["label-normal"]}
-            name="chevron-back"
-            size={20}
+          <Image
+            contentFit="contain"
+            source={require("@/assets/signup/icon-back.svg")}
+            style={styles.backIcon}
           />
         </Pressable>
-      ) : (
-        <View style={styles.backButton} />
       )}
-      <ThemedText style={styles.headerTitle} typography="body-1-medium">
-        {title}
-      </ThemedText>
-      <View style={styles.headerSide} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    alignItems: "center",
-    backgroundColor: semanticColors["background-normal"],
-    flexDirection: "row",
-    height: 52,
-    paddingHorizontal: 8,
+    height: SIGNUP_HEADER_HEIGHT,
+    width: "100%",
+  },
+  // 제목을 화면 전체 폭 기준으로 가운데 두고(BackTouch 폭에 영향받지 않게)
+  // 그 위에 back 버튼을 absolute로 얹는다.
+  headerTitle: {
+    color: signupColors.text,
+    left: BACK_TOUCH_SIZE + 8,
+    position: "absolute",
+    right: BACK_TOUCH_SIZE + 8,
+    textAlign: "center",
+    top: TITLE_TOP,
+    lineHeight: TITLE_LINE_HEIGHT,
   },
   backButton: {
     alignItems: "center",
-    height: 48,
+    height: BACK_TOUCH_SIZE,
     justifyContent: "center",
-    width: 48,
+    left: 8,
+    position: "absolute",
+    top: (SIGNUP_HEADER_HEIGHT - BACK_TOUCH_SIZE) / 2,
+    width: BACK_TOUCH_SIZE,
   },
-  headerTitle: {
-    color: semanticColors["label-normal"],
-    flex: 1,
-    textAlign: "center",
-  },
-  headerSide: {
-    width: 48,
+  backIcon: {
+    height: BACK_ICON_HEIGHT,
+    width: BACK_ICON_WIDTH,
   },
 });

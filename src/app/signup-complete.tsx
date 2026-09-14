@@ -4,15 +4,25 @@ import { Alert, BackHandler, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { typography } from "@/constants/tokens";
 import {
   isNicknameAlreadyUsedError,
   updateMyProfile,
 } from "@/features/auth/api";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
-import { ProfileAvatarPreview } from "@/features/auth/components/profile-avatar-preview";
+import {
+  OnboardingContent,
+  OnboardingFooter,
+} from "@/features/auth/components/onboarding-layout";
+import {
+  AVATAR_SIZE_COMPACT,
+  AVATAR_SIZE_WIDE,
+  ProfileAvatarPreview,
+} from "@/features/auth/components/profile-avatar-preview";
+import { signupColors } from "@/features/auth/signup-ui";
 import type { UpdateProfileRequest } from "@/features/auth/types";
+import { useSignupHeroLayout } from "@/features/auth/use-signup-hero-layout";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
 import {
   ImageUploadError,
@@ -45,6 +55,18 @@ import { useSignupStore } from "@/store/signup-store";
 // signup-store via getState() inside a mount-once (`[]`-deps) effect, not
 // a reactive selector, so clearing the store here can no longer re-trigger
 // a stale screen's redirect the way it did before that fix.
+// Figma 4501:44992 — 콘텐츠(아바타 152, gap 24, title/1/bold 24/32, gap 8,
+// body/3/regular 13/18)의 세로 중심이 화면 50% - 54. 375 폭 프레임은 없어서
+// 아바타 크기만 profile-photo와 같은 기준(120)으로 줄이고 위치 식은 그대로 쓴다.
+const HERO_CENTER_OFFSET = 54;
+const HERO_AVATAR_TEXT_GAP = 24;
+const HERO_TITLE_DESCRIPTION_GAP = 8;
+const HERO_HEIGHT_WITHOUT_AVATAR =
+  HERO_AVATAR_TEXT_GAP +
+  typography["title-1-bold"].lineHeight +
+  HERO_TITLE_DESCRIPTION_GAP +
+  typography["body-3-regular"].lineHeight;
+
 function finishSignup() {
   useSignupStore.getState().reset();
   router.dismissAll();
@@ -163,6 +185,13 @@ export default function SignupCompleteScreen() {
     }
   }
 
+  const { isWide, heroMarginTop } = useSignupHeroLayout();
+  const avatarSize = isWide ? AVATAR_SIZE_WIDE : AVATAR_SIZE_COMPACT;
+  const heroTop = heroMarginTop(
+    avatarSize + HERO_HEIGHT_WITHOUT_AVATAR,
+    HERO_CENTER_OFFSET,
+  );
+
   return (
     <SafeAreaView
       edges={["top", "left", "right", "bottom"]}
@@ -172,57 +201,60 @@ export default function SignupCompleteScreen() {
           flow, so OnboardingHeader's onBack is intentionally omitted. */}
       <OnboardingHeader title="가입 완료" />
 
-      <View style={styles.content}>
-        <ProfileAvatarPreview imageUri={confirmedPhotoUri} />
+      <OnboardingContent style={styles.content}>
+        <View style={[styles.hero, { marginTop: heroTop }]}>
+          {/* Figma의 회색 원은 placeholder일 뿐 — 사용자가 등록한 사진이
+              있으면 그대로 보여준다. */}
+          <ProfileAvatarPreview
+            imageUri={confirmedPhotoUri}
+            size={avatarSize}
+          />
 
-        <View style={styles.textBlock}>
-          <ThemedText style={styles.title} typography="title-3-bold">
-            환영합니다!
-          </ThemedText>
-          <ThemedText style={styles.description} typography="body-2-medium">
-            프로필 설정이 완료됐어요.
-          </ThemedText>
+          <View style={styles.textBlock}>
+            <ThemedText style={styles.title} typography="title-1-bold">
+              환영합니다!
+            </ThemedText>
+            <ThemedText style={styles.description} typography="body-3-regular">
+              프로필 설정이 완료됐어요
+            </ThemedText>
+          </View>
         </View>
-      </View>
+      </OnboardingContent>
 
-      <View style={styles.footer}>
+      <OnboardingFooter>
         <OnboardingCtaButton
           disabled={isSubmitting}
           label="시작하기"
           onPress={handleStart}
         />
-      </View>
+      </OnboardingFooter>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["fill-subtle"],
+    backgroundColor: signupColors.white,
     flex: 1,
   },
   content: {
-    alignItems: "center",
     flex: 1,
-    gap: 18,
-    justifyContent: "center",
-    paddingHorizontal: 20,
+  },
+  hero: {
+    alignItems: "center",
+    gap: HERO_AVATAR_TEXT_GAP,
   },
   textBlock: {
     alignItems: "center",
-    gap: 8,
+    gap: HERO_TITLE_DESCRIPTION_GAP,
+    width: "100%",
   },
   title: {
-    color: semanticColors["label-normal"],
+    color: signupColors.text,
     textAlign: "center",
   },
   description: {
-    color: semanticColors["label-subtle"],
+    color: signupColors.textSubtle,
     textAlign: "center",
-  },
-  footer: {
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 8,
   },
 });

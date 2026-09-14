@@ -1,4 +1,3 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
 import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
@@ -12,10 +11,15 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { radius, semanticColors } from "@/constants/tokens";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
+import { CheckCircle } from "@/features/auth/components/check-circle";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
+import {
+  OnboardingContent,
+  OnboardingFooter,
+} from "@/features/auth/components/onboarding-layout";
+import { signupColors } from "@/features/auth/signup-ui";
 import type { Term } from "@/features/auth/types";
 import { useSignupStore } from "@/store/signup-store";
 
@@ -56,29 +60,6 @@ function handleBack() {
   router.replace("/login");
 }
 
-type CheckboxProps = {
-  checked: boolean;
-};
-
-function Checkbox({ checked }: CheckboxProps) {
-  return (
-    <View
-      style={[
-        styles.checkbox,
-        checked ? styles.checkboxChecked : styles.checkboxUnchecked,
-      ]}
-    >
-      {checked && (
-        <Ionicons
-          color={semanticColors["primary-on"]}
-          name="checkmark"
-          size={16}
-        />
-      )}
-    </View>
-  );
-}
-
 type TermRowProps = {
   title: string;
   required: boolean;
@@ -88,6 +69,8 @@ type TermRowProps = {
   onPressDetail?: () => void;
 };
 
+// Figma "약관 행"(4501:44659) — py 14, 24px Circle, gap 12, body/2/regular
+// 본문, 상세가 있는 행만 오른쪽에 body/3/regular 밑줄 "보기"(charcoal/5).
 function TermRow({
   title,
   required,
@@ -105,39 +88,33 @@ function TermRow({
         onPress={onToggle}
         style={styles.termCheckArea}
       >
-        <Checkbox checked={checked} />
+        <CheckCircle checked={checked} />
         <ThemedText style={styles.termText} typography="body-2-regular">
           {required ? "[필수] " : "[선택] "}
           {title}
         </ThemedText>
       </Pressable>
-      {hasDetail ? (
+      {hasDetail && (
         <Pressable
           accessibilityLabel={`${title} 상세 보기`}
           accessibilityRole="button"
-          hitSlop={10}
+          hitSlop={12}
           onPress={onPressDetail}
-          style={styles.chevronButton}
         >
-          <Ionicons
-            color={semanticColors["label-subtle"]}
-            name="chevron-forward"
-            size={18}
-          />
+          <ThemedText style={styles.detailText} typography="body-3-regular">
+            보기
+          </ThemedText>
         </Pressable>
-      ) : (
-        // Keeps the same-width column so rows without a detail page still
-        // align their checkbox/text with rows that have a chevron.
-        <View style={styles.chevronButton} />
       )}
     </View>
   );
 }
 
 // 화면에 그려지는 약관은 전부 GET /api/v1/terms 응답이고, 로컬에서 만들어내는
-// 약관은 없다. 이 배열은 Figma(AC-01-04)가 정의하는 표시 계층 — 노출 순서, 문구,
-// chevron(상세 진입) 노출 여부 — 만 담당한다. id·type·required·contentUrl·agreed
-// 같은 실제 약관 상태는 서버 응답이 source of truth다.
+// 약관은 없다. 이 배열은 Figma(AC-01-04, 4501:44638)가 정의하는 표시 계층 —
+// 노출 순서, 문구, "보기"(상세 진입) 노출 여부, 노출 자체 — 만 담당한다.
+// id·type·required·contentUrl·agreed 같은 실제 약관 상태는 서버 응답이
+// source of truth다.
 //
 // SERVICE 타입 약관이 둘(만 14세 / 이용약관)이라 type만으로는 구분되지 않아
 // 그 둘은 title로, 타입이 유일한 MARKETING은 title 변경에 흔들리지 않도록
@@ -147,10 +124,15 @@ type TermDisplaySpec = {
   match: (term: Term) => boolean;
   title: string;
   hasDetail: boolean;
+  // 최신 Figma에 없는 항목. 서버가 여전히 내려주더라도 화면에는 그리지 않고,
+  // agreement 상태는 서버가 준 초기값(agreed) 그대로 POST payload에 실린다 —
+  // API contract는 건드리지 않는다. required 약관은 사용자가 동의할 수 있어야
+  // 다음으로 갈 수 있으므로 hidden이어도 렌더링한다(아래 isVisibleTerm).
+  hidden?: boolean;
 };
 
-function byTitle(title: string) {
-  return (term: Term) => term.title.replace(/\s*동의$/, "") === title;
+function byTitle(...titles: string[]) {
+  return (term: Term) => titles.includes(term.title.replace(/\s*동의$/, ""));
 }
 
 const TERM_DISPLAY: TermDisplaySpec[] = [
@@ -161,8 +143,9 @@ const TERM_DISPLAY: TermDisplaySpec[] = [
     hasDetail: false,
   },
   {
-    match: byTitle("찌뿌두둥 이용약관"),
-    title: "찌뿌두둥 이용약관 동의",
+    // 서비스명 표기가 서버/Figma에서 "찌뿌둥"과 "찌뿌두둥"으로 갈려 둘 다 받는다.
+    match: byTitle("찌뿌둥 이용약관", "찌뿌두둥 이용약관"),
+    title: "찌뿌둥 이용약관 동의",
     hasDetail: true,
   },
   {
@@ -173,10 +156,15 @@ const TERM_DISPLAY: TermDisplaySpec[] = [
   {
     match: (term) => term.type === "MARKETING",
     title: "Push 알림 동의",
-    // 서버가 contentUrl을 내려주더라도 Figma에는 chevron이 없다.
     hasDetail: false,
+    hidden: true,
   },
 ];
+
+function isVisibleTerm(term: Term) {
+  const display = TERM_DISPLAY.find((spec) => spec.match(term));
+  return term.required || !display?.hidden;
+}
 
 function termOrderIndex(term: Term) {
   const index = TERM_DISPLAY.findIndex((spec) => spec.match(term));
@@ -221,14 +209,20 @@ export default function TermsAgreementScreen() {
       terms === null
         ? null
         : // sort는 stable이라 TERM_DISPLAY에 없는 약관끼리는 서버 순서를 유지한다.
-          [...terms].sort((a, b) => termOrderIndex(a) - termOrderIndex(b)),
+          terms
+            .filter(isVisibleTerm)
+            .sort((a, b) => termOrderIndex(a) - termOrderIndex(b)),
     [terms],
   );
 
-  // 선택 약관(MARKETING)까지 포함한다.
+  // "약관 전체 동의"는 화면에 보이는 약관만 다룬다 — hidden 약관의 agreed는
+  // 서버 초기값에서 바뀌지 않는다.
   const allAgreed = useMemo(
-    () => terms !== null && terms.every((term) => agreements[term.id]),
-    [terms, agreements],
+    () =>
+      orderedTerms !== null &&
+      orderedTerms.length > 0 &&
+      orderedTerms.every((term) => agreements[term.id]),
+    [orderedTerms, agreements],
   );
 
   // required 약관만 본다 — MARKETING은 required=false라 미동의여도 다음 단계로
@@ -245,8 +239,11 @@ export default function TermsAgreementScreen() {
   }, [terms, agreements]);
 
   function toggleAll(value: boolean) {
-    if (!terms) return;
-    setAgreements(Object.fromEntries(terms.map((term) => [term.id, value])));
+    if (!orderedTerms) return;
+    setAgreements((current) => ({
+      ...current,
+      ...Object.fromEntries(orderedTerms.map((term) => [term.id, value])),
+    }));
   }
 
   async function handleSubmit() {
@@ -318,7 +315,7 @@ export default function TermsAgreementScreen() {
       >
         <OnboardingHeader onBack={handleBack} title="회원가입" />
         <View style={styles.loadingScreen}>
-          <ActivityIndicator color={semanticColors["label-normal"]} />
+          <ActivityIndicator color={signupColors.text} />
         </View>
       </SafeAreaView>
     );
@@ -333,7 +330,7 @@ export default function TermsAgreementScreen() {
     >
       <OnboardingHeader onBack={handleBack} title="회원가입" />
 
-      <View style={styles.content}>
+      <OnboardingContent style={styles.content}>
         <ThemedText style={styles.title} typography="title-3-bold">
           이용약관 동의
         </ThemedText>
@@ -343,64 +340,67 @@ export default function TermsAgreementScreen() {
           accessibilityRole="checkbox"
           accessibilityState={{ checked: allAgreed }}
           onPress={() => toggleAll(!allAgreed)}
-          style={styles.allAgreeCard}
+          style={styles.allAgreeRow}
         >
-          <Checkbox checked={allAgreed} />
-          <ThemedText style={styles.allAgreeText} typography="body-2-bold">
+          <CheckCircle checked={allAgreed} />
+          <ThemedText style={styles.allAgreeText} typography="body-1-bold">
             약관 전체 동의
           </ThemedText>
         </Pressable>
 
-        <ThemedText style={styles.sectionLabel} typography="caption-1-regular">
-          찌뿌둥 이용약관
-        </ThemedText>
+        <View style={styles.divider} />
 
-        <View style={styles.termsList}>
-          {orderedTerms.map((term) => {
-            const display = TERM_DISPLAY.find((spec) => spec.match(term));
-            const title = display?.title ?? term.title;
-            // chevron 노출은 Figma 정책이 먼저고, 서버 contentUrl은 실제로 열
-            // 페이지가 있는지 확인하는 용도로만 쓴다.
-            const hasDetail =
-              (display?.hasDetail ?? true) && isValidHttpUrl(term.contentUrl);
-            return (
-              <TermRow
-                checked={agreements[term.id] ?? false}
-                hasDetail={hasDetail}
-                key={term.id}
-                onPressDetail={
-                  hasDetail
-                    ? () => openTermContent(title, term.contentUrl)
-                    : undefined
-                }
-                onToggle={() =>
-                  setAgreements((current) => ({
-                    ...current,
-                    [term.id]: !current[term.id],
-                  }))
-                }
-                required={term.required}
-                title={title}
-              />
-            );
-          })}
+        <View style={styles.sectionLabelArea}>
+          <ThemedText style={styles.sectionLabel} typography="body-3-bold">
+            약관 동의
+          </ThemedText>
         </View>
-      </View>
 
-      <View style={styles.footer}>
+        {orderedTerms.map((term) => {
+          const display = TERM_DISPLAY.find((spec) => spec.match(term));
+          const title = display?.title ?? term.title;
+          // "보기" 노출은 Figma 정책이 먼저고, 서버 contentUrl은 실제로 열
+          // 페이지가 있는지 확인하는 용도로만 쓴다.
+          const hasDetail =
+            (display?.hasDetail ?? true) && isValidHttpUrl(term.contentUrl);
+          return (
+            <TermRow
+              checked={agreements[term.id] ?? false}
+              hasDetail={hasDetail}
+              key={term.id}
+              onPressDetail={
+                hasDetail
+                  ? () => openTermContent(title, term.contentUrl)
+                  : undefined
+              }
+              onToggle={() =>
+                setAgreements((current) => ({
+                  ...current,
+                  [term.id]: !current[term.id],
+                }))
+              }
+              required={term.required}
+              title={title}
+            />
+          );
+        })}
+      </OnboardingContent>
+
+      <OnboardingFooter>
         <OnboardingCtaButton disabled={!canSubmit} onPress={handleSubmit} />
-      </View>
+      </OnboardingFooter>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   screen: {
-    backgroundColor: semanticColors["fill-subtle"],
+    backgroundColor: signupColors.white,
     flex: 1,
   },
   loadingScreen: {
     alignItems: "center",
+    flex: 1,
     gap: 16,
     justifyContent: "center",
     paddingHorizontal: 24,
@@ -410,50 +410,51 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: radius.default,
+    backgroundColor: signupColors.text,
+    borderRadius: 999,
     height: 44,
     justifyContent: "center",
     paddingHorizontal: 24,
   },
   retryButtonText: {
-    color: semanticColors["primary-on"],
+    color: signupColors.white,
   },
+  // Figma 콘텐츠 top 108 = status bar 44 + TopNav 52 + 12.
   content: {
     flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 18,
+    paddingTop: 12,
   },
   title: {
-    color: semanticColors["label-normal"],
-    marginBottom: 18,
+    color: signupColors.text,
   },
-  allAgreeCard: {
+  allAgreeRow: {
     alignItems: "center",
-    backgroundColor: semanticColors["background-normal"],
-    borderColor: semanticColors["line-normal"],
-    borderRadius: radius.default,
-    borderWidth: 1,
     flexDirection: "row",
     gap: 12,
-    height: 52,
-    marginBottom: 14,
-    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 24,
   },
   allAgreeText: {
-    color: semanticColors["label-normal"],
+    color: signupColors.text,
+    flex: 1,
+  },
+  divider: {
+    backgroundColor: signupColors.fill,
+    height: 1,
+    width: "100%",
+  },
+  sectionLabelArea: {
+    paddingBottom: 4,
+    paddingTop: 24,
   },
   sectionLabel: {
-    color: semanticColors["label-subtle"],
-    marginBottom: 18,
-  },
-  termsList: {
-    gap: 14,
+    color: signupColors.textSubtle,
   },
   termRow: {
     alignItems: "center",
     flexDirection: "row",
-    height: 44,
+    gap: 12,
+    paddingVertical: 14,
   },
   termCheckArea: {
     alignItems: "center",
@@ -462,33 +463,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   termText: {
-    color: semanticColors["label-normal"],
-    flexShrink: 1,
+    color: signupColors.text,
+    flex: 1,
   },
-  chevronButton: {
-    alignItems: "center",
-    height: 44,
-    justifyContent: "center",
-    width: 24,
-  },
-  checkbox: {
-    alignItems: "center",
-    borderRadius: 6,
-    height: 24,
-    justifyContent: "center",
-    width: 24,
-  },
-  checkboxChecked: {
-    backgroundColor: semanticColors["primary-normal"],
-  },
-  checkboxUnchecked: {
-    backgroundColor: semanticColors["background-normal"],
-    borderColor: semanticColors["line-strong"],
-    borderWidth: 1,
-  },
-  footer: {
-    paddingBottom: 24,
-    paddingHorizontal: 20,
-    paddingTop: 8,
+  detailText: {
+    color: signupColors.textSubtle,
+    textDecorationLine: "underline",
   },
 });
