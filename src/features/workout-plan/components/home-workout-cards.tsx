@@ -1,10 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { useEffect, useState } from "react";
-import { Modal, Pressable, View } from "react-native";
+import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import {
   formatStopwatchTime,
@@ -362,96 +363,6 @@ export function TodayWorkoutCard({
   );
 }
 
-// Figma 4331:25730/4331:25611의 "모달-캡션O" — RN 기본 Alert 대신 디자인
-// 그대로(흰 카드+알약 버튼 2개)로 맞춘 확인창. 확정 버튼 색만 상황에 따라
-// 다르다(종료=브랜드 오렌지, 리셋=경고 빨강).
-function ConfirmModal({
-  visible,
-  title,
-  description,
-  cancelLabel,
-  confirmLabel,
-  confirmColor,
-  onCancel,
-  onConfirm,
-}: {
-  visible: boolean;
-  title: string;
-  description: string;
-  cancelLabel: string;
-  confirmLabel: string;
-  confirmColor: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  if (!visible) return null;
-
-  return (
-    <Modal animationType="fade" onRequestClose={onCancel} transparent visible>
-      <View
-        className="flex-1 items-center justify-center px-6"
-        style={{ backgroundColor: "rgba(23, 23, 25, 0.45)" }}
-      >
-        <Pressable
-          accessibilityLabel="닫기"
-          accessibilityRole="button"
-          className="absolute inset-0"
-          onPress={onCancel}
-        />
-        <View className="w-[300px] items-center gap-5 rounded-[20px] bg-white px-5 pb-[18px] pt-[26px]">
-          <View className="items-center gap-2">
-            <ThemedText
-              style={{
-                color: primitiveColors.charcoal[11],
-                textAlign: "center",
-              }}
-              typography="title-3-bold"
-            >
-              {title}
-            </ThemedText>
-            <ThemedText
-              style={{
-                color: primitiveColors.charcoal[5],
-                textAlign: "center",
-              }}
-              typography="caption-1-regular"
-            >
-              {description}
-            </ThemedText>
-          </View>
-          <View className="flex-row gap-2.5">
-            <Pressable
-              accessibilityRole="button"
-              className="h-[50px] w-[125px] items-center justify-center rounded-full border border-charcoal-3 bg-white"
-              onPress={onCancel}
-            >
-              <ThemedText
-                style={{ color: primitiveColors.charcoal[11] }}
-                typography="body-3-bold"
-              >
-                {cancelLabel}
-              </ThemedText>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              className="h-[50px] w-[125px] items-center justify-center rounded-full"
-              onPress={onConfirm}
-              style={{ backgroundColor: confirmColor }}
-            >
-              <ThemedText
-                style={{ color: semanticColors["label-inverse"] }}
-                typography="body-3-bold"
-              >
-                {confirmLabel}
-              </ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 // Figma 4331:25004(운동 타이머) — 위 행 바로 아래 붙어서 한 카드처럼 보이는
 // 어두운 바. 표시값은 매초 강제 리렌더하되 startedAt(벽시계 기준)으로 다시
 // 계산해서, 화면이 꺼지거나 앱이 백그라운드로 가도 어긋나지 않는다.
@@ -560,6 +471,7 @@ function StopwatchBar({
           setConfirmDialog(null);
           onReset();
         }}
+        swapButtons
         title="기록을 리셋할까요?"
         visible={confirmDialog === "reset"}
       />
