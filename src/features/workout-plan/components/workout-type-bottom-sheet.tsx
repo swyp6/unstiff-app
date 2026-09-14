@@ -11,6 +11,7 @@ import {
 } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { EXERCISE_TYPES } from "@/features/workout-plan/model";
 
@@ -215,29 +216,13 @@ export function WorkoutTypeBottomSheet({
         )}
 
         <View style={styles.actionArea}>
-          <Pressable
-            accessibilityRole="button"
+          <ActionButton
             disabled={!canConfirm}
+            label="선택 완료"
             onPress={() =>
               onConfirm(isCustomMode ? customValue : (selectedType ?? value))
             }
-            style={styles.confirmPressable}
-          >
-            {({ pressed }) => (
-              <View
-                pointerEvents="none"
-                style={[
-                  styles.confirmButton,
-                  !canConfirm && styles.disabledButton,
-                  pressed && canConfirm && styles.pressed,
-                ]}
-              >
-                <ThemedText style={styles.confirmText} typography="body-1-bold">
-                  선택 완료
-                </ThemedText>
-              </View>
-            )}
-          </Pressable>
+          />
         </View>
       </View>
     </BottomSheet>
@@ -347,24 +332,6 @@ const styles = StyleSheet.create({
   actionArea: {
     height: 70,
     paddingTop: 16,
-  },
-  confirmPressable: {
-    height: 54,
-    width: "100%",
-  },
-  confirmButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["label-normal"],
-    borderRadius: 14,
-    flex: 1,
-    justifyContent: "center",
-    height: 54,
-  },
-  disabledButton: {
-    opacity: 0.35,
-  },
-  confirmText: {
-    color: semanticColors["label-inverse"],
   },
   pressed: {
     opacity: 0.7,
