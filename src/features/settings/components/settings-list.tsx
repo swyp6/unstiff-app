@@ -19,6 +19,7 @@ export const SETTINGS_DIVIDER_COLOR = primitiveColors.charcoal["1"];
 const SETTINGS_DIVIDER_WIDTH = 1;
 
 const ROW_HEIGHT = 56;
+const ROW_HEIGHT_COMPACT = 48;
 const ROW_HEIGHT_WITH_DESCRIPTION = 68;
 // Figma "Chevron / Design system" — 6×12 glyph를 담은 SVG(7.5×13.5).
 const CHEVRON_WIDTH = 7.5;
@@ -51,6 +52,10 @@ type SettingsRowProps = SettingsDividerProps & {
   destructive?: boolean;
   disabled?: boolean;
   onPress?: () => void;
+  // Figma List Row Trailing: Chevron(기본) / None(동의 내역처럼 표시만 하는 행).
+  trailing?: "chevron" | "none";
+  // 48 높이 변형(약관 및 개인정보의 "동의서 보기" 행).
+  compact?: boolean;
 };
 
 type SettingsInfoRowProps = SettingsDividerProps & {
@@ -119,13 +124,15 @@ function SettingsChevron() {
   );
 }
 
-// Trailing: Chevron. `description`이 있으면 68, 없으면 56 높이.
+// Trailing: Chevron / None. `description`이 있으면 68, 없으면 56(compact 48).
 export function SettingsRow({
   title,
   description,
   destructive = false,
   disabled = false,
   onPress,
+  trailing = "chevron",
+  compact = false,
   ...dividerProps
 }: SettingsRowProps) {
   return (
@@ -137,6 +144,7 @@ export function SettingsRow({
       onPress={onPress}
       style={[
         styles.row,
+        compact && styles.rowCompact,
         description !== undefined && styles.rowWithDescription,
         disabled && styles.rowDisabled,
       ]}
@@ -157,7 +165,7 @@ export function SettingsRow({
           </ThemedText>
         )}
       </View>
-      <SettingsChevron />
+      {trailing === "chevron" && <SettingsChevron />}
       <SettingsRowDividers {...dividerProps} />
     </Pressable>
   );
@@ -261,6 +269,9 @@ const styles = StyleSheet.create({
     height: ROW_HEIGHT,
     position: "relative",
     width: "100%",
+  },
+  rowCompact: {
+    height: ROW_HEIGHT_COMPACT,
   },
   rowWithDescription: {
     height: ROW_HEIGHT_WITH_DESCRIPTION,

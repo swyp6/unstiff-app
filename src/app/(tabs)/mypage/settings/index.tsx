@@ -58,12 +58,11 @@ export default function SettingsScreen() {
 
         <View style={[styles.section, styles.serviceSection]}>
           <SettingsSectionLabel label="서비스" />
-          {/* Figma 4841:25631은 약관 4종 대신 "약관 및 개인정보" 단일 진입점을
-              둔다. 그 관리 화면(약관 조회·동의 내역·AI 선택 동의)은 아직 route가
-              없어(후속 디자인에서 연결 예정) 누를 수 없는 상태로 둔다 — 존재하지
-              않는 route를 push하거나 문서 4종 중 하나를 대표로 열지 않는다. */}
+          {/* Figma 4841:25631 — 약관 4종을 각각 열던 대신 약관 조회·동의 내역·
+              AI 선택 동의를 관리하는 단일 진입점. */}
           <SettingsRow
             description="약관 조회 · 동의 내역 · AI 선택 동의 관리"
+            onPress={() => router.push("/mypage/settings/legal")}
             title="약관 및 개인정보"
           />
         </View>

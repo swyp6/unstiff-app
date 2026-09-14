@@ -7,6 +7,7 @@ import type {
   OAuth2SignInResponse,
   OAuthProvider,
   TermsListResponse,
+  TermsType,
   UpdateProfileRequest,
   UserProfile,
 } from "./types";
@@ -72,4 +73,11 @@ export async function hasUnagreedRequiredTerms() {
 
 export async function agreeToTerms(termsDocumentIds: number[]) {
   await apiClient.post("/api/v1/terms/agreements", { termsDocumentIds });
+}
+
+// DELETE /api/v1/terms/agreements/{type} — 선택 약관 동의 철회. 서버는 필수
+// 약관이면 REQUIRED_TERMS_CANNOT_WITHDRAW로 거절하므로 UI에서는 EXTERNAL_AI
+// 같은 선택 약관에만 쓴다.
+export async function withdrawTermsAgreement(type: TermsType) {
+  await apiClient.delete(`/api/v1/terms/agreements/${type}`);
 }
