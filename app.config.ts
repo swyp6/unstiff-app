@@ -27,6 +27,7 @@ const config: ExpoConfig = {
     },
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
 
