@@ -18,75 +18,82 @@
   }
 
   body {
-    @apply m-0 bg-background-normal text-label-normal antialiased;
+    @apply m-0 bg-background-normal text-charcoal-11 antialiased;
   }
 }
 
-/* Figma "WebView / Document" typography mapping:
-   title      → body/1/bold      (t05, 16/22, label-normal)
-   heading    → body/2/bold      (t04, 14/19, label-normal)
-   body/list  → caption/1/regular (t02, 12/16, label-subtle)
-   Figma의 327x530 카드는 앱 안의 mockup이라 폭/높이를 고정하지 않고,
-   카드가 화면 폭에 맞춰 늘어나고 본문은 세로로 자연스럽게 흐르게 둔다. */
+/* Figma AC-01-04-a (1449:2978) 문서 계층을 white theme으로 변환한 값.
+   title    → head_24_sb  (24px / 600 / 1.4)  #EFEFEF → charcoal-11 #252527
+   heading  → body_15_sb  (15px / 600 / 1.4)  #CCCCCC → charcoal-9  #424246
+   body     → Etc_13_r    (13px → 14px / 400)  #999999 → charcoal-8  #525257
+   레퍼런스의 line-height: normal은 한글 장문에 맞춰 1.6으로 바꾼다.
+   간격: 제목→본문 22px, section→section 26px, heading→body 8px,
+   문단→문단 10px, list item 6px. */
 @layer components {
   .legal-page {
-    @apply mx-auto min-h-screen w-full max-w-[800px] px-6 py-6 sm:py-10;
-    padding-top: max(1.5rem, env(safe-area-inset-top));
-    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    @apply mx-auto w-full max-w-[640px] px-5 pb-12 pt-7 sm:pt-10;
+    padding-bottom: max(3rem, env(safe-area-inset-bottom));
+  }
+
+  .legal-header h1 {
+    @apply text-[24px] font-semibold leading-[1.4] text-charcoal-11;
   }
 
   .legal-document {
-    @apply overflow-hidden rounded-xl border border-line-normal bg-background-normal px-[15px] pb-6 pt-[17px];
+    @apply mt-[22px] text-[14px] font-normal leading-[1.6] text-charcoal-8;
   }
 
-  .legal-document-header h1 {
-    @apply text-t05 font-bold text-label-normal;
+  .legal-document h2 {
+    @apply text-[15px] font-semibold leading-[1.4] text-charcoal-9;
   }
 
-  /* Figma: 구분선 아래 첫 section heading까지 19px */
-  .legal-document-body {
-    @apply mt-3 border-t border-line-normal pt-[19px];
+  .legal-document h2:not(:first-child) {
+    @apply mt-[26px];
   }
 
-  .legal-document-body h2 {
-    @apply text-t04 font-bold text-label-normal;
-  }
-
-  .legal-document-body h2:not(:first-child) {
-    @apply mt-7;
-  }
-
-  .legal-document-body p {
-    @apply mt-2 text-t02 font-normal text-label-subtle;
-  }
-
-  .legal-document-body h2 + p {
-    @apply mt-[7px];
-  }
-
-  /* Figma "Document / List · Collected Items": 항목 목록은 fill-subtle 배경의
-     highlight 블록 안에 들어간다. */
-  .legal-document-body ul {
-    @apply mt-3 list-disc rounded-default bg-fill-subtle py-[14px] pl-8 pr-[14px];
-  }
-
-  .legal-document-body ol {
-    @apply mt-2 list-decimal pl-5;
-  }
-
-  .legal-document-body li {
-    @apply text-t02 font-normal text-label-subtle;
-  }
-
-  .legal-document-body li + li {
+  .legal-document h2 + p,
+  .legal-document h2 + ol,
+  .legal-document h2 + ul {
     @apply mt-2;
   }
 
-  .legal-document-body li strong {
-    @apply font-bold text-label-normal;
+  .legal-document p + p,
+  .legal-document ol,
+  .legal-document ul,
+  .legal-document ol + p,
+  .legal-document ul + p {
+    @apply mt-2.5;
   }
 
-  .legal-document-body a {
-    @apply text-label-normal underline underline-offset-2;
+  .legal-document ol {
+    @apply list-decimal pl-5;
   }
+
+  .legal-document ul {
+    @apply list-disc pl-5;
+  }
+
+  .legal-document li + li {
+    @apply mt-1.5;
+  }
+
+  .legal-document li::marker {
+    @apply text-charcoal-6;
+  }
+
+  /* 수집 항목 / 이용 목적 같은 항목 라벨 — 본문과 같은 크기, heading 색으로만
+     구분한다. */
+  .legal-document li strong {
+    @apply font-semibold text-charcoal-9;
+  }
+
+  .legal-document a {
+    @apply text-charcoal-11 underline underline-offset-2;
+  }
+}
+
+/* .eleventy.js keepMiddleDotWords transform이 "수집·이용" 같은 어절에 붙인다.
+   content 파일에 없는 클래스라 @layer 밖에 둬야 purge되지 않는다. */
+.nowrap {
+  white-space: nowrap;
 }

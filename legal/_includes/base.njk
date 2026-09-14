@@ -12,20 +12,17 @@
     <link rel="stylesheet" href="/styles/site.css" />
   </head>
   <body>
+    {# Figma AC-01-04-a (1449:2978)의 문서 구조를 white theme으로 옮긴 flat
+       editorial layout: 카드·구분선 없이 제목 → 본문이 화면 위에 바로 놓인다.
+       [필수]/[선택], 버전, 시행일은 웹 문서에 표시하지 않는다.
+       typography/spacing은 styles/input.css의 .legal-document 규칙이 담당한다. #}
     <main class="legal-page">
-      {# Figma "WebView / Document" (4576:39975, 4576:40001): 제목·구분선·본문이
-         하나의 카드 안에 들어간다. Figma의 "웹페이지 · 배포 URL 연결"은 개발
-         설명 placeholder라 실제 페이지에는 두지 않고, 버전/시행일도 확정값이
-         없어 표시하지 않는다. 문서 본문 typography는 styles/input.css의
-         .legal-document 규칙이 담당한다. #}
-      <article class="legal-document">
-        <header class="legal-document-header">
-          <h1>{{ title }}</h1>
-        </header>
+      <header class="legal-header">
+        <h1>{{ title }}</h1>
+      </header>
 
-        <div class="legal-document-body">
-          {{ content | safe }}
-        </div>
+      <article class="legal-document">
+        {{ content | safe }}
       </article>
     </main>
   </body>
