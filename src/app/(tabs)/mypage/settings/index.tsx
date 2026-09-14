@@ -1,12 +1,10 @@
-import * as WebBrowser from "expo-web-browser";
 import Constants from "expo-constants";
 import { router } from "expo-router";
-import { Alert, StyleSheet, View } from "react-native";
+import { Alert, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
-import { LEGAL_DOCUMENTS } from "@/constants/legal-urls";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
 import {
@@ -20,18 +18,6 @@ const ACCOUNT_ITEMS = [
   { title: "알림 설정", href: "/mypage/settings/notification" },
   { title: "앱 권한 및 연동", href: "/mypage/settings/permissions" },
 ] as const;
-
-// 온보딩 약관과 같은 문서 4종. 설정 row는 기존 항목처럼 [필수]/[선택]
-// 접두어 없이 문서명만 보여준다.
-const SERVICE_ITEMS = LEGAL_DOCUMENTS;
-
-async function openLegalDocument(url: string) {
-  try {
-    await WebBrowser.openBrowserAsync(url);
-  } catch {
-    Alert.alert("오류", "페이지를 열지 못했습니다. 잠시 후 다시 시도해주세요.");
-  }
-}
 
 export default function SettingsScreen() {
   function handleLogout() {
@@ -47,9 +33,16 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
-      <SettingsHeader onBack={() => goBackOrReplace("/mypage")} title="설정" />
+      <SettingsHeader
+        onBack={() => goBackOrReplace("/mypage")}
+        title="설정"
+        variant="settingsNav"
+      />
 
-      <View style={styles.content}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.section}>
           <SettingsSectionLabel label="계정 및 앱 설정" />
           <View>
@@ -63,17 +56,16 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
+        <View style={[styles.section, styles.serviceSection]}>
           <SettingsSectionLabel label="서비스" />
-          <View>
-            {SERVICE_ITEMS.map((item) => (
-              <SettingsRow
-                key={item.url}
-                onPress={() => void openLegalDocument(item.url)}
-                title={item.title}
-              />
-            ))}
-          </View>
+          {/* Figma 4841:25631은 약관 4종 대신 "약관 및 개인정보" 단일 진입점을
+              둔다. 그 관리 화면(약관 조회·동의 내역·AI 선택 동의)은 아직 route가
+              없어(후속 디자인에서 연결 예정) 누를 수 없는 상태로 둔다 — 존재하지
+              않는 route를 push하거나 문서 4종 중 하나를 대표로 열지 않는다. */}
+          <SettingsRow
+            description="약관 조회 · 동의 내역 · AI 선택 동의 관리"
+            title="약관 및 개인정보"
+          />
         </View>
 
         <View style={styles.actionSection}>
@@ -85,14 +77,14 @@ export default function SettingsScreen() {
           />
         </View>
 
-        <ThemedText
-          style={styles.versionText}
-          themeColor="textDisabled"
-          typography="caption-2-regular"
-        >
+        {/* Figma 기준(812 높이) 마지막 행 아래 108, safe-area 하단 위 39에
+            버전이 오도록 — 남는 세로 공간이 있으면 spacer가 늘어나 아래쪽에
+            머물고, 작은 기기에서는 최소 간격만 지키며 스크롤된다. */}
+        <View style={styles.versionSpacer} />
+        <ThemedText style={styles.versionText} typography="caption-2-regular">
           {`현재 앱 버전 : ${Constants.expoConfig?.version ?? "-"}`}
         </ThemedText>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -103,17 +95,28 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    flexGrow: 1,
+    paddingBottom: 39,
     paddingHorizontal: 24,
+    paddingTop: 16,
   },
   section: {
     gap: 8,
-    marginBottom: 32,
+    marginBottom: 40,
+  },
+  // Figma: 서비스 섹션과 로그아웃·회원 탈퇴 그룹 사이만 24.
+  serviceSection: {
+    marginBottom: 24,
   },
   actionSection: {
-    marginTop: 8,
+    gap: 8,
+  },
+  versionSpacer: {
+    flexGrow: 1,
+    minHeight: 108,
   },
   versionText: {
-    marginTop: 32,
+    color: primitiveColors.charcoal["5"],
     textAlign: "center",
   },
 });
