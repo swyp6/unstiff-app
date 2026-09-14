@@ -1219,7 +1219,7 @@ export default function HomeScreen() {
           onClose={() => setNewPlanDraft(null)}
           onDelete={() => setNewPlanDraft(null)}
           onSave={saveNewPlan}
-          saveLabel="운동 추가하기"
+          saveLabel="오늘의 운동으로 담기"
           showDelete={false}
           showAddToTodayToggle
           title="운동 추가하기"

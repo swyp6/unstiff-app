@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 
 export function WorkoutPlanDragIndicator() {
   return <View style={styles.dragIndicator} />;
@@ -45,11 +45,32 @@ export function WorkoutPlanHeader({
   );
 }
 
-export function SectionLabel({ children }: { children: ReactNode }) {
+export function SectionLabel({
+  children,
+  optional = false,
+}: {
+  children: ReactNode;
+  // Figma node 4640:17123 등 — 필수 아닌 필드(예상 시작 시간/강도/한 줄 메모)만
+  // 라벨 옆에 회색 "선택" 표시가 붙는다.
+  optional?: boolean;
+}) {
   return (
-    <ThemedText style={styles.sectionLabel} typography="caption-1-bold">
-      {children}
-    </ThemedText>
+    <View style={styles.sectionLabelRow}>
+      <ThemedText
+        style={{ color: primitiveColors.charcoal["11"] }}
+        typography="body-1-bold"
+      >
+        {children}
+      </ThemedText>
+      {optional && (
+        <ThemedText
+          style={{ color: primitiveColors.charcoal["5"] }}
+          typography="caption-1-regular"
+        >
+          선택
+        </ThemedText>
+      )}
+    </View>
   );
 }
 
@@ -69,7 +90,7 @@ export function SelectionRow({
     <>
       <ThemedText
         style={!hasValue && { color: semanticColors["label-disabled"] }}
-        typography="body-2-bold"
+        typography="body-1-medium"
       >
         {hasValue ? value : placeholder}
       </ThemedText>
@@ -163,8 +184,10 @@ const styles = StyleSheet.create({
     flex: 1,
     textAlign: "center",
   },
-  sectionLabel: {
-    color: semanticColors["label-normal"],
+  sectionLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     marginBottom: 6,
   },
   selectionRow: {

@@ -87,7 +87,7 @@ export function WorkoutPlanEditSheet({
   // 맞춰 바뀐다 — 편집 흐름(showAddToTodayToggle=false)은 항상 전달받은
   // saveLabel 그대로 쓴다.
   const displayedSaveLabel =
-    showAddToTodayToggle && saveAsRoutine ? "루틴 추가하기" : saveLabel;
+    showAddToTodayToggle && saveAsRoutine ? "루틴으로 추가하기" : saveLabel;
   // 운동명·운동 종류·기록할 항목(4개 중 하나 이상) 셋 다 있어야 저장 가능.
   const canSubmit =
     draft.title.trim().length > 0 &&
@@ -240,7 +240,7 @@ export function WorkoutPlanEditSheet({
           <View style={styles.stopwatchRow}>
             <ThemedText
               style={styles.stopwatchLabel}
-              typography="body-2-regular"
+              typography="body-1-regular"
             >
               스톱워치
             </ThemedText>
@@ -264,7 +264,7 @@ export function WorkoutPlanEditSheet({
         )}
 
         <View>
-          <SectionLabel>예상 시작 시간</SectionLabel>
+          <SectionLabel optional>예상 시작 시간</SectionLabel>
           <SelectionRow
             onPress={() => setIsTimeSheetVisible(true)}
             placeholder="선택해주세요"
@@ -273,7 +273,7 @@ export function WorkoutPlanEditSheet({
         </View>
 
         <View>
-          <SectionLabel>강도</SectionLabel>
+          <SectionLabel optional>강도</SectionLabel>
           <SelectionRow
             onPress={() => setIsIntensitySheetVisible(true)}
             placeholder="선택해주세요"
@@ -282,7 +282,7 @@ export function WorkoutPlanEditSheet({
         </View>
 
         <View>
-          <SectionLabel>한 줄 메모</SectionLabel>
+          <SectionLabel optional>한 줄 메모</SectionLabel>
           <TextInput
             accessibilityLabel="한 줄 메모"
             maxLength={20}
@@ -332,7 +332,7 @@ export function WorkoutPlanEditSheet({
                 />
               )}
             </View>
-            <ThemedText typography="body-2-regular">루틴으로 할래요</ThemedText>
+            <ThemedText typography="body-1-regular">루틴으로 할래요</ThemedText>
           </Pressable>
         )}
 
