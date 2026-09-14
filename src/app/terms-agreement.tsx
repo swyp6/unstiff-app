@@ -11,7 +11,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { LEGAL_DOCUMENTS } from "@/constants/legal-urls";
+import { LEGAL_DOCUMENTS, LEGAL_URLS } from "@/constants/legal-urls";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
 import { CheckCircle } from "@/features/auth/components/check-circle";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
@@ -115,12 +115,16 @@ function TermRow({
 // 화면에 그려지는 약관은 전부 GET /api/v1/terms 응답이고, 로컬에서 만들어내는
 // 약관은 없다. 이 배열은 표시 계층 — 노출 순서와 문구 — 만 담당한다.
 // id·type·required·contentUrl·agreed 같은 실제 약관 상태는 서버 응답이
-// source of truth다. 4종 모두 배포된 문서(LEGAL_DOCUMENTS)가 있으므로 "보기"는
+// source of truth다. 배포된 문서(LEGAL_DOCUMENTS)가 있으므로 "보기"는
 // 서버가 열 수 있는 contentUrl을 내려주는지만 보고 정한다.
 //
-// 민감정보/외부 AI 약관의 서버 type은 아직 정해지지 않아 type이 아니라 문서명으로
+// 민감정보/AI 약관의 서버 type은 아직 정해지지 않아 type이 아니라 문서명으로
 // 매칭한다. 서버가 "[필수] " 접두어나 "동의" 접미사를 붙여 내려주든 아니든
 // 걸리도록 둘 다 떼고 비교한다.
+//
+// 온보딩은 PRIVACY / SERVICE / SENSITIVE 3종만 받는다(allowlist). AI 개인화 기능
+// 이용 동의(EXTERNAL_AI)를 비롯해 서버에 추가되는 다른 약관은 온보딩에 노출하지
+// 않는다 — 설정 화면에서만 노출하므로 LEGAL_DOCUMENTS에는 그대로 둔다.
 type TermDisplaySpec = {
   match: (term: Term) => boolean;
   title: string;
@@ -139,14 +143,42 @@ function byTitle(title: string) {
   return (term: Term) => normalizeTermTitle(term.title) === expected;
 }
 
-const TERM_DISPLAY: TermDisplaySpec[] = LEGAL_DOCUMENTS.map((document) => ({
-  match: byTitle(document.title),
-  title: document.title,
-}));
+// 온보딩에 노출하는 문서 3종 — 노출 순서 그대로.
+const ONBOARDING_DOCUMENT_URLS: readonly string[] = [
+  LEGAL_URLS.privacy,
+  LEGAL_URLS.terms,
+  LEGAL_URLS.sensitive,
+];
+
+const TERM_DISPLAY: TermDisplaySpec[] = ONBOARDING_DOCUMENT_URLS.flatMap(
+  (url) =>
+    LEGAL_DOCUMENTS.filter((document) => document.url === url).map(
+      (document) => ({ match: byTitle(document.title), title: document.title }),
+    ),
+);
+
+// 온보딩 허용 type. SENSITIVE는 아직 TermsType 유니온에 없어 문자열 Set으로 둔다.
+const ONBOARDING_TERM_TYPES: ReadonlySet<string> = new Set([
+  "PRIVACY",
+  "SERVICE",
+  "SENSITIVE",
+]);
+
+// 서버 응답에서 온보딩에 보여줄 약관만 남긴다(allowlist). type이 허용 목록에
+// 있거나, type이 불완전해도 문서명이 온보딩 3종과 매칭되면 통과한다. 그 외
+// (EXTERNAL_AI, 앞으로 추가될 다른 약관)는 렌더링은 물론 전체 동의·
+// requiredAgreed·POST /terms/agree 어디에도 들어가지 않는다 — 사용자가 보지
+// 못한 약관에 동의 데이터를 만들면 안 되기 때문이다.
+function isOnboardingTerm(term: Term) {
+  return (
+    ONBOARDING_TERM_TYPES.has(term.type) ||
+    TERM_DISPLAY.some((spec) => spec.match(term))
+  );
+}
 
 function termOrderIndex(term: Term) {
   const index = TERM_DISPLAY.findIndex((spec) => spec.match(term));
-  // 목록에 없는 약관이 서버에 추가되면 알려진 항목 뒤에 서버 순서대로 붙는다.
+  // type으로만 통과한 약관(문서명 미매칭)은 알려진 항목 뒤에 서버 순서대로 붙는다.
   return index === -1 ? TERM_DISPLAY.length : index;
 }
 
@@ -162,10 +194,12 @@ export default function TermsAgreementScreen() {
     getTerms()
       .then((result) => {
         if (cancelled) return;
-        setTerms(result.terms);
+        // 이후 모든 계산(정렬·전체 동의·필수 동의·제출)은 이 필터링된 목록만 본다.
+        const onboardingTerms = result.terms.filter(isOnboardingTerm);
+        setTerms(onboardingTerms);
         setAgreements(
           Object.fromEntries(
-            result.terms.map((term) => [term.id, term.agreed]),
+            onboardingTerms.map((term) => [term.id, term.agreed]),
           ),
         );
       })
@@ -191,7 +225,7 @@ export default function TermsAgreementScreen() {
     [terms],
   );
 
-  // 선택 약관(외부 AI 동의)까지 포함한다.
+  // 온보딩에 보이는 약관(allowlist 통과분)만 대상이다.
   const allAgreed = useMemo(
     () =>
       orderedTerms !== null &&
@@ -200,8 +234,8 @@ export default function TermsAgreementScreen() {
     [orderedTerms, agreements],
   );
 
-  // required 약관만 본다 — 선택 약관(외부 AI 동의)은 required=false라 미동의여도
-  // 다음 단계로 진행할 수 있다.
+  // required 약관만 본다 — 서버가 선택 약관을 추가로 내려주면 required=false라
+  // 미동의여도 다음 단계로 진행할 수 있다.
   const requiredAgreed = useMemo(() => {
     if (terms === null) return false;
     const requiredTerms = terms.filter((term) => term.required);
@@ -225,6 +259,7 @@ export default function TermsAgreementScreen() {
     if (!terms) return;
     setIsSubmitting(true);
     try {
+      // terms는 이미 온보딩 노출 목록이라 allowlist 밖 약관 id는 들어올 수 없다.
       const agreedIds = terms
         .filter((term) => agreements[term.id])
         .map((term) => term.id);
@@ -334,8 +369,8 @@ export default function TermsAgreementScreen() {
         {orderedTerms.map((term) => {
           const display = TERM_DISPLAY.find((spec) => spec.match(term));
           const title = display?.title ?? term.title;
-          // 4종 모두 상세 문서가 있어 열 수 있는 contentUrl이 오면 "보기"를
-          // 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만 둔다.
+          // 온보딩 약관은 모두 상세 문서가 있어 열 수 있는 contentUrl이 오면
+          // "보기"를 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만 둔다.
           const hasDetail = isValidHttpUrl(term.contentUrl);
           return (
             <TermRow
