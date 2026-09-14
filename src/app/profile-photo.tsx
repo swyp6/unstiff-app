@@ -35,18 +35,26 @@ const HERO_CENTER_OFFSET_COMPACT = 34;
 const HERO_AVATAR_TEXT_GAP = 24;
 const HERO_TITLE_DESCRIPTION_GAP = 8;
 
+type PhotoLibraryAccess = "full" | "limited" | "denied";
+
 // 커스텀 앨범(/profile-photo-library)은 expo-media-library의 읽기 권한이
 // 있어야 목록을 가져올 수 있다. 권한이 없거나(예: Android 13+에서 manifest에
 // READ_MEDIA_IMAGES가 없어 요청 자체가 거부되는 경우) 요청이 실패하면 기존
 // native picker(expo-image-picker) 흐름으로 그대로 돌아간다.
-async function canUseCustomPhotoLibrary() {
+//
+// "limited"(iOS "선택한 사진만" / Android 14 부분 접근)는 granted=true로
+// 내려오지만 커스텀 앨범에는 허용한 사진만 나오고 허용 목록을 바꿀 UI도 없다.
+// 시스템 picker는 limited여도 전체 라이브러리를 보여주므로 full과 구분해
+// 호출부가 picker로 보낼 수 있게 한다.
+async function getPhotoLibraryAccess(): Promise<PhotoLibraryAccess> {
   try {
     const permission = await MediaLibrary.requestPermissionsAsync(false, [
       "photo",
     ]);
-    return permission.granted || permission.accessPrivileges === "limited";
+    if (permission.accessPrivileges === "limited") return "limited";
+    return permission.granted ? "full" : "denied";
   } catch {
-    return false;
+    return "denied";
   }
 }
 
@@ -103,10 +111,12 @@ export default function ProfilePhotoScreen() {
     if (isPicking) return;
     setIsPicking(true);
     try {
-      if (await canUseCustomPhotoLibrary()) {
+      if ((await getPhotoLibraryAccess()) === "full") {
         router.push("/profile-photo-library");
         return;
       }
+      // limited → 시스템 picker가 전체 라이브러리를 보여준다.
+      // denied → pickImage가 기존대로 권한 요청 후 거부 시 안내 alert를 띄운다.
       const asset = await pickImage("library");
       if (!asset) return; // user cancelled the system picker — stay put
       router.push({
