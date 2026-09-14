@@ -42,6 +42,7 @@ export default function RootLayout() {
             <Stack.Screen name="onboarding" />
             <Stack.Screen name="login" />
             <Stack.Screen name="terms-agreement" />
+            <Stack.Screen name="terms-document/[type]" />
             <Stack.Screen name="map" />
             <Stack.Screen
               name="camera"

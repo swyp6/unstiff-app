@@ -9,14 +9,14 @@ import {
 import { semanticColors } from "@/constants/tokens";
 import { getTerms } from "@/features/auth/api";
 import type { Term } from "@/features/auth/types";
-import { LegalDocumentCard } from "@/features/settings/components/legal-document-card";
+import { LegalDocumentCard } from "@/features/legal/components/legal-document-card";
+import { formatLegalDocumentMeta } from "@/features/legal/legal-document-meta";
 import {
   SETTINGS_CHROME_BACKGROUND,
   SettingsHeader,
 } from "@/features/settings/components/settings-header";
 import {
   findTerm,
-  formatLegalDocumentMeta,
   isLegalDocumentType,
   LEGAL_DOCUMENT_COPY,
 } from "@/features/settings/legal-terms";

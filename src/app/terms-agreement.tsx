@@ -1,4 +1,3 @@
-import * as WebBrowser from "expo-web-browser";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -11,7 +10,6 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { LEGAL_DOCUMENTS, LEGAL_URLS } from "@/constants/legal-urls";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
 import { CheckCircle } from "@/features/auth/components/check-circle";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
@@ -20,37 +18,23 @@ import {
   OnboardingContent,
   OnboardingFooter,
 } from "@/features/auth/components/onboarding-layout";
+import {
+  getOnboardingTermTitle,
+  isOnboardingTermType,
+  isValidHttpUrl,
+  ONBOARDING_TERM_DISPLAY,
+  type OnboardingTermType,
+} from "@/features/auth/onboarding-terms";
 import { signupColors } from "@/features/auth/signup-ui";
 import type { Term } from "@/features/auth/types";
 import { useSignupStore } from "@/store/signup-store";
 
-function isValidHttpUrl(value: string | null | undefined): value is string {
-  if (!value) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-async function openTermContent(
-  title: string,
-  contentUrl: string | null | undefined,
-) {
-  if (!isValidHttpUrl(contentUrl)) {
-    console.warn(
-      `[terms-agreement] invalid contentUrl for term "${title}":`,
-      contentUrl,
-    );
-    Alert.alert("오류", "약관 내용을 불러올 수 없습니다.");
-    return;
-  }
-  try {
-    await WebBrowser.openBrowserAsync(contentUrl);
-  } catch {
-    Alert.alert("오류", "페이지를 열지 못했습니다. 잠시 후 다시 시도해주세요.");
-  }
+// "보기"는 앱 안의 온보딩 문서 상세(terms-document/[type])를 push한다 —
+// 설정 > 약관 및 개인정보 상세와 같은 WebView 카드다. type만 넘기고 contentUrl은
+// 상세가 GET /terms에서 다시 찾는다(source of truth를 서버에 둔다). push라 이
+// 화면은 스택에 남고, back으로 돌아오면 체크 상태(agreements)가 그대로다.
+function openTermDocument(type: OnboardingTermType) {
+  router.push(`/terms-document/${type}` as const);
 }
 
 function handleBack() {
@@ -113,73 +97,28 @@ function TermRow({
 }
 
 // 화면에 그려지는 약관은 전부 GET /api/v1/terms 응답이고, 로컬에서 만들어내는
-// 약관은 없다. 이 배열은 표시 계층 — 노출 순서와 문구 — 만 담당한다.
+// 약관은 없다. 노출 대상(allowlist)·순서·문구 정책은 onboarding-terms.ts에 있고
 // id·type·required·contentUrl·agreed 같은 실제 약관 상태는 서버 응답이
-// source of truth다. 배포된 문서(LEGAL_DOCUMENTS)가 있으므로 "보기"는
-// 서버가 열 수 있는 contentUrl을 내려주는지만 보고 정한다.
+// source of truth다. "보기"는 서버가 열 수 있는 contentUrl을 내려주는지만 보고
+// 정한다.
 //
-// 민감정보/AI 약관의 서버 type은 아직 정해지지 않아 type이 아니라 문서명으로
-// 매칭한다. 서버가 "[필수] " 접두어나 "동의" 접미사를 붙여 내려주든 아니든
-// 걸리도록 둘 다 떼고 비교한다.
-//
-// 온보딩은 PRIVACY / SERVICE / SENSITIVE 3종만 받는다(allowlist). AI 개인화 기능
-// 이용 동의(EXTERNAL_AI)를 비롯해 서버에 추가되는 다른 약관은 온보딩에 노출하지
-// 않는다 — 설정 화면에서만 노출하므로 LEGAL_DOCUMENTS에는 그대로 둔다.
-type TermDisplaySpec = {
-  match: (term: Term) => boolean;
-  title: string;
-};
-
-function normalizeTermTitle(title: string) {
-  return title
-    .replace(/^\[(필수|선택)\]\s*/, "")
-    .replace(/\s+/g, " ")
-    .replace(/\s*동의$/, "")
-    .trim();
-}
-
-function byTitle(title: string) {
-  const expected = normalizeTermTitle(title);
-  return (term: Term) => normalizeTermTitle(term.title) === expected;
-}
-
-// 온보딩에 노출하는 문서 3종 — 노출 순서 그대로.
-const ONBOARDING_DOCUMENT_URLS: readonly string[] = [
-  LEGAL_URLS.privacy,
-  LEGAL_URLS.terms,
-  LEGAL_URLS.sensitive,
-];
-
-const TERM_DISPLAY: TermDisplaySpec[] = ONBOARDING_DOCUMENT_URLS.flatMap(
-  (url) =>
-    LEGAL_DOCUMENTS.filter((document) => document.url === url).map(
-      (document) => ({ match: byTitle(document.title), title: document.title }),
-    ),
-);
-
-// 온보딩 허용 type. SENSITIVE는 아직 TermsType 유니온에 없어 문자열 Set으로 둔다.
-const ONBOARDING_TERM_TYPES: ReadonlySet<string> = new Set([
-  "PRIVACY",
-  "SERVICE",
-  "SENSITIVE",
-]);
-
-// 서버 응답에서 온보딩에 보여줄 약관만 남긴다(allowlist). type이 허용 목록에
-// 있거나, type이 불완전해도 문서명이 온보딩 3종과 매칭되면 통과한다. 그 외
-// (EXTERNAL_AI, 앞으로 추가될 다른 약관)는 렌더링은 물론 전체 동의·
-// requiredAgreed·POST /terms/agree 어디에도 들어가지 않는다 — 사용자가 보지
-// 못한 약관에 동의 데이터를 만들면 안 되기 때문이다.
+// 서버 응답에서 온보딩에 보여줄 약관만 남긴다(allowlist). type이 허용 목록
+// (PRIVACY / SERVICE / SENSITIVE)에 있거나, type이 불완전해도 문서명이 온보딩
+// 3종과 매칭되면 통과한다. 그 외(EXTERNAL_AI, 앞으로 추가될 다른 약관)는
+// 렌더링은 물론 전체 동의·requiredAgreed·POST /terms/agreements 어디에도
+// 들어가지 않는다 — 사용자가 보지 못한 약관에 동의 데이터를 만들면 안 되기
+// 때문이다.
 function isOnboardingTerm(term: Term) {
   return (
-    ONBOARDING_TERM_TYPES.has(term.type) ||
-    TERM_DISPLAY.some((spec) => spec.match(term))
+    isOnboardingTermType(term.type) ||
+    ONBOARDING_TERM_DISPLAY.some((spec) => spec.match(term))
   );
 }
 
 function termOrderIndex(term: Term) {
-  const index = TERM_DISPLAY.findIndex((spec) => spec.match(term));
+  const index = ONBOARDING_TERM_DISPLAY.findIndex((spec) => spec.match(term));
   // type으로만 통과한 약관(문서명 미매칭)은 알려진 항목 뒤에 서버 순서대로 붙는다.
-  return index === -1 ? TERM_DISPLAY.length : index;
+  return index === -1 ? ONBOARDING_TERM_DISPLAY.length : index;
 }
 
 export default function TermsAgreementScreen() {
@@ -220,7 +159,8 @@ export default function TermsAgreementScreen() {
     () =>
       terms === null
         ? null
-        : // sort는 stable이라 TERM_DISPLAY에 없는 약관끼리는 서버 순서를 유지한다.
+        : // sort는 stable이라 ONBOARDING_TERM_DISPLAY에 없는 약관끼리는 서버 순서를
+          // 유지한다.
           [...terms].sort((a, b) => termOrderIndex(a) - termOrderIndex(b)),
     [terms],
   );
@@ -367,20 +307,22 @@ export default function TermsAgreementScreen() {
         </View>
 
         {orderedTerms.map((term) => {
-          const display = TERM_DISPLAY.find((spec) => spec.match(term));
-          const title = display?.title ?? term.title;
+          const title = getOnboardingTermTitle(term);
           // 온보딩 약관은 모두 상세 문서가 있어 열 수 있는 contentUrl이 오면
-          // "보기"를 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만 둔다.
-          const hasDetail = isValidHttpUrl(term.contentUrl);
+          // "보기"를 보여준다. contentUrl이 null인 약관은 서버 계약대로 체크박스만
+          // 둔다. 상세 route는 allowlist type만 받으므로 문서명으로만 통과한
+          // (type 미확정) 약관은 "보기"를 열 수 없어 숨긴다.
+          const detailType =
+            isValidHttpUrl(term.contentUrl) && isOnboardingTermType(term.type)
+              ? term.type
+              : null;
           return (
             <TermRow
               checked={agreements[term.id] ?? false}
-              hasDetail={hasDetail}
+              hasDetail={detailType !== null}
               key={term.id}
               onPressDetail={
-                hasDetail
-                  ? () => openTermContent(title, term.contentUrl)
-                  : undefined
+                detailType ? () => openTermDocument(detailType) : undefined
               }
               onToggle={() =>
                 setAgreements((current) => ({
