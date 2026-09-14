@@ -1,6 +1,8 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import {
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -39,6 +41,32 @@ export function WorkoutTypeBottomSheet({
   const [customDraft, setCustomDraft] = useState(
     isDefaultType ? "" : value.slice(0, MAX_CUSTOM_LENGTH),
   );
+  // 시트가 열리자마자(기존 값이 직접 입력 값이라 isCustomMode가 처음부터
+  // true인 경우) 키보드가 자동으로 뜨면 안 되고, "직접 입력"을 눌러서 연
+  // 경우에만 키보드가 떠야 한다.
+  const [shouldAutoFocusCustom, setShouldAutoFocusCustom] = useState(false);
+  // BottomSheet의 KeyboardAvoidingView("padding")는 이 임베디드 시트
+  // 구조(Modal + 애니메이션 transform 중첩)에서는 안 먹혀서, 키보드 높이를
+  // 직접 추적해 그만큼 컨텐츠 아래쪽에 빈 공간을 줘서 직접 입력 필드와
+  // 완료 버튼이 키보드 위로 밀려 올라오게 한다.
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const showSubscription = Keyboard.addListener(showEvent, (event) =>
+      setKeyboardHeight(event.endCoordinates.height),
+    );
+    const hideSubscription = Keyboard.addListener(hideEvent, () =>
+      setKeyboardHeight(0),
+    );
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
   const customValue = customDraft.trim();
   const canConfirm = isCustomMode
     ? customValue.length > 0
@@ -52,6 +80,7 @@ export function WorkoutTypeBottomSheet({
   const openCustomInput = () => {
     setSelectedType(null);
     setIsCustomMode(true);
+    setShouldAutoFocusCustom(true);
   };
 
   const toggleCustomInput = () => {
@@ -66,120 +95,123 @@ export function WorkoutTypeBottomSheet({
     <BottomSheet
       embedded={embedded}
       fixedHeightRatio={682 / 814}
+      keyboardAvoiding={false}
       onClose={onClose}
       title="운동 종류"
       visible={visible}
     >
-      <ScrollView
-        contentContainerStyle={styles.optionsContent}
-        nestedScrollEnabled
-        showsVerticalScrollIndicator={false}
-        style={styles.options}
-      >
-        {EXERCISE_TYPES.map((type) => {
-          const selected = !isCustomMode && selectedType === type;
-          return (
-            <Fragment key={type}>
-              <Pressable
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selected }}
-                onPress={() => selectDefaultType(type)}
-                style={styles.optionPressable}
+      <View style={[styles.body, { paddingBottom: keyboardHeight }]}>
+        <ScrollView
+          contentContainerStyle={styles.optionsContent}
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+          style={styles.options}
+        >
+          {EXERCISE_TYPES.map((type) => {
+            const selected = !isCustomMode && selectedType === type;
+            return (
+              <Fragment key={type}>
+                <Pressable
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: selected }}
+                  onPress={() => selectDefaultType(type)}
+                  style={styles.optionPressable}
+                >
+                  {({ pressed }) => (
+                    <View
+                      pointerEvents="none"
+                      style={[styles.option, pressed && styles.pressed]}
+                    >
+                      <ThemedText typography="body-2-bold">{type}</ThemedText>
+                      <SelectionCircle selected={selected} />
+                    </View>
+                  )}
+                </Pressable>
+                <View style={styles.divider} />
+              </Fragment>
+            );
+          })}
+
+          <Pressable
+            accessibilityRole="button"
+            onPress={toggleCustomInput}
+            style={styles.customOptionPressable}
+          >
+            {({ pressed }) => (
+              <View
+                pointerEvents="none"
+                style={[styles.option, pressed && styles.pressed]}
               >
-                {({ pressed }) => (
-                  <View
-                    pointerEvents="none"
-                    style={[styles.option, pressed && styles.pressed]}
-                  >
-                    <ThemedText typography="body-2-bold">{type}</ThemedText>
-                    <SelectionCircle selected={selected} />
-                  </View>
-                )}
+                <ThemedText typography="body-2-bold">직접 입력</ThemedText>
+                <Ionicons
+                  color={semanticColors["label-subtle"]}
+                  name={isCustomMode ? "remove" : "add"}
+                  size={14}
+                />
+              </View>
+            )}
+          </Pressable>
+        </ScrollView>
+
+        {isCustomMode && (
+          <View style={styles.customInputRow}>
+            <TextInput
+              accessibilityLabel="직접 입력 운동 종류"
+              autoFocus={shouldAutoFocusCustom}
+              maxLength={MAX_CUSTOM_LENGTH}
+              onChangeText={setCustomDraft}
+              placeholder="운동 종류를 입력해 주세요"
+              placeholderTextColor={semanticColors["label-disabled"]}
+              returnKeyType="done"
+              style={styles.input}
+              value={customDraft}
+            />
+            <ThemedText style={styles.count} typography="caption-1-medium">
+              {customDraft.length} / {MAX_CUSTOM_LENGTH}
+            </ThemedText>
+            {customDraft.length > 0 && (
+              <Pressable
+                accessibilityLabel="직접 입력 내용 지우기"
+                accessibilityRole="button"
+                hitSlop={8}
+                onPress={() => setCustomDraft("")}
+                style={styles.clearButton}
+              >
+                <Ionicons
+                  color={semanticColors["label-subtle"]}
+                  name="close-circle"
+                  size={20}
+                />
               </Pressable>
-              <View style={styles.divider} />
-            </Fragment>
-          );
-        })}
+            )}
+          </View>
+        )}
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={toggleCustomInput}
-          style={styles.customOptionPressable}
-        >
-          {({ pressed }) => (
-            <View
-              pointerEvents="none"
-              style={[styles.option, pressed && styles.pressed]}
-            >
-              <ThemedText typography="body-2-bold">직접 입력</ThemedText>
-              <Ionicons
-                color={semanticColors["label-subtle"]}
-                name={isCustomMode ? "remove" : "add"}
-                size={14}
-              />
-            </View>
-          )}
-        </Pressable>
-      </ScrollView>
-
-      {isCustomMode && (
-        <View style={styles.customInputRow}>
-          <TextInput
-            accessibilityLabel="직접 입력 운동 종류"
-            autoFocus
-            maxLength={MAX_CUSTOM_LENGTH}
-            onChangeText={setCustomDraft}
-            placeholder="운동 종류를 입력해 주세요"
-            placeholderTextColor={semanticColors["label-disabled"]}
-            returnKeyType="done"
-            style={styles.input}
-            value={customDraft}
-          />
-          <ThemedText style={styles.count} typography="caption-1-medium">
-            {customDraft.length} / {MAX_CUSTOM_LENGTH}
-          </ThemedText>
-          {customDraft.length > 0 && (
-            <Pressable
-              accessibilityLabel="직접 입력 내용 지우기"
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => setCustomDraft("")}
-              style={styles.clearButton}
-            >
-              <Ionicons
-                color={semanticColors["label-subtle"]}
-                name="close-circle"
-                size={20}
-              />
-            </Pressable>
-          )}
+        <View style={styles.actionArea}>
+          <Pressable
+            accessibilityRole="button"
+            disabled={!canConfirm}
+            onPress={() =>
+              onConfirm(isCustomMode ? customValue : (selectedType ?? value))
+            }
+            style={styles.confirmPressable}
+          >
+            {({ pressed }) => (
+              <View
+                pointerEvents="none"
+                style={[
+                  styles.confirmButton,
+                  !canConfirm && styles.disabledButton,
+                  pressed && canConfirm && styles.pressed,
+                ]}
+              >
+                <ThemedText style={styles.confirmText} typography="body-1-bold">
+                  선택 완료
+                </ThemedText>
+              </View>
+            )}
+          </Pressable>
         </View>
-      )}
-
-      <View style={styles.actionArea}>
-        <Pressable
-          accessibilityRole="button"
-          disabled={!canConfirm}
-          onPress={() =>
-            onConfirm(isCustomMode ? customValue : (selectedType ?? value))
-          }
-          style={styles.confirmPressable}
-        >
-          {({ pressed }) => (
-            <View
-              pointerEvents="none"
-              style={[
-                styles.confirmButton,
-                !canConfirm && styles.disabledButton,
-                pressed && canConfirm && styles.pressed,
-              ]}
-            >
-              <ThemedText style={styles.confirmText} typography="body-1-bold">
-                선택 완료
-              </ThemedText>
-            </View>
-          )}
-        </Pressable>
       </View>
     </BottomSheet>
   );
@@ -200,6 +232,9 @@ function SelectionCircle({ selected }: { selected: boolean }) {
 }
 
 const styles = StyleSheet.create({
+  body: {
+    flex: 1,
+  },
   options: {
     flex: 1,
     minHeight: 0,
