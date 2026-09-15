@@ -306,18 +306,20 @@ const EMPTY_CHART_BARS = [
   { left: 38, top: 26, height: 16, opacity: 0.55 },
 ];
 
-// Figma "Activity Report / Empty State" (4405:24196) — 327×320 white card,
-// border 1 line-subtle(#F2F4F6), radius 20, shadow 0/4/12 rgba(0,0,0,0.04).
-// 내부는 Figma 좌표 그대로 absolute로 놓는다. Figma 좌표는 카드 바깥 프레임
-// 기준(stroke는 안쪽)인데 RN은 absolute 자식을 border 안쪽 기준으로 놓으므로
-// border 두께만큼 빼서 렌더 위치를 Figma와 같게 맞춘다.
+// Figma "Activity Report / Empty State" (4405:24196) — 375 캔버스에서 x24 /
+// w327 = 화면 좌우 24 inset이므로 너비는 부모(활동구성 영역)를 꽉 채우고
+// 높이만 320 고정. border 1 line-subtle(#F2F4F6), radius 20, shadow 0/4/12
+// rgba(0,0,0,0.04). 내부 세로 좌표(32/52/119/203)와 left 23은 Figma 그대로
+// absolute, 원과 설명은 카드 폭이 늘어나도 따라오도록 가로 중앙 정렬. Figma
+// 좌표는 카드 바깥 프레임 기준(stroke는 안쪽)인데 RN은 absolute 자식을
+// border 안쪽 기준으로 놓으므로 border 두께만큼 빼서 위치를 맞춘다.
 const CARD_BORDER_WIDTH = 1;
 const inCard = (figmaOffset: number) => figmaOffset - CARD_BORDER_WIDTH;
 
 function ActivityReportEmptyCard() {
   return (
     <View
-      className="h-[320px] w-[327px] overflow-hidden rounded-[20px] border-line-subtle bg-background-normal shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)]"
+      className="h-[320px] w-full overflow-hidden rounded-[20px] border-line-subtle bg-background-normal shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)]"
       style={{ borderWidth: CARD_BORDER_WIDTH }}
     >
       <ThemedText
@@ -343,21 +345,23 @@ function ActivityReportEmptyCard() {
         아직 쌓인 활동이 없어요
       </ThemedText>
       <View
-        className="absolute size-[64px] overflow-hidden rounded-[32px] bg-charcoal-1"
-        style={{ left: inCard(130.5), top: inCard(119) }}
+        className="absolute left-0 right-0 items-center"
+        style={{ top: inCard(119) }}
       >
-        {EMPTY_CHART_BARS.map((bar) => (
-          <View
-            className="absolute w-[5px] rounded-[2.5px] bg-charcoal-5"
-            key={bar.left}
-            style={{
-              height: bar.height,
-              left: bar.left,
-              opacity: bar.opacity,
-              top: bar.top,
-            }}
-          />
-        ))}
+        <View className="size-[64px] overflow-hidden rounded-[32px] bg-charcoal-1">
+          {EMPTY_CHART_BARS.map((bar) => (
+            <View
+              className="absolute w-[5px] rounded-[2.5px] bg-charcoal-5"
+              key={bar.left}
+              style={{
+                height: bar.height,
+                left: bar.left,
+                opacity: bar.opacity,
+                top: bar.top,
+              }}
+            />
+          ))}
+        </View>
       </View>
       <ThemedText
         className="absolute text-center"
@@ -411,8 +415,11 @@ export function ActivitySummaryTab({ createdAt }: ActivitySummaryTabProps) {
   return (
     <View className="items-center gap-[20px]">
       <PeriodSelector onChange={selectMode} value={mode} />
-      {/* Figma "활동구성 영역" (4573:35654) — 327 wide, 헤더 48 + gap 8 + 카드 320 */}
-      <View className="w-[327px] items-center gap-[8px]">
+      {/* Figma "활동구성 영역" (4573:35654) — 375 캔버스에서 x24/w327, 즉 컨텐츠
+          영역(px 20) 안에서 좌우 4씩 더 들어간 폭. 고정 327이 아니라 부모를
+          채우고 mx 4로 표현해야 넓은 기기에서도 카드가 화면 좌우 24 inset을
+          유지한다. 세로: 헤더 48 + gap 8 + 카드 320. */}
+      <View className="mx-[4px] items-center gap-[8px] self-stretch">
         <PeriodNavigator
           canGoNext={canGoNext}
           canGoPrevious={canGoPrevious}
