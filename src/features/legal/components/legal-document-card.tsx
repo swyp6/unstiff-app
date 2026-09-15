@@ -1,15 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  Linking,
-  Pressable,
-  StyleSheet,
-  View,
-} from "react-native";
-import { WebView } from "react-native-webview";
+import { StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
-import { primitiveColors, radius, semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
+import {
+  LEGAL_EMBED_META_ID,
+  LegalDocumentBodyLoading,
+  LegalDocumentBodyMessage,
+  LegalDocumentWebView,
+} from "@/features/legal/components/legal-document-webview";
 
 type LegalDocumentCardProps = {
   title: string;
@@ -40,9 +38,6 @@ const BODY_PADDING_RIGHT = 8;
 // charcoal/5, 조항 사이 16, 제목→본문 4)로 만든다. site.css는 <link>라 우리
 // <style>보다 늦게 적용될 수 있어 동일 specificity로는 덮이므로 규칙마다
 // !important를 쓴다. selector는 site.css에 실제로 있는 것만 쓴다.
-const EMBEDDED_STYLE_ID = "unstiff-legal-embedded-style";
-const EMBEDDED_META_ID = "unstiff-legal-embedded-meta";
-const EMBEDDED_READY_MESSAGE = "unstiff-legal-embedded-ready";
 const EMBEDDED_CSS = `
 html, body {
   margin: 0 !important;
@@ -57,7 +52,7 @@ html, body {
   max-width: none !important;
 }
 .legal-document-header h1 { display: none !important; }
-#${EMBEDDED_META_ID} {
+#${LEGAL_EMBED_META_ID} {
   margin: 0 0 12px !important;
   font-size: 12px !important;
   font-weight: 400 !important;
@@ -110,43 +105,6 @@ html, body {
 .legal-document-body a { color: #525257 !important; }
 `;
 
-// 문서 파싱 시작 시점(injectedJavaScriptBeforeContentLoaded)과 로드 완료 시점
-// (injectedJavaScript)에 같은 스크립트를 넣는다. style은 id로 한 번만 붙고,
-// meta 한 줄은 .legal-document-body가 생긴 뒤(로드 완료)에만, 역시 한 번만
-// 끼운다. 끝나면 postMessage로 알려 그때 WebView를 드러낸다 — onLoadEnd보다
-// 늦게 style이 적용되는 순간의 원본 layout flicker를 피하기 위해서다.
-function buildEmbedScript(metaText: string) {
-  return `
-(function () {
-  try {
-    if (!document.getElementById(${JSON.stringify(EMBEDDED_STYLE_ID)})) {
-      var style = document.createElement("style");
-      style.id = ${JSON.stringify(EMBEDDED_STYLE_ID)};
-      style.textContent = ${JSON.stringify(EMBEDDED_CSS)};
-      (document.head || document.documentElement).appendChild(style);
-    }
-    var body = document.querySelector(".legal-document-body");
-    if (body && !document.getElementById(${JSON.stringify(EMBEDDED_META_ID)})) {
-      var meta = document.createElement("div");
-      meta.id = ${JSON.stringify(EMBEDDED_META_ID)};
-      meta.textContent = ${JSON.stringify(metaText)};
-      body.parentNode.insertBefore(meta, body);
-    }
-  } finally {
-    if (document.readyState !== "loading" && window.ReactNativeWebView) {
-      window.ReactNativeWebView.postMessage(${JSON.stringify(EMBEDDED_READY_MESSAGE)});
-    }
-  }
-})();
-true;
-`;
-}
-
-function getOrigin(url: string) {
-  const match = /^[a-z][a-z0-9+.-]*:\/\/[^/]+/i.exec(url);
-  return match ? match[0].toLowerCase() : null;
-}
-
 export function LegalDocumentCard({
   title,
   metaText,
@@ -154,111 +112,21 @@ export function LegalDocumentCard({
   fetchError = false,
   onRetryFetch,
 }: LegalDocumentCardProps) {
-  // WebView 자체의 로드 상태. reloadKey를 올리면 WebView를 다시 마운트해
-  // 처음부터 다시 연다.
-  const [isPageLoading, setIsPageLoading] = useState(true);
-  const [pageError, setPageError] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
-  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const embedScript = useMemo(() => buildEmbedScript(metaText), [metaText]);
-
-  function clearRevealTimer() {
-    if (revealTimerRef.current) {
-      clearTimeout(revealTimerRef.current);
-      revealTimerRef.current = null;
-    }
-  }
-
-  useEffect(() => clearRevealTimer, []);
-
-  function reveal() {
-    clearRevealTimer();
-    setIsPageLoading(false);
-  }
-
-  function retryPage() {
-    clearRevealTimer();
-    setPageError(false);
-    setIsPageLoading(true);
-    setReloadKey((key) => key + 1);
-  }
-
   function renderBody() {
     if (fetchError) {
       return (
-        <BodyMessage
+        <LegalDocumentBodyMessage
           message="문서를 불러오지 못했습니다."
           onRetry={onRetryFetch}
         />
       );
     }
-    if (uri === undefined) {
-      return (
-        <View style={styles.bodyCenter}>
-          <ActivityIndicator color={semanticColors["label-normal"]} />
-        </View>
-      );
-    }
+    if (uri === undefined) return <LegalDocumentBodyLoading />;
     if (uri === null) {
-      return <BodyMessage message="문서를 불러올 수 없습니다." />;
+      return <LegalDocumentBodyMessage message="문서를 불러올 수 없습니다." />;
     }
-    if (pageError) {
-      return (
-        <BodyMessage
-          message="문서를 불러오지 못했습니다."
-          onRetry={retryPage}
-        />
-      );
-    }
-
-    const documentOrigin = getOrigin(uri);
     return (
-      <>
-        <WebView
-          key={reloadKey}
-          allowsBackForwardNavigationGestures={false}
-          injectedJavaScript={embedScript}
-          injectedJavaScriptBeforeContentLoaded={embedScript}
-          onError={() => {
-            clearRevealTimer();
-            setIsPageLoading(false);
-            setPageError(true);
-          }}
-          onHttpError={() => {
-            clearRevealTimer();
-            setIsPageLoading(false);
-            setPageError(true);
-          }}
-          // 정상 경로는 주입 스크립트의 ready 메시지에서 드러낸다. 메시지가
-          // 오지 않는 경우(스크립트 실패 등)에도 페이지가 영영 숨겨지지
-          // 않도록 onLoadEnd 뒤 잠시 기다렸다가 드러낸다.
-          onLoadEnd={() => {
-            clearRevealTimer();
-            revealTimerRef.current = setTimeout(reveal, 400);
-          }}
-          onMessage={(event) => {
-            if (event.nativeEvent.data === EMBEDDED_READY_MESSAGE) reveal();
-          }}
-          // 약관 도메인 안의 문서만 WebView에서 연다. mailto: 같은 다른
-          // scheme이나 다른 도메인 링크는 OS 기본 앱으로 넘기고 WebView는
-          // 그 자리에 머문다.
-          onShouldStartLoadWithRequest={(request) => {
-            if (documentOrigin && getOrigin(request.url) === documentOrigin) {
-              return true;
-            }
-            void Linking.openURL(request.url).catch(() => {});
-            return false;
-          }}
-          setSupportMultipleWindows={false}
-          source={{ uri }}
-          style={[styles.webView, isPageLoading && styles.webViewLoading]}
-        />
-        {isPageLoading && (
-          <View pointerEvents="none" style={styles.loadingOverlay}>
-            <ActivityIndicator color={semanticColors["label-normal"]} />
-          </View>
-        )}
-      </>
+      <LegalDocumentWebView css={EMBEDDED_CSS} metaText={metaText} uri={uri} />
     );
   }
 
@@ -269,38 +137,6 @@ export function LegalDocumentCard({
       </ThemedText>
       <View style={styles.headerDivider} />
       <View style={styles.body}>{renderBody()}</View>
-    </View>
-  );
-}
-
-function BodyMessage({
-  message,
-  onRetry,
-}: {
-  message: string;
-  onRetry?: () => void;
-}) {
-  return (
-    <View style={styles.bodyCenter}>
-      <ThemedText
-        style={styles.messageText}
-        themeColor="textSecondary"
-        typography="body-2-medium"
-      >
-        {message}
-      </ThemedText>
-      {onRetry && (
-        <Pressable
-          accessibilityLabel="다시 시도"
-          accessibilityRole="button"
-          onPress={onRetry}
-          style={styles.retryButton}
-        >
-          <ThemedText style={styles.retryButtonText} typography="body-1-medium">
-            다시 시도
-          </ThemedText>
-        </Pressable>
-      )}
     </View>
   );
 }
@@ -330,41 +166,5 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingRight: BODY_PADDING_RIGHT,
     position: "relative",
-  },
-  bodyCenter: {
-    alignItems: "center",
-    flex: 1,
-    gap: 16,
-    justifyContent: "center",
-  },
-  messageText: {
-    textAlign: "center",
-  },
-  retryButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["primary-normal"],
-    borderRadius: radius.default,
-    height: 44,
-    justifyContent: "center",
-    paddingHorizontal: 24,
-  },
-  retryButtonText: {
-    color: semanticColors["primary-on"],
-  },
-  webView: {
-    backgroundColor: semanticColors["background-normal"],
-    flex: 1,
-  },
-  webViewLoading: {
-    opacity: 0,
-  },
-  loadingOverlay: {
-    alignItems: "center",
-    bottom: 0,
-    justifyContent: "center",
-    left: 0,
-    position: "absolute",
-    right: 0,
-    top: 0,
   },
 });

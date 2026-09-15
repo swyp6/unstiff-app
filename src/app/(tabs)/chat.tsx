@@ -82,6 +82,11 @@ export default function ChatScreen() {
   const entryState = useChatStore((state) => state.entryState);
   const consentDeclined = useChatStore((state) => state.consentDeclined);
   const isConsenting = useChatStore((state) => state.isConsenting);
+  const externalAiTerm = useChatStore((state) => state.externalAiTerm);
+  const externalAiTermError = useChatStore(
+    (state) => state.externalAiTermError,
+  );
+  const loadExternalAiTerm = useChatStore((state) => state.loadExternalAiTerm);
   const loadConversation = useChatStore((state) => state.loadConversation);
   const sendMessage = useChatStore((state) => state.sendMessage);
   const agreeToExternalAi = useChatStore((state) => state.agreeToExternalAi);
@@ -176,6 +181,9 @@ export default function ChatScreen() {
         isSubmitting={isConsenting}
         onAgree={handleAgree}
         onDecline={handleDecline}
+        onRetryTerm={loadExternalAiTerm}
+        term={externalAiTerm}
+        termError={externalAiTermError}
         visible={entryState === "consent-required" && !consentDeclined}
       />
     </ThemedView>

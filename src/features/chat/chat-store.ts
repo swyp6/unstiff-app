@@ -2,6 +2,7 @@ import { isAxiosError } from "axios";
 import { create } from "zustand";
 
 import { agreeToTerms, getTerms } from "@/features/auth/api";
+import type { Term } from "@/features/auth/types";
 import {
   enterAiChat,
   fetchAiChatHistory,
@@ -71,6 +72,12 @@ type ChatState = {
   // 미동의 사실을 로컬에 영구 저장해 우회하지 않는다.
   consentDeclined: boolean;
   isConsenting: boolean;
+  // 동의 모달이 보여줄 EXTERNAL_AI 약관(GET /terms). undefined: 아직 조회
+  // 전/중, null: 서버 응답에 EXTERNAL_AI가 없음. 같은 객체를 CTA의 동의
+  // POST에도 써서 한 화면 진입에 GET /terms가 한 번만 나간다.
+  externalAiTerm: Term | null | undefined;
+  externalAiTermError: boolean;
+  loadExternalAiTerm: () => void;
   loadConversation: () => void;
   sendMessage: (text: string) => void;
   // 실제 EXTERNAL_AI 약관 동의(POST /terms/agreements) → enter 재확인까지
@@ -88,7 +95,13 @@ const INITIAL_STATE = {
   entryState: "loading" as ChatEntryState,
   consentDeclined: false,
   isConsenting: false,
+  externalAiTerm: undefined as Term | null | undefined,
+  externalAiTermError: false,
 };
+
+function findExternalAiTerm(terms: Term[]) {
+  return terms.find((term) => term.type === "EXTERNAL_AI") ?? null;
+}
 
 // 목업이 아닌 실제 채팅 API(POST /api/v1/chat/ai/enter, /send, GET /messages)를
 // 호출한다. 서버가 대화를 저장하므로 전송할 때는 새 메시지 하나만 보내면 되고,
@@ -161,8 +174,26 @@ export const useChatStore = create<ChatState>()((set, get) => {
     }
   }
 
+  // 가장 최근 조회만 반영하기 위한 순번 — 모달이 닫힌 뒤 늦게 온 응답이나
+  // 재시도 중 겹친 응답이 서로 덮지 않게 한다.
+  let termRequestId = 0;
+
   return {
     ...INITIAL_STATE,
+    loadExternalAiTerm: () => {
+      const requestId = ++termRequestId;
+      set({ externalAiTerm: undefined, externalAiTermError: false });
+      getTerms()
+        .then(({ terms }) => {
+          if (requestId !== termRequestId) return;
+          set({ externalAiTerm: findExternalAiTerm(terms) });
+        })
+        .catch((error) => {
+          logChatError("loadExternalAiTerm", error);
+          if (requestId !== termRequestId) return;
+          set({ externalAiTermError: true });
+        });
+    },
     loadConversation: () => {
       if (get().isLoading) return;
       set({ isLoading: true, consentDeclined: false });
@@ -176,6 +207,8 @@ export const useChatStore = create<ChatState>()((set, get) => {
               entryState: "consent-required",
               isLoading: false,
             });
+            // 모달 본문(contentUrl)과 동의 POST(id)가 같이 쓸 약관을 한 번 조회.
+            get().loadExternalAiTerm();
             return;
           }
           return bootstrapConversation(entry.available);
@@ -236,11 +269,11 @@ export const useChatStore = create<ChatState>()((set, get) => {
       if (get().isConsenting) return false;
       set({ isConsenting: true });
       try {
-        // 약관 ID는 GET /terms가 source of truth — 하드코딩하지 않는다.
-        const { terms } = await getTerms();
-        const externalAiTerm = terms.find(
-          (term) => term.type === "EXTERNAL_AI",
-        );
+        // 약관 ID는 GET /terms가 source of truth — 하드코딩하지 않는다. 모달이
+        // 이미 받아둔 약관이 있으면 그대로 쓰고(중복 GET 방지), 없을 때만
+        // 다시 조회한다.
+        const externalAiTerm =
+          get().externalAiTerm ?? findExternalAiTerm((await getTerms()).terms);
         if (!externalAiTerm) {
           throw new Error("EXTERNAL_AI term is missing from GET /api/v1/terms");
         }

@@ -1,9 +1,16 @@
 import { Image } from "expo-image";
 import { useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import type { Term } from "@/features/auth/types";
+import {
+  LEGAL_EMBED_INFO_ID,
+  LegalDocumentBodyLoading,
+  LegalDocumentBodyMessage,
+  LegalDocumentWebView,
+} from "@/features/legal/components/legal-document-webview";
 
 // Figma "Modal / AI 개인정보 처리 동의" (4939:26757) — 최초 채팅 진입 시
 // 외부 AI 개인정보 처리 동의 팝업. 화면 4923:57384(체크 전 / 버튼 비활성)와
@@ -34,33 +41,73 @@ const CHECKBOX_RADIUS = 6;
 const ROW_HEIGHT = 48;
 
 const CONSENT_TITLE = "외부 AI를 통한 개인정보 처리 동의";
-const CONSENT_INTRO =
-  "8% 운영팀은 이용자가 AI 기반 개인화 미션 기능 이용에 동의한 경우 아래와 같이 외부 AI를 통해 개인정보를 처리합니다.";
-const CONSENT_ITEMS: { label: string; value: string }[] = [
-  { label: "• 외부 AI 사업자", value: "OpenAI, L.L.C." },
-  {
-    label: "• 전송 정보",
-    value:
-      "운동 취향 및 생활습관 관련 대화 내용, 운동 기록 요약 정보, 개인화 미션 생성에 필요한 운동 관련 정보",
-  },
-  {
-    label: "• 이용 목적",
-    value: "AI 기반 운동 대화, 개인화된 운동 미션 및 운동 관련 안내 제공",
-  },
-  { label: "• 전송 국가", value: "미국" },
-  {
-    label: "• 보유 및 이용 기간",
-    value:
-      "AI 기능 제공에 필요한 기간 동안 처리하며, 서비스 내 보유 정보는 회원 탈퇴 또는 처리 목적 달성 시 삭제합니다.",
-  },
-];
-const CONSENT_NOTES = [
-  "이 동의는 선택 사항이며, 동의하지 않아도 운동 계획 및 운동 기록 등 기본 서비스는 이용할 수 있습니다. 다만, AI 기반 개인화 미션 기능은 이용할 수 없습니다.",
-  "이용자는 설정 화면에서 언제든지 동의를 철회할 수 있습니다.",
-];
+
+// 약관 본문은 GET /terms의 EXTERNAL_AI.contentUrl(원격 HTML)이 source of
+// truth라 앱에 문구를 두지 않고 WebView로 연다. 원격 문서 구조는
+// .legal-document-body > p(도입부) + ul > li(strong 라벨 + br + 값) + p(안내)
+// 이고, Figma 동의서 카드(4939:26726)는 도입부 11/15 Regular charcoal-5,
+// 그 아래 회색(charcoal-50) 박스(radius 8, padding 12/23/12/8) 안에 항목
+// 라벨 11/15 Bold charcoal/12 · 값 11/15 Regular charcoal-5 · 항목/안내 사이
+// 16이다. 박스는 도입부 뒤 요소를 #LEGAL_EMBED_INFO_ID로 감싸 만든다.
+// HTML 안이라 토큰을 못 쓰므로 같은 토큰의 hex를 그대로 적는다.
+const CONSENT_EMBEDDED_CSS = `
+html, body {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  background: #ffffff !important;
+}
+.legal-page, .legal-document {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+}
+.legal-document-header h1 { display: none !important; }
+.legal-document-body {
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  color: #8c8c92 !important;
+  font-size: 11px !important;
+  font-weight: 400 !important;
+  line-height: 15px !important;
+}
+.legal-document-body > p:first-child { margin: 0 0 8px !important; }
+#${LEGAL_EMBED_INFO_ID} {
+  box-sizing: border-box !important;
+  margin: 0 !important;
+  padding: ${INFO_BOX_PADDING.vertical}px ${INFO_BOX_PADDING.right}px ${INFO_BOX_PADDING.vertical}px ${INFO_BOX_PADDING.left}px !important;
+  border-radius: 8px !important;
+  background: ${INFO_BOX_BACKGROUND} !important;
+}
+#${LEGAL_EMBED_INFO_ID} ul,
+#${LEGAL_EMBED_INFO_ID} ol {
+  margin: 0 !important;
+  padding: 0 !important;
+  list-style: none !important;
+}
+#${LEGAL_EMBED_INFO_ID} li,
+#${LEGAL_EMBED_INFO_ID} p { margin: 0 !important; }
+#${LEGAL_EMBED_INFO_ID} li + li,
+#${LEGAL_EMBED_INFO_ID} ul + p,
+#${LEGAL_EMBED_INFO_ID} p + p { margin-top: 16px !important; }
+#${LEGAL_EMBED_INFO_ID} li strong {
+  display: block !important;
+  font-weight: 700 !important;
+  color: #171719 !important;
+}
+#${LEGAL_EMBED_INFO_ID} li strong::before { content: "\\2022\\00a0"; }
+#${LEGAL_EMBED_INFO_ID} li br { display: none !important; }
+.legal-document-body a { color: #525257 !important; }
+`;
 
 type ExternalAiConsentModalProps = {
   visible: boolean;
+  // GET /terms의 EXTERNAL_AI 약관. undefined: 조회 중, null: 서버에 없음.
+  term: Term | null | undefined;
+  termError: boolean;
+  onRetryTerm: () => void;
   // 동의 요청이 서버에서 처리되는 동안 true — CTA 잠금.
   isSubmitting: boolean;
   onAgree: () => void;
@@ -69,20 +116,55 @@ type ExternalAiConsentModalProps = {
 
 export function ExternalAiConsentModal({
   visible,
+  term,
+  termError,
+  onRetryTerm,
   isSubmitting,
   onAgree,
   onDecline,
 }: ExternalAiConsentModalProps) {
   const [checked, setChecked] = useState(false);
+  // 약관 문서가 실제로 화면에 떠 있을 때만 체크/동의할 수 있다 — contentUrl이
+  // 없거나 조회/로드에 실패한 채로 동의 POST가 나가는 구조를 막는다.
+  const [documentReady, setDocumentReady] = useState(false);
   // 닫혔다가 다시 열리면 Figma "체크 전"부터 시작한다 — 렌더 중 prop 변화를
   // 감지해 state를 되돌리는 React 권장 패턴(effect 안 setState 대신).
   const [wasVisible, setWasVisible] = useState(visible);
   if (wasVisible !== visible) {
     setWasVisible(visible);
-    if (!visible) setChecked(false);
+    if (!visible) {
+      setChecked(false);
+      setDocumentReady(false);
+    }
   }
 
-  const canAgree = checked && !isSubmitting;
+  const contentUrl = term?.contentUrl ?? null;
+  const documentShown = !termError && term !== undefined && contentUrl !== null;
+  const canCheck = documentShown && documentReady && !isSubmitting;
+  const canAgree = checked && canCheck;
+
+  function renderDocument() {
+    if (termError) {
+      return (
+        <LegalDocumentBodyMessage
+          message="문서를 불러오지 못했습니다."
+          onRetry={onRetryTerm}
+        />
+      );
+    }
+    if (term === undefined) return <LegalDocumentBodyLoading />;
+    if (contentUrl === null) {
+      return <LegalDocumentBodyMessage message="문서를 불러올 수 없습니다." />;
+    }
+    return (
+      <LegalDocumentWebView
+        css={CONSENT_EMBEDDED_CSS}
+        onReadyChange={setDocumentReady}
+        uri={contentUrl}
+        wrapAfterIntro
+      />
+    );
+  }
 
   return (
     <Modal
@@ -105,52 +187,14 @@ export function ExternalAiConsentModal({
               {CONSENT_TITLE}
             </ThemedText>
             <View style={styles.titleDivider} />
-            <ScrollView
-              contentContainerStyle={styles.consentBody}
-              indicatorStyle="black"
-              style={styles.consentScroll}
-            >
-              <ThemedText
-                style={{ color: primitiveColors.charcoal["5"] }}
-                typography="caption-2-regular"
-              >
-                {CONSENT_INTRO}
-              </ThemedText>
-              <View style={styles.infoBox}>
-                {CONSENT_ITEMS.map((item) => (
-                  <View key={item.label}>
-                    <ThemedText
-                      style={{ color: primitiveColors.charcoal["12"] }}
-                      typography="caption-2-bold"
-                    >
-                      {item.label}
-                    </ThemedText>
-                    <ThemedText
-                      style={{ color: primitiveColors.charcoal["5"] }}
-                      typography="caption-2-regular"
-                    >
-                      {item.value}
-                    </ThemedText>
-                  </View>
-                ))}
-                {CONSENT_NOTES.map((note) => (
-                  <ThemedText
-                    key={note}
-                    style={{ color: primitiveColors.charcoal["5"] }}
-                    typography="caption-2-regular"
-                  >
-                    {note}
-                  </ThemedText>
-                ))}
-              </View>
-            </ScrollView>
+            <View style={styles.documentBody}>{renderDocument()}</View>
           </View>
 
           <View style={styles.footer}>
             <Pressable
               accessibilityRole="checkbox"
-              accessibilityState={{ checked, disabled: isSubmitting }}
-              disabled={isSubmitting}
+              accessibilityState={{ checked, disabled: !canCheck }}
+              disabled={!canCheck}
               onPress={() => setChecked((value) => !value)}
               style={styles.checkboxRow}
             >
@@ -248,20 +292,10 @@ const styles = StyleSheet.create({
     backgroundColor: primitiveColors.neutral["200"],
     height: 1,
   },
-  consentScroll: {
+  documentBody: {
     flex: 1,
-  },
-  consentBody: {
-    gap: 8,
     paddingRight: CONSENT_BODY_GUTTER_RIGHT,
-  },
-  infoBox: {
-    backgroundColor: INFO_BOX_BACKGROUND,
-    borderRadius: 8,
-    gap: 16,
-    paddingLeft: INFO_BOX_PADDING.left,
-    paddingRight: INFO_BOX_PADDING.right,
-    paddingVertical: INFO_BOX_PADDING.vertical,
+    position: "relative",
   },
   footer: {
     gap: 8,
