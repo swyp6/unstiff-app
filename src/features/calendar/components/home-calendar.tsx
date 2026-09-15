@@ -351,8 +351,10 @@ export function HomeCalendar({
                   </>
                 )}
                 {/* Figma 4305:34469 "장수 배지" — 그 날 기록이 여러 건일 때만
-                    개수를 보여준다(1건이면 굳이 셀 필요가 없다). */}
-                {!isToday && hasPhoto && (dayEntry?.recordCount ?? 0) > 1 && (
+                    개수를 보여준다(1건이면 굳이 셀 필요가 없다). 오늘도 다른
+                    날짜와 같은 서버 필드(recordCount)를 쓰므로 제외할 이유가
+                    없다. */}
+                {hasPhoto && (dayEntry?.recordCount ?? 0) > 1 && (
                   <View className="absolute bottom-1 right-1 h-4 w-4 items-center justify-center rounded-full bg-charcoal-12">
                     <ThemedText
                       style={{ color: semanticColors["label-inverse"] }}

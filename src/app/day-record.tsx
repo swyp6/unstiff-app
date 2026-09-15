@@ -33,6 +33,7 @@ import {
 import { WorkoutHistoryEditSheet } from "@/features/workout-history/components/workout-history-edit-sheet";
 import { formatMeasureValue } from "@/features/workout-history/model";
 import { saveImageToAlbum } from "@/features/workout-history/save-photo";
+import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 import type {
   ExerciseMeasuresDto,
   IntensityDto,
@@ -162,6 +163,10 @@ export default function DayRecordScreen() {
         imageUrl: secureUrl,
       });
       applyUpdatedEntry({ ...entry, imageUrl: secureUrl });
+      // 홈 화면 캘린더는 이 화면과 별개 인스턴스라 자동으로 다시 안 읽는다
+      // — savedRecordAt을 건드려서 home.tsx가 그 신호로 캘린더 달을
+      // 재조회하게 한다(기록 저장 때와 같은 경로).
+      useRecordFlowStore.getState().markRecordSaved();
     } catch (error) {
       applyUpdatedEntry(entry);
       logImageUploadError("day-record change photo failed", error);
@@ -188,6 +193,7 @@ export default function DayRecordScreen() {
         memo: entry.memo,
       });
       applyUpdatedEntry({ ...entry, imageUrl: undefined });
+      useRecordFlowStore.getState().markRecordSaved();
     } catch (error) {
       console.error("Failed to delete photo", error);
       Alert.alert("오류", "사진을 삭제하지 못했습니다. 다시 시도해주세요.");
