@@ -1,7 +1,10 @@
 import { create } from "zustand";
 
 import type { GoalType } from "@/features/workout-plan/model";
-import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
+import type {
+  ExerciseMeasuresDto,
+  IntensityDto,
+} from "@/features/workout-plan/types";
 
 import type { WorkoutRefType } from "./types";
 
@@ -49,9 +52,14 @@ type RecordFlowPhoto = {
 // 보여줄 때 measure-units.ts로 UI 단위(분/km)로 되돌린다 — 여기 값을 미리
 // 분/km로 바꿔두면 "API DTO인데 UI 단위"인 애매한 상태가 된다.
 export type ConfirmedWorkoutRecord = {
+  // 서버가 발급한 운동 기록 id(POST /api/v1/workouts 응답) — 완료 화면의
+  // "점세개" 메뉴(사진 저장/변경/삭제, 기록 수정)가 day-record.tsx와 같은
+  // PUT /api/v1/workouts/{id}를 쓰려면 이 값이 필요하다.
+  id: number;
   target: RecordFlowTarget;
   secureUrl?: string;
   measures: ExerciseMeasuresDto;
+  intensity?: IntensityDto;
   memo?: string;
   date: Date;
 };

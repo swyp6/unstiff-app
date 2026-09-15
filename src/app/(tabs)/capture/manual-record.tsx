@@ -130,7 +130,7 @@ export default function ManualRecordScreen() {
       const trimmedTitle = title.trim();
       const imageUrl = photo?.secureUrl;
 
-      await saveWorkoutRecord({
+      const saved = await saveWorkoutRecord({
         refType: "PLAN",
         name: trimmedTitle,
         exerciseType,
@@ -142,9 +142,11 @@ export default function ManualRecordScreen() {
       });
 
       useRecordFlowStore.getState().setConfirmed({
+        id: saved.id,
         target: { mode: "MANUAL", title: trimmedTitle, exerciseType },
         secureUrl: imageUrl,
         measures,
+        intensity: apiIntensity,
         memo: trimmedMemo || undefined,
         date: submittedAt,
       });
