@@ -88,7 +88,12 @@ export function MissionCard({
           "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
       {isAccepted && (
         <View className="min-h-8 flex-row items-center justify-between">
-          <ThemedText typography="body-3-bold" themeColor="textSecondary">
+          {/* TodayWorkoutCard의 "오늘의 운동" 헤딩과 같은 타이포/색상 —
+              홈 화면에 나란히 쌓이는 두 카드 헤더가 같은 무게로 보여야 한다. */}
+          <ThemedText
+            style={{ color: primitiveColors.charcoal["11"] }}
+            typography="heading-1-bold"
+          >
             오늘의 미션
           </ThemedText>
           {closeButton}

@@ -210,11 +210,11 @@ export default function DayRecordScreen() {
         paddingTop: insets.top,
       }}
     >
-      <View className="h-12 flex-row items-center justify-between">
+      <View className="h-12 flex-row items-center justify-between px-5">
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="닫기"
-          className="h-12 w-12 items-center justify-center"
+          className="h-11 w-11 items-center justify-center"
           onPress={() => router.back()}
         >
           <Ionicons
@@ -223,13 +223,13 @@ export default function DayRecordScreen() {
             size={24}
           />
         </Pressable>
-        <ThemedText typography="body-2-regular">
+        <ThemedText typography="heading-1-bold">
           {formatDateLabel(parseDateParam(params.date))}
         </ThemedText>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="더보기"
-          className="h-12 w-12 items-center justify-center"
+          className="h-11 w-11 items-center justify-center"
           onPress={() => setIsMenuVisible(true)}
         >
           <Ionicons
