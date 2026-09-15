@@ -170,6 +170,13 @@ export function LegalDocumentWebView({
           setIsPageLoading(false);
           setPageError(true);
         }}
+        // 같은 WebView가 새 문서를 열기 시작하면(uri 변경, 같은 도메인 링크
+        // 이동) 다시 로딩 상태로 되돌려 ready(=동의 가능)가 이전 문서 기준으로
+        // 남지 않게 한다. 이후 ready 메시지/onLoadEnd fallback이 다시 드러낸다.
+        onLoadStart={() => {
+          clearRevealTimer();
+          setIsPageLoading(true);
+        }}
         // 정상 경로는 주입 스크립트의 ready 메시지에서 드러낸다. 메시지가
         // 오지 않는 경우(스크립트 실패 등)에도 페이지가 영영 숨겨지지
         // 않도록 onLoadEnd 뒤 잠시 기다렸다가 드러낸다.

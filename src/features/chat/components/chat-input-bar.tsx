@@ -1,14 +1,24 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { useState } from "react";
 import { Pressable, StyleSheet, TextInput, View } from "react-native";
 
-import { primitiveColors, semanticColors } from "@/constants/tokens";
+import {
+  primitiveColors,
+  semanticColors,
+  typography,
+} from "@/constants/tokens";
+
+// Figma Icon / Send: 44 원 안 24 래퍼, 그 안의 send-01 glyph가 18.75.
+const SEND_GLYPH_SIZE = 18.75;
 
 type ChatInputBarProps = {
   onSend: (text: string) => void;
   disabled?: boolean;
 };
 
+// Figma Composer / Input Bar: px24 py12 gap8, 입력창 h44 r24 px16 charcoal/1
+// body/2/regular, 전송 44 원 charcoal/12. 빈 입력/답변 대기 중에는 전송 동작만
+// 막고 외형은 그대로 검정 — Figma가 placeholder 상태에서도 같은 색을 쓴다.
 export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
   const [text, setText] = useState("");
   const canSend = text.trim().length > 0 && !disabled;
@@ -28,7 +38,7 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
         onChangeText={setText}
         placeholder="메시지를 입력하세요"
         placeholderTextColor={semanticColors["label-disabled"]}
-        style={styles.input}
+        style={[typography["body-2-regular"], styles.input]}
         value={text}
       />
       <Pressable
@@ -37,13 +47,15 @@ export function ChatInputBar({ onSend, disabled }: ChatInputBarProps) {
         disabled={!canSend}
         hitSlop={8}
         onPress={handleSend}
-        style={[styles.sendButton, !canSend && styles.sendButtonDisabled]}
+        style={styles.sendButton}
       >
-        <Ionicons
-          color={semanticColors["label-inverse"]}
-          name="send"
-          size={18}
-        />
+        <View style={styles.sendIcon}>
+          <Image
+            contentFit="contain"
+            source={require("@/assets/chat/send-01.svg")}
+            style={styles.sendGlyph}
+          />
+        </View>
       </Pressable>
     </View>
   );
@@ -54,20 +66,19 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     flexDirection: "row",
     gap: 8,
-    paddingBottom: 12,
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingVertical: 12,
   },
   input: {
     backgroundColor: primitiveColors.charcoal["1"],
     borderRadius: 24,
     color: semanticColors["label-normal"],
     flex: 1,
-    fontSize: 16,
-    lineHeight: 22,
     maxHeight: 120,
+    minHeight: 44,
+    paddingBottom: 13,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingTop: 12,
   },
   sendButton: {
     alignItems: "center",
@@ -77,7 +88,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     width: 44,
   },
-  sendButtonDisabled: {
-    opacity: 0.4,
+  sendIcon: {
+    alignItems: "center",
+    height: 24,
+    justifyContent: "center",
+    width: 24,
+  },
+  sendGlyph: {
+    height: SEND_GLYPH_SIZE,
+    width: SEND_GLYPH_SIZE,
   },
 });

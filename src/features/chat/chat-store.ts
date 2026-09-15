@@ -10,6 +10,7 @@ import {
 } from "@/features/chat/api";
 import type {
   AiChatHistoryItem,
+  AiChatMessageResponse,
   AiConversationType,
   ChatMessage,
 } from "@/features/chat/types";
@@ -17,11 +18,6 @@ import { useAuthStore } from "@/store/auth-store";
 
 const CONVERSATION_TYPE: AiConversationType = "DAILY_DISCOVERY";
 const HISTORY_PAGE_SIZE = 50;
-
-const SEND_FAILED_MESSAGE =
-  "메시지를 보내는 데 문제가 생겼어. 잠시 후 다시 시도해줄래?";
-const LOAD_FAILED_MESSAGE =
-  "대화를 불러오는 데 문제가 생겼어. 잠시 후 다시 시도해줄래?";
 
 function createMessage(
   role: ChatMessage["role"],
@@ -48,6 +44,28 @@ function fromHistoryItem(item: AiChatHistoryItem): ChatMessage {
   };
 }
 
+// 과거 페이지를 앞에 붙인다. 서버 페이지는 오래된 순이고 cursor 페이지의 id는
+// 모두 현재 것보다 작으므로 정렬은 그대로 두고, 이미 있는 id만 걸러낸다.
+function prependHistory(older: ChatMessage[], current: ChatMessage[]) {
+  const known = new Set(current.map((message) => message.id));
+  const uniqueOlder = older.filter((message) => {
+    if (known.has(message.id)) return false;
+    known.add(message.id);
+    return true;
+  });
+  return [...uniqueOlder, ...current];
+}
+
+function toAssistantMessage(response: AiChatMessageResponse) {
+  return {
+    ...createMessage("assistant", response.content, {
+      options: response.options,
+      stop: response.stop,
+    }),
+    createdAt: response.createdAt,
+  };
+}
+
 function logChatError(context: string, error: unknown) {
   if (isAxiosError(error)) {
     console.log(`[chat:${context}] status:`, error.response?.status);
@@ -61,11 +79,22 @@ function logChatError(context: string, error: unknown) {
 // 하지 않는다. true일 때만 히스토리 조회/첫 인사로 이어진다.
 export type ChatEntryState = "loading" | "consent-required" | "ready";
 
+// 다시 시도할 수 있는 실패. 서버 history에 없는 일시 상태라 messages에 가짜
+// assistant 메시지로 넣지 않고 따로 든다 — load는 질문/선택지(enter·history·첫
+// 인사) 실패, send는 답변 저장 실패로 재전송할 원문을 함께 기억한다.
+export type ChatFailure = { kind: "load" } | { kind: "send"; text: string };
+
 type ChatState = {
   messages: ChatMessage[];
   isLoading: boolean;
   isTyping: boolean;
   canSend: boolean;
+  failure: ChatFailure | null;
+  // 과거 대화 cursor pagination. nextCursor는 서버가 준 마지막(가장 오래된)
+  // 메시지 id, hasOlderHistory=false면 더 요청하지 않는다.
+  nextCursor: number | null;
+  hasOlderHistory: boolean;
+  isLoadingOlderHistory: boolean;
   entryState: ChatEntryState;
   // "거부하기"로 동의 모달을 닫았는지. 이번 진입에만 유효하고 다음
   // loadConversation(포커스 재진입)에서 서버 상태를 다시 물어보며 리셋된다 —
@@ -79,7 +108,11 @@ type ChatState = {
   externalAiTermError: boolean;
   loadExternalAiTerm: () => void;
   loadConversation: () => void;
+  // 위로 스크롤해 목록 끝에 닿았을 때 — 이전 페이지를 messages 앞에 붙인다.
+  loadOlderHistory: () => void;
   sendMessage: (text: string) => void;
+  // failure 종류에 맞게 같은 요청을 실제로 다시 보낸다.
+  retryFailure: () => void;
   // 실제 EXTERNAL_AI 약관 동의(POST /terms/agreements) → enter 재확인까지
   // 서버에서 성공했을 때만 true. 성공 시 정상 채팅 bootstrap까지 마친다.
   agreeToExternalAi: () => Promise<boolean>;
@@ -92,6 +125,10 @@ const INITIAL_STATE = {
   isLoading: false,
   isTyping: false,
   canSend: true,
+  failure: null as ChatFailure | null,
+  nextCursor: null as number | null,
+  hasOlderHistory: false,
+  isLoadingOlderHistory: false,
   entryState: "loading" as ChatEntryState,
   consentDeclined: false,
   isConsenting: false,
@@ -107,41 +144,55 @@ function findExternalAiTerm(terms: Term[]) {
 // 호출한다. 서버가 대화를 저장하므로 전송할 때는 새 메시지 하나만 보내면 되고,
 // 화면에 보여줄 과거 대화는 진입 시 별도로 조회한다.
 export const useChatStore = create<ChatState>()((set, get) => {
+  // 대화 조회 세대. 새 bootstrap과 reset(로그아웃)마다 올라가고, 진행 중이던
+  // 비동기 흐름은 시작 시점의 세대를 들고 있다가 응답이 와도 세대가 바뀌었으면
+  // store를 건드리지 않는다 — 이전 조회/계정의 늦은 응답이 현재 상태를 덮어쓰지
+  // 못하게 한다. 요청 자체를 취소하는 대신 결과만 버린다.
+  let sessionGeneration = 0;
+  const isCurrent = (generation: number) => generation === sessionGeneration;
+
   // 동의가 확인된 뒤의 공통 bootstrap — 첫 진입과 동의 직후가 같은 코드를
-  // 탄다. 히스토리가 있으면 그대로 보여주고, 없는데 오늘 대화가 가능하면
-  // message 없이 보내 첫 인사를 요청하고, 불가능하면 오늘 대화 종료 상태.
-  async function bootstrapConversation(available: boolean) {
+  // 탄다. 히스토리 첫 페이지(최신)를 받고, 오늘 대화를 새로 시작해야 하면
+  // (히스토리가 없거나 마지막 대화가 stop으로 끝났는데 available — 서버
+  // resolveConversationId와 같은 기준) message 없이 보내 첫 인사를 요청한다.
+  // 첫 인사까지 받은 뒤에야 messages를 채우므로 그동안은 "질문 준비중" 상태다.
+  async function bootstrapConversation(available: boolean, generation: number) {
+    let historyMessages: ChatMessage[];
+    let page: { nextCursor: number | null; hasOlderHistory: boolean };
     try {
       const history = await fetchAiChatHistory(CONVERSATION_TYPE, {
         size: HISTORY_PAGE_SIZE,
       });
+      if (!isCurrent(generation)) return;
       // 히스토리는 오래된 순(오름차순)으로 내려와 화면에 보여줄 순서와 같다.
-      const historyMessages = history.items.map(fromHistoryItem);
-
-      if (historyMessages.length > 0) {
-        set({
-          messages: historyMessages,
-          canSend: available,
-          entryState: "ready",
-          isLoading: false,
-        });
-        return;
-      }
-
-      if (!available) {
-        set({
-          messages: [],
-          canSend: false,
-          entryState: "ready",
-          isLoading: false,
-        });
-        return;
-      }
+      historyMessages = history.items.map(fromHistoryItem);
+      page = {
+        nextCursor: history.nextCursor ?? null,
+        hasOlderHistory:
+          history.hasNext &&
+          history.nextCursor !== null &&
+          history.nextCursor !== undefined,
+      };
     } catch (error) {
       logChatError("loadConversation", error);
+      if (!isCurrent(generation)) return;
       set({
-        messages: [createMessage("assistant", LOAD_FAILED_MESSAGE)],
+        messages: [],
+        failure: { kind: "load" },
         canSend: false,
+        entryState: "ready",
+        isLoading: false,
+      });
+      return;
+    }
+
+    const latest = historyMessages[historyMessages.length - 1];
+    const needsGreeting = available && (!latest || latest.stop === true);
+    if (!needsGreeting) {
+      set({
+        messages: historyMessages,
+        ...page,
+        canSend: available,
         entryState: "ready",
         isLoading: false,
       });
@@ -152,26 +203,49 @@ export const useChatStore = create<ChatState>()((set, get) => {
       const response = await sendAiChatMessage({
         conversationType: CONVERSATION_TYPE,
       });
+      if (!isCurrent(generation)) return;
       set({
-        messages: [
-          createMessage("assistant", response.content, {
-            options: response.options,
-            stop: response.stop,
-          }),
-        ],
+        messages: [...historyMessages, toAssistantMessage(response)],
+        ...page,
         canSend: !response.stop,
         entryState: "ready",
         isLoading: false,
       });
     } catch (error) {
       logChatError("loadConversation:start", error);
+      if (!isCurrent(generation)) return;
       set({
-        messages: [createMessage("assistant", LOAD_FAILED_MESSAGE)],
+        messages: [],
+        failure: { kind: "load" },
         canSend: false,
         entryState: "ready",
         isLoading: false,
       });
     }
+  }
+
+  // 답변 전송과 재시도가 같이 쓰는 실제 POST /send. user bubble은 여기서 붙이지
+  // 않는다 — 처음 보낼 때 한 번만 붙이고, 재시도는 같은 원문만 다시 보낸다
+  // (서버도 실패한 user 메시지를 지우므로 재시도가 중복 저장되지 않는다).
+  function submitMessage(text: string, generation: number) {
+    set({ isTyping: true, failure: null });
+    sendAiChatMessage({
+      conversationType: CONVERSATION_TYPE,
+      message: text,
+    })
+      .then((response) => {
+        if (!isCurrent(generation)) return;
+        set((state) => ({
+          messages: [...state.messages, toAssistantMessage(response)],
+          isTyping: false,
+          canSend: !response.stop,
+        }));
+      })
+      .catch((error) => {
+        logChatError("sendMessage", error);
+        if (!isCurrent(generation)) return;
+        set({ isTyping: false, failure: { kind: "send", text } });
+      });
   }
 
   // 가장 최근 조회만 반영하기 위한 순번 — 모달이 닫힌 뒤 늦게 온 응답이나
@@ -195,11 +269,26 @@ export const useChatStore = create<ChatState>()((set, get) => {
         });
     },
     loadConversation: () => {
-      if (get().isLoading) return;
-      set({ isLoading: true, consentDeclined: false });
+      const { isLoading, isTyping, isConsenting } = get();
+      if (isLoading || isTyping || isConsenting) return;
+      // 새 첫 페이지 조회는 이전 bootstrap/pagination 결과를 모두 무효화한다.
+      const generation = ++sessionGeneration;
+      // 조회 중에는 동의 모달을 내린다 — 직전 enter가 미동의였더라도 결과가
+      // 오기 전에 동의(agreeToExternalAi)가 같은 세대에서 겹쳐 bootstrap이 두 번
+      // 돌지 않게 한다. 결과에 따라 consent-required/ready로 다시 정해진다.
+      set({
+        isLoading: true,
+        entryState: "loading",
+        consentDeclined: false,
+        failure: null,
+        nextCursor: null,
+        hasOlderHistory: false,
+        isLoadingOlderHistory: false,
+      });
 
       enterAiChat(CONVERSATION_TYPE)
         .then((entry) => {
+          if (!isCurrent(generation)) return;
           if (!entry.externalAiAgreed) {
             set({
               messages: [],
@@ -211,62 +300,84 @@ export const useChatStore = create<ChatState>()((set, get) => {
             get().loadExternalAiTerm();
             return;
           }
-          return bootstrapConversation(entry.available);
+          return bootstrapConversation(entry.available, generation);
         })
         .catch((error) => {
           logChatError("loadConversation:enter", error);
+          if (!isCurrent(generation)) return;
           set({
-            messages: [createMessage("assistant", LOAD_FAILED_MESSAGE)],
+            messages: [],
+            failure: { kind: "load" },
             canSend: false,
             entryState: "ready",
             isLoading: false,
           });
         });
     },
-    sendMessage: (text) => {
-      const trimmed = text.trim();
-      if (!trimmed || get().isTyping || !get().canSend) return;
+    loadOlderHistory: () => {
+      const { nextCursor, hasOlderHistory, isLoadingOlderHistory, isLoading } =
+        get();
+      if (!hasOlderHistory || nextCursor === null) return;
+      // 같은 cursor로 겹쳐 요청하지 않고, 첫 페이지를 다시 받는 중에도 쉰다.
+      if (isLoadingOlderHistory || isLoading) return;
+      const generation = sessionGeneration;
+      set({ isLoadingOlderHistory: true });
 
-      const userMessage = createMessage("user", trimmed);
-
-      set((state) => ({
-        messages: [...state.messages, userMessage],
-        isTyping: true,
-      }));
-
-      sendAiChatMessage({
-        conversationType: CONVERSATION_TYPE,
-        message: trimmed,
+      fetchAiChatHistory(CONVERSATION_TYPE, {
+        cursor: nextCursor,
+        size: HISTORY_PAGE_SIZE,
       })
-        .then((response) => {
+        .then((history) => {
+          if (!isCurrent(generation)) return;
+          const updatedCursor = history.nextCursor ?? null;
           set((state) => ({
-            messages: [
-              ...state.messages,
-              createMessage("assistant", response.content, {
-                options: response.options,
-                stop: response.stop,
-              }),
-            ],
-            isTyping: false,
-            canSend: !response.stop,
+            messages: prependHistory(
+              history.items.map(fromHistoryItem),
+              state.messages,
+            ),
+            nextCursor: updatedCursor,
+            // 서버가 같은 cursor를 다시 주면 동일 페이지를 순차 반복 호출하지 않는다.
+            hasOlderHistory:
+              history.hasNext &&
+              updatedCursor !== null &&
+              updatedCursor !== nextCursor,
+            isLoadingOlderHistory: false,
           }));
         })
         .catch((error) => {
-          logChatError("sendMessage", error);
-          set((state) => ({
-            messages: [
-              ...state.messages,
-              createMessage("assistant", SEND_FAILED_MESSAGE),
-            ],
-            isTyping: false,
-          }));
+          // 현재 보고 있는 대화는 그대로 두고, 다음에 다시 끝에 닿으면 재요청한다.
+          logChatError("loadOlderHistory", error);
+          if (!isCurrent(generation)) return;
+          set({ isLoadingOlderHistory: false });
         });
+    },
+    sendMessage: (text) => {
+      const trimmed = text.trim();
+      if (!trimmed || get().isTyping || !get().canSend || get().failure) return;
+
+      set((state) => ({
+        messages: [...state.messages, createMessage("user", trimmed)],
+      }));
+      submitMessage(trimmed, sessionGeneration);
+    },
+    retryFailure: () => {
+      const { failure, isLoading, isTyping } = get();
+      if (!failure || isLoading || isTyping) return;
+      if (failure.kind === "load") {
+        get().loadConversation();
+        return;
+      }
+      submitMessage(failure.text, sessionGeneration);
     },
     agreeToExternalAi: async () => {
       // 두 번 눌러도 POST /terms/agreements가 한 번만 나가도록 잠근다. 성공
       // 경로에서는 bootstrap까지 끝난 뒤(finally) 풀리는데, 그때는 이미
-      // entryState가 ready라 모달이 사라진 상태다.
-      if (get().isConsenting) return false;
+      // entryState가 ready라 모달이 사라진 상태다. 첫 페이지 조회
+      // (loadConversation)가 진행 중이면 그 enter → bootstrap과 겹치지 않도록
+      // 시작하지 않는다 — 두 흐름은 서로의 isLoading/isConsenting을 보고 배타적이다.
+      const { isLoading, isConsenting } = get();
+      if (isLoading || isConsenting) return false;
+      const generation = sessionGeneration;
       set({ isConsenting: true });
       try {
         // 약관 ID는 GET /terms가 source of truth — 하드코딩하지 않는다. 모달이
@@ -274,32 +385,44 @@ export const useChatStore = create<ChatState>()((set, get) => {
         // 다시 조회한다.
         const externalAiTerm =
           get().externalAiTerm ?? findExternalAiTerm((await getTerms()).terms);
+        if (!isCurrent(generation)) return false;
         if (!externalAiTerm) {
           throw new Error("EXTERNAL_AI term is missing from GET /api/v1/terms");
         }
+        // 서버 계약(TermsResponse.from)상 agreed는 "현재 버전에 동의"이고
+        // reagreementRequired는 항상 !agreed와 같이 움직이므로, 재동의가 필요한
+        // 개정 약관도 이 분기에서 다시 POST된다.
         if (!externalAiTerm.agreed) {
           await agreeToTerms([externalAiTerm.id]);
+          if (!isCurrent(generation)) return false;
         }
         // 동의 POST가 성공했어도 enter 응답이 최종 판단이다 — 서버가 아직
         // 미동의라고 하면 모달을 유지한다.
         const entry = await enterAiChat(CONVERSATION_TYPE);
+        if (!isCurrent(generation)) return false;
         if (!entry.externalAiAgreed) {
           throw new Error("server still reports externalAiAgreed=false");
         }
         set({ entryState: "ready", isLoading: true });
-        await bootstrapConversation(entry.available);
+        await bootstrapConversation(entry.available, generation);
         return true;
       } catch (error) {
         logChatError("agreeToExternalAi", error);
         return false;
       } finally {
-        set({ isConsenting: false });
+        // 로그아웃으로 세대가 바뀐 뒤 늦게 끝난 요청이 다음 계정의 잠금을
+        // 풀어버리지 않게 한다 — reset()이 이미 false로 돌려놓았다.
+        if (isCurrent(generation)) set({ isConsenting: false });
       }
     },
     declineExternalAi: () => {
       set({ consentDeclined: true, canSend: false });
     },
-    reset: () => set(INITIAL_STATE),
+    reset: () => {
+      sessionGeneration += 1;
+      termRequestId += 1;
+      set(INITIAL_STATE);
+    },
   };
 });
 
