@@ -423,7 +423,7 @@ export default function CameraScreen() {
                 accessibilityLabel="갤러리에서 선택"
                 onPress={handlePickFromLibrary}
               >
-                <Ionicons name="images-outline" size={24} color="#ffffff" />
+                <Ionicons name="images-outline" size={28} color="#ffffff" />
               </Pressable>
 
               <Pressable
@@ -440,7 +440,7 @@ export default function CameraScreen() {
               </Pressable>
 
               <Pressable
-                className="size-12 items-center justify-center rounded-full bg-white/[0.16]"
+                className="size-[59px] items-center justify-center rounded-full bg-white/[0.16]"
                 accessibilityRole="button"
                 accessibilityLabel="카메라 전환"
                 onPress={() => {
@@ -452,7 +452,7 @@ export default function CameraScreen() {
               >
                 <Ionicons
                   name="camera-reverse-outline"
-                  size={22}
+                  size={28}
                   color="#ffffff"
                 />
               </Pressable>

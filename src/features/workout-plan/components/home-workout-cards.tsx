@@ -619,7 +619,7 @@ function SavedWorkoutPlanRow({
   onOpenDetail: () => void;
 }) {
   return (
-    <View className="flex-row items-center gap-3 border-b border-line-subtle py-3">
+    <View className="flex-row items-center gap-3 border-b border-line-subtle py-1.5">
       <Pressable
         accessibilityLabel={`${plan.title} 오늘의 운동에 추가`}
         accessibilityRole="button"
