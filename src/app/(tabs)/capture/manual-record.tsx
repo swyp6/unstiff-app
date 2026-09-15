@@ -10,7 +10,10 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import ReanimatedAnimated, {
   FadeIn,
   FadeInDown,
@@ -19,13 +22,12 @@ import ReanimatedAnimated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { ActionButton } from "@/components/ui/action-button";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
-import { IntensityBottomSheet } from "@/features/workout-plan/components/intensity-bottom-sheet";
 import { WorkoutTypeBottomSheet } from "@/features/workout-plan/components/workout-type-bottom-sheet";
 import {
-  PrimaryActionButton,
   SectionLabel,
   SelectionRow,
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
@@ -41,9 +43,11 @@ import { toActualMeasuresDto } from "@/features/workout-record/actual-measure";
 import { saveWorkoutRecord } from "@/features/workout-record/api";
 import { ActualMeasureStepper } from "@/features/workout-record/components/actual-measure-stepper";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
+import { useMeasureSheets } from "@/features/workout-record/use-measure-sheets";
 
 const TITLE_MAX_LENGTH = 20;
-const MEMO_MAX_LENGTH = 40;
+// 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
+const MEMO_MAX_LENGTH = 50;
 
 // Figma 4173:30739 "2.2.2.1 신규 운동 기록 입력 -> 운동종류 선택시" — 기존
 // 오늘의 운동/미션에 연결하지 않고 사용자가 직접 운동명·종류·수행값을 적는
@@ -54,6 +58,7 @@ export default function ManualRecordScreen() {
   // 탭의 nested Stack에서만 pop한다 — target.tsx의 같은 주석 참고.
   const navigation = useNavigation();
   const photo = useRecordFlowStore((state) => state.photo);
+  const insets = useSafeAreaInsets();
 
   const [title, setTitle] = useState("");
   const [exerciseType, setExerciseType] = useState("");
@@ -66,7 +71,14 @@ export default function ManualRecordScreen() {
     sets: 1,
   });
   const [intensity, setIntensity] = useState<Intensity>(null);
-  const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
+  const { intensitySheet, measureSheet, openIntensitySheet, openMeasureSheet } =
+    useMeasureSheets({
+      embeddedBottomInset: insets.bottom,
+      intensity,
+      onChangeIntensity: setIntensity,
+      onChangeValues: setValues,
+      values,
+    });
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -75,8 +87,12 @@ export default function ManualRecordScreen() {
   // 중복 생성하므로, 응답이 오기 전까지 두 번째 진입을 동기적으로 막는다.
   const submissionLockRef = useRef(false);
 
+  const isTitleTooLong = title.length > TITLE_MAX_LENGTH;
+  const isMemoTooLong = memo.length > MEMO_MAX_LENGTH;
   const canSubmit =
     title.trim().length > 0 &&
+    !isTitleTooLong &&
+    !isMemoTooLong &&
     exerciseType.length > 0 &&
     selectedTypes.length > 0 &&
     !isSubmitting;
@@ -233,33 +249,66 @@ export default function ManualRecordScreen() {
                 신규 운동 기록
               </ThemedText>
 
-              <View style={{ gap: 4 }}>
+              <View>
                 <SectionLabel>운동명</SectionLabel>
-                <View
-                  style={{
-                    backgroundColor: semanticColors["fill-subtle"],
-                    borderRadius: 12,
-                    height: 44,
-                    justifyContent: "center",
-                    paddingHorizontal: 14,
-                  }}
-                >
+                <View style={{ justifyContent: "center" }}>
                   <TextInput
                     accessibilityLabel="운동명"
-                    maxLength={TITLE_MAX_LENGTH}
                     onChangeText={setTitle}
                     placeholder="운동명을 입력해주세요"
                     placeholderTextColor={semanticColors["label-disabled"]}
                     returnKeyType="done"
                     style={{
+                      backgroundColor: semanticColors["fill-subtle"],
+                      borderColor: isTitleTooLong
+                        ? primitiveColors.red["6"]
+                        : "transparent",
+                      borderRadius: 12,
+                      borderWidth: 1,
                       color: semanticColors["label-normal"],
-                      fontFamily: "Pretendard-Regular",
-                      fontSize: 12,
-                      paddingVertical: 0,
+                      fontFamily: "Pretendard-Medium",
+                      fontSize: 16,
+                      minHeight: 50,
+                      paddingHorizontal: 16,
+                      paddingRight: 64,
                     }}
                     value={title}
                   />
+                  <ThemedText
+                    typography="caption-1-regular"
+                    style={{
+                      position: "absolute",
+                      right: 16,
+                      color: isTitleTooLong
+                        ? primitiveColors.red["6"]
+                        : semanticColors["label-disabled"],
+                    }}
+                  >
+                    {title.length} / {TITLE_MAX_LENGTH}
+                  </ThemedText>
                 </View>
+                {isTitleTooLong && (
+                  <View
+                    style={{
+                      alignItems: "center",
+                      flexDirection: "row",
+                      gap: 4,
+                      marginTop: 6,
+                    }}
+                  >
+                    <Ionicons
+                      color={primitiveColors.red["6"]}
+                      name="alert-circle"
+                      size={14}
+                    />
+                    <ThemedText
+                      typography="caption-1-regular"
+                      style={{ color: primitiveColors.red["6"] }}
+                    >
+                      {TITLE_MAX_LENGTH}자까지 쓸 수 있어요
+                    </ThemedText>
+                  </View>
+                )}
               </View>
 
               <View style={{ gap: 4 }}>
@@ -284,6 +333,7 @@ export default function ManualRecordScreen() {
                       layout={LinearTransition}
                     >
                       <ActualMeasureStepper
+                        onPressValue={() => openMeasureSheet(type)}
                         type={type}
                         value={values[type]}
                         onChange={(value) =>
@@ -302,52 +352,81 @@ export default function ManualRecordScreen() {
                 같은 컴포넌트/문구를 쓴다 — 두 화면이 같은 기록을 남기는 입력이라
                 따로 만들지 않는다. 둘 다 선택 사항이다. */}
               <View style={{ gap: 4 }}>
-                <SectionLabel>강도</SectionLabel>
+                <SectionLabel optional>강도</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="강도 선택"
-                  onPress={() => setIsIntensitySheetVisible(true)}
+                  onPress={openIntensitySheet}
                   placeholder="선택해주세요"
                   value={getIntensityLabel(intensity)}
                 />
               </View>
 
-              <View style={{ gap: 6 }}>
-                <SectionLabel>한 줄 기록 (선택)</SectionLabel>
-                <View
+              <View>
+                <SectionLabel
+                  optional
+                  trailing={
+                    <ThemedText
+                      typography="caption-1-regular"
+                      style={{
+                        color: isMemoTooLong
+                          ? primitiveColors.red["6"]
+                          : semanticColors["label-disabled"],
+                      }}
+                    >
+                      {memo.length} / {MEMO_MAX_LENGTH}
+                    </ThemedText>
+                  }
+                >
+                  한 줄 기록
+                </SectionLabel>
+                <TextInput
+                  accessibilityLabel="한 줄 기록"
+                  multiline
+                  onChangeText={setMemo}
+                  placeholder="기록을 남겨보세요"
+                  placeholderTextColor={semanticColors["label-disabled"]}
+                  returnKeyType="done"
                   style={{
                     backgroundColor: semanticColors["fill-subtle"],
+                    borderColor: isMemoTooLong
+                      ? primitiveColors.red["6"]
+                      : "transparent",
                     borderRadius: 12,
-                    height: 52,
+                    borderWidth: 1,
+                    color: semanticColors["label-normal"],
+                    fontFamily: "Pretendard-Medium",
+                    fontSize: 16,
+                    lineHeight: 24,
+                    minHeight: 50,
+                    paddingBottom: 14,
                     paddingHorizontal: 16,
-                    justifyContent: "center",
+                    paddingTop: 10,
+                    textAlignVertical: "top",
                   }}
-                >
-                  <TextInput
-                    accessibilityLabel="한 줄 기록"
-                    maxLength={MEMO_MAX_LENGTH}
-                    onChangeText={setMemo}
-                    placeholder="기록을 남겨보세요"
-                    placeholderTextColor={semanticColors["label-disabled"]}
-                    returnKeyType="done"
+                  value={memo}
+                />
+                {isMemoTooLong && (
+                  <View
                     style={{
-                      color: semanticColors["label-normal"],
-                      fontFamily: "Pretendard-Bold",
-                      fontSize: 13,
-                      paddingRight: 48,
-                    }}
-                    value={memo}
-                  />
-                  <ThemedText
-                    typography="caption-2-regular"
-                    style={{
-                      position: "absolute",
-                      right: 16,
-                      color: semanticColors["label-disabled"],
+                      alignItems: "center",
+                      flexDirection: "row",
+                      gap: 4,
+                      marginTop: 6,
                     }}
                   >
-                    {memo.length} / {MEMO_MAX_LENGTH}
-                  </ThemedText>
-                </View>
+                    <Ionicons
+                      color={primitiveColors.red["6"]}
+                      name="alert-circle"
+                      size={14}
+                    />
+                    <ThemedText
+                      typography="caption-1-regular"
+                      style={{ color: primitiveColors.red["6"] }}
+                    >
+                      {MEMO_MAX_LENGTH}자까지 쓸 수 있어요
+                    </ThemedText>
+                  </View>
+                )}
               </View>
 
               {error && (
@@ -369,42 +448,40 @@ export default function ManualRecordScreen() {
             entering={FadeInDown.duration(220)}
             style={{ paddingHorizontal: 20, paddingBottom: 16 }}
           >
-            <PrimaryActionButton
+            <ActionButton
               disabled={!canSubmit}
               label={isSubmitting ? "저장 중..." : "운동 완료하기"}
               onPress={handleSubmit}
             />
           </ReanimatedAnimated.View>
         </KeyboardAvoidingView>
+
+        {isTypeSheetVisible && (
+          // 이 화면은 카메라 탭의 nested route라 Native TabBar가 함께 보인다 —
+          // RN Modal(기본값)은 그 탭바까지 덮으므로 inline(embedded)으로
+          // 띄운다. embedded의 absoluteFill은 RN에서 부모의 padding을 무시하고
+          // 부모 테두리 기준 bottom:0을 잡아서, SafeAreaView 안에 두는 것만으론
+          // 탭바 높이를 못 피한다 — embeddedBottomInset으로 그 높이를 직접
+          // 넘겨야 시트가 탭바 위에서 멈춘다.
+          <WorkoutTypeBottomSheet
+            embedded
+            embeddedBottomInset={insets.bottom}
+            onClose={() => setIsTypeSheetVisible(false)}
+            onConfirm={(value) => {
+              setExerciseType(value);
+              setIsTypeSheetVisible(false);
+            }}
+            value={exerciseType}
+            visible
+          />
+        )}
+
+        {/* 강도·실제값 시트는 record-editor-screen.tsx와 공유한다
+            (use-measure-sheets.tsx) — embeddedBottomInset으로 탭바 위에서
+            멈추는 처리도 거기 한 군데에만 있다. */}
+        {intensitySheet}
+        {measureSheet}
       </SafeAreaView>
-
-      {isTypeSheetVisible && (
-        // 이 화면은 카메라 탭의 nested route라 Native TabBar가 함께 보인다 —
-        // RN Modal(기본값)은 그 탭바까지 덮으므로 inline(embedded)으로 띄운다.
-        <WorkoutTypeBottomSheet
-          embedded
-          onClose={() => setIsTypeSheetVisible(false)}
-          onConfirm={(value) => {
-            setExerciseType(value);
-            setIsTypeSheetVisible(false);
-          }}
-          value={exerciseType}
-          visible
-        />
-      )}
-
-      {isIntensitySheetVisible && (
-        <IntensityBottomSheet
-          embedded
-          onClose={() => setIsIntensitySheetVisible(false)}
-          onConfirm={(value) => {
-            setIntensity(value);
-            setIsIntensitySheetVisible(false);
-          }}
-          value={intensity}
-          visible
-        />
-      )}
     </View>
   );
 }

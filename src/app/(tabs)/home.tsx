@@ -955,6 +955,13 @@ export default function HomeScreen() {
     // 못하면(이론상 있을 수 없지만 방어적으로) 초기값 없이 기존 빈 선택
     // 상태로 시작한다.
     const workout = todayWorkouts.find((item) => item.id === planItemId);
+    // 스톱워치로 잰 시간은 계획의 목표 시간(plan.goalValues.time)과 다른
+    // 값이다 — 스톱워치가 있는 항목(plan.stopwatchEnabled)은 finishStopwatch
+    // 시점에 toggleStopwatchRun이 이미 멈춰서 정산해둔 실제 경과 초를
+    // 분으로 바꿔 목표 시간 대신 넣는다. 없으면 그대로 목표값을 쓴다.
+    const stopwatchMinutes = workout?.stopwatch
+      ? Math.max(1, Math.round(workout.stopwatch.elapsedSeconds / 60))
+      : null;
     return {
       mode: "LINKED" as const,
       refType: "PLAN" as const,
@@ -963,7 +970,10 @@ export default function HomeScreen() {
       ...(workout && workout.plan.selectedGoalTypes.length > 0
         ? {
             initialGoalTypes: workout.plan.selectedGoalTypes,
-            initialGoalValues: workout.plan.goalValues,
+            initialGoalValues:
+              stopwatchMinutes == null
+                ? workout.plan.goalValues
+                : { ...workout.plan.goalValues, time: stopwatchMinutes },
           }
         : null),
     };

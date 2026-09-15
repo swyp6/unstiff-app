@@ -5,6 +5,7 @@ import type {
   DailyPlanCreateResponse,
   DailyPlanListResponse,
   DailyPlanUpdateRequest,
+  ExerciseTypeListResponse,
   PlanPresetCreateRequest,
   PlanPresetCreateResponse,
   PlanPresetListResponse,
@@ -42,6 +43,14 @@ export async function getDailyPlans(date: string) {
 export async function getPlanPresets() {
   const { data } = await apiClient.get<PlanPresetListResponse>(
     "/api/v1/plan-presets",
+  );
+  return data;
+}
+
+// GET /api/v1/exercise-types — 운동 종류 목록 조회
+export async function getExerciseTypes() {
+  const { data } = await apiClient.get<ExerciseTypeListResponse>(
+    "/api/v1/exercise-types",
   );
   return data;
 }

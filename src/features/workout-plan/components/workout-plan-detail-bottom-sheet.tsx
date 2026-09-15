@@ -9,7 +9,6 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   FadeIn,
   FadeOut,
@@ -17,6 +16,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import {
   BottomSheet,
   type BottomSheetHandle,
@@ -30,18 +30,13 @@ import {
   toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
-import { useKeyboardHeight } from "@/hooks/use-keyboard-height";
 
 import { DeletePlanModal } from "./delete-plan-modal";
 import { GoalStepper } from "./goal-stepper";
 import { GoalTypeSelector } from "./goal-type-selector";
 import { IntensityBottomSheet } from "./intensity-bottom-sheet";
 import { TimePickerBottomSheet } from "./time-picker-bottom-sheet";
-import {
-  PrimaryActionButton,
-  SectionLabel,
-  SelectionRow,
-} from "./workout-plan-screen-ui";
+import { SectionLabel, SelectionRow } from "./workout-plan-screen-ui";
 import { WorkoutTypeBottomSheet } from "./workout-type-bottom-sheet";
 
 type ChildSheet = "exerciseType" | "time" | "intensity" | null;
@@ -67,65 +62,19 @@ export function WorkoutPlanDetailBottomSheet({
     goalValues: { ...plan.goalValues },
   }));
   const [childSheet, setChildSheet] = useState<ChildSheet>(null);
-  const [isParentExpanded, setIsParentExpanded] = useState(false);
   const [isDeleteModalVisible, setIsDeleteModalVisible] = useState(false);
   const [titleTextWidth, setTitleTextWidth] = useState(0);
   // 이름 수정은 별도 바텀시트를 띄우지 않고 이 자리에서 바로 입력창으로
-  // 바뀐다 — 겹쳐 뜨는 시트라 autoFocus가 KeyboardAvoidingView보다 먼저
-  // 키보드를 열어버려 입력창이 키보드 아래에 묻히던 문제가 있었다.
+  // 바뀐다.
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const titleInputRef = useRef<TextInput>(null);
-  const pendingChildSheet = useRef<Exclude<ChildSheet, null> | null>(null);
   const sheetRef = useRef<BottomSheetHandle>(null);
   const scrollRef = useRef<ScrollView>(null);
-  const insets = useSafeAreaInsets();
-  // KeyboardAvoidingView는 이 시트(Modal + 애니메이션 transform으로 겹겹이
-  // 싸인 구조) 안에서는 계속 씹혀서(패딩 계산이 아예 안 됨) 못 미더워, 실제
-  // 키보드 높이를 Keyboard API로 직접 추적해서 쓴다.
-  // (reanimated의 useAnimatedKeyboard는 이 화면에서 "frozen object" 렌더
-  // 에러를 던져서 순정 API로 대체했다.)
-  const keyboardHeight = useKeyboardHeight();
-  // 완료/삭제 버튼 묶음의 실제 높이(패딩 제외) — 스크롤 콘텐츠 맨 아래가
-  // 이 떠 있는 푸터 뒤에 가리지 않도록 그만큼 여백을 더 잡아둔다.
-  const [actionsHeight, setActionsHeight] = useState(0);
-
-  // 완료/삭제 버튼은 키보드가 얼마나 떠 있든 항상 키보드 바로 위에 붙어
-  // 있어야 하므로, 스크롤 영역 밖(overlay)에 별도로 떠 있는 바로 렌더링하고
-  // 이 값으로 직접 위치를 맞춘다.
-  const actionsBarBottomPadding = Math.max(keyboardHeight, insets.bottom);
 
   useEffect(() => {
     if (isEditingTitle) titleInputRef.current?.focus();
   }, [isEditingTitle]);
 
-  const openChildSheet = useCallback(
-    (nextChildSheet: Exclude<ChildSheet, null>) => {
-      if (isParentExpanded) {
-        setChildSheet(nextChildSheet);
-        return;
-      }
-
-      pendingChildSheet.current = nextChildSheet;
-      setIsParentExpanded(true);
-    },
-    [isParentExpanded],
-  );
-
-  const openTimePicker = useCallback(
-    () => openChildSheet("time"),
-    [openChildSheet],
-  );
-  const openIntensityPicker = useCallback(
-    () => openChildSheet("intensity"),
-    [openChildSheet],
-  );
-  const handleParentExpanded = useCallback(() => {
-    const nextChildSheet = pendingChildSheet.current;
-    if (!nextChildSheet) return;
-
-    pendingChildSheet.current = null;
-    setChildSheet(nextChildSheet);
-  }, []);
   const measureTitle = useCallback((event: LayoutChangeEvent) => {
     setTitleTextWidth(event.nativeEvent.layout.width);
   }, []);
@@ -151,37 +100,6 @@ export function WorkoutPlanDetailBottomSheet({
 
   const childOverlay = (
     <>
-      {/* 키보드가 뜨면 이 바의 투명한 paddingBottom 영역이 화면 아래 절반
-          가까이 차지하는데, pointerEvents 없이는 그 안 보이는 여백도 터치를
-          그대로 먹어버려서 그 위치에서 시작한 스크롤 제스처가 아래
-          ScrollView까지 전달되지 않았다 — box-none으로 버튼/링크가 아닌
-          빈 여백은 터치를 통과시킨다. */}
-      <View
-        pointerEvents="box-none"
-        style={[styles.actionsBar, { paddingBottom: actionsBarBottomPadding }]}
-      >
-        <View
-          onLayout={(event) =>
-            setActionsHeight(event.nativeEvent.layout.height)
-          }
-          style={styles.actions}
-        >
-          <PrimaryActionButton label="수정 완료하기" onPress={savePlan} />
-          <Pressable
-            accessibilityRole="button"
-            hitSlop={{ bottom: 13, left: 20, right: 20, top: 13 }}
-            onPress={() => setIsDeleteModalVisible(true)}
-            style={({ pressed }) => pressed && styles.pressed}
-          >
-            <View pointerEvents="none" style={styles.deleteButton}>
-              <ThemedText style={styles.deleteText} typography="body-3-bold">
-                계획 삭제하기
-              </ThemedText>
-            </View>
-          </Pressable>
-        </View>
-      </View>
-
       {childSheet === "exerciseType" && (
         <WorkoutTypeBottomSheet
           embedded
@@ -237,37 +155,16 @@ export function WorkoutPlanDetailBottomSheet({
 
   return (
     <BottomSheet
-      expanded={isParentExpanded}
       fullHeight
-      // 713/814는 이 시트의 원래(축소 상태) 콘텐츠 높이 비율이다. 그 아래
-      // "계획 삭제하기" 링크(paddingTop 16 + gap 16 + 높이 18 = 50)가 나중에
-      // 추가됐는데 이 비율을 안 늘려서, 축소 상태에서 그 링크가 화면 아래로
-      // 밀려나 안 보였다 — 시트를 펼쳐야만(translateY 0) 보이던 상태.
-      initialHeightRatio={(713 + 50) / 814}
-      keyboardAvoiding={false}
-      onClose={onClose}
-      onExpanded={handleParentExpanded}
-      onExpandedChange={setIsParentExpanded}
-      overlay={childOverlay}
-      ref={sheetRef}
-      visible
-    >
-      <ScrollView
-        bounces={false}
-        contentContainerStyle={[
-          styles.content,
-          // 완료/삭제 버튼이 이제 스크롤 밖에서 화면 아래에 떠 있으므로,
-          // 마지막 필드(한 줄 메모)가 그 뒤에 가리지 않도록 그 바의 높이만큼
-          // 여백을 더 확보한다.
-          { paddingBottom: 20 + actionsHeight + actionsBarBottomPadding },
-        ]}
-        keyboardDismissMode="on-drag"
-        keyboardShouldPersistTaps="handled"
-        nestedScrollEnabled
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        style={styles.scrollView}
-      >
+      // 운동 추가하기 시트(workout-plan-edit-sheet.tsx)와 동일한 2단계
+      // 스와이프: 처음엔 화면 절반만 올라오고, 위로 스와이프하면 원래 콘텐츠
+      // 높이 비율(713/814) + "계획 삭제하기" 링크(paddingTop 16 + gap 16 +
+      // 높이 18 = 50)까지 펼쳐진다. 추가하기 시트처럼 이 높이 전환은 순전히
+      // 스와이프로만 이뤄지고, 필드를 누른다고 강제로 펼쳐지지 않는다 —
+      // 자식 시트(운동 종류·시간·강도·삭제 확인)는 overlay라 부모가 접혀
+      // 있어도 그 위에 그대로 뜬다.
+      expandedHeightRatio={(713 + 50) / 814}
+      headerExtra={
         <View style={styles.titleEditArea}>
           <View style={styles.titleRow}>
             <View style={styles.titleTextArea}>
@@ -323,12 +220,27 @@ export function WorkoutPlanDetailBottomSheet({
             </Pressable>
           </View>
         </View>
-
+      }
+      initialHeightRatio={0.5}
+      onClose={onClose}
+      overlay={childOverlay}
+      ref={sheetRef}
+      visible
+    >
+      <ScrollView
+        contentContainerStyle={styles.content}
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        nestedScrollEnabled
+        ref={scrollRef}
+        showsVerticalScrollIndicator={false}
+        style={styles.scrollView}
+      >
         <View>
           <SectionLabel>운동 종류</SectionLabel>
           <SelectionRow
             accessibilityLabel="운동 종류 선택"
-            onPress={() => openChildSheet("exerciseType")}
+            onPress={() => setChildSheet("exerciseType")}
             value={detailDraft.exerciseType}
           />
         </View>
@@ -398,7 +310,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SectionLabel>예상 시작 시간</SectionLabel>
           <SelectionRow
             accessibilityLabel="예상 시작 시간 선택"
-            onPress={openTimePicker}
+            onPress={() => setChildSheet("time")}
             placeholder="선택해주세요"
             value={formatStartTime(detailDraft.startTime)}
           />
@@ -408,7 +320,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SectionLabel>강도</SectionLabel>
           <SelectionRow
             accessibilityLabel="강도 선택"
-            onPress={openIntensityPicker}
+            onPress={() => setChildSheet("intensity")}
             placeholder="선택해주세요"
             value={getIntensityLabel(detailDraft.intensity)}
           />
@@ -422,9 +334,8 @@ export function WorkoutPlanDetailBottomSheet({
             onChangeText={(memo) =>
               setDetailDraft((current) => ({ ...current, memo }))
             }
-            // 마지막 필드라 포커스되면 스크롤 맨 끝까지 밀어서, 예약해둔
-            // 여백(키보드+떠 있는 버튼 바 높이) 위로 이 입력창이 보이게
-            // 한다. 포커스 시점엔 키보드 높이가 아직 반영 전이라 콘텐츠
+            // 마지막 필드라 포커스되면 스크롤 맨 끝까지 밀어서 키보드 위로
+            // 보이게 한다. 포커스 시점엔 키보드 높이가 아직 반영 전이라
             // 여백이 다 안 잡혀 있을 수 있어, 키보드 애니메이션이 끝날
             // 즈음(iOS 기본 250ms) 한 번 더 끝까지 스크롤한다.
             onFocus={() => {
@@ -440,6 +351,22 @@ export function WorkoutPlanDetailBottomSheet({
             style={styles.memoInput}
             value={detailDraft.memo}
           />
+        </View>
+
+        <View style={styles.actions}>
+          <ActionButton label="수정 완료하기" onPress={savePlan} />
+          <Pressable
+            accessibilityRole="button"
+            hitSlop={{ bottom: 13, left: 20, right: 20, top: 13 }}
+            onPress={() => setIsDeleteModalVisible(true)}
+            style={({ pressed }) => pressed && styles.pressed}
+          >
+            <View pointerEvents="none" style={styles.deleteButton}>
+              <ThemedText style={styles.deleteText} typography="body-3-bold">
+                계획 삭제하기
+              </ThemedText>
+            </View>
+          </Pressable>
         </View>
       </ScrollView>
     </BottomSheet>
@@ -460,6 +387,9 @@ const styles = StyleSheet.create({
     height: 64,
     marginBottom: -11,
     maxWidth: "100%",
+    // BottomSheet의 content(paddingHorizontal 20)가 아니라 헤더 쪽에
+    // 렌더되므로 좌우 여백을 직접 챙겨야 한다.
+    paddingHorizontal: 20,
     paddingTop: 22,
   },
   titleRow: {
@@ -525,19 +455,6 @@ const styles = StyleSheet.create({
     minHeight: 50,
     paddingHorizontal: 16,
     paddingVertical: 0,
-  },
-  // 스크롤 영역 밖에서 화면(키보드) 맨 아래에 항상 떠 있는 바 — 세로
-  // paddingBottom은 actionsBarBottomPadding(키보드 높이 기준)이 채운다.
-  actionsBar: {
-    backgroundColor: semanticColors["background-normal"],
-    bottom: 0,
-    left: 0,
-    paddingHorizontal: 20,
-    position: "absolute",
-    right: 0,
-    // 시트 본체(Animated.View)가 zIndex:1이라, 이 값이 없으면 overlay의
-    // 형제로 렌더돼도 시트 뒤로 깔려 안 보인다.
-    zIndex: 2,
   },
   actions: {
     gap: 16,

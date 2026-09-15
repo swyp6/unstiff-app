@@ -31,9 +31,19 @@ import { semanticColors } from "@/constants/tokens";
 type BottomSheetProps = PropsWithChildren<{
   visible: boolean;
   title?: string;
+  // title(고정 문자열) 대신/추가로 손잡이 아래 드래그 영역에 넣을 커스텀
+  // 헤더(예: 인라인 편집 가능한 이름) — panResponder.panHandlers가 걸린
+  // 영역 안에 렌더돼서 그 부분을 스와이프해도 시트가 열리고 닫힌다.
+  headerExtra?: ReactNode;
   fullHeight?: boolean;
   fixedHeightRatio?: number;
   embedded?: boolean;
+  // embedded일 때 RN의 position:absolute는 부모의 padding을 무시하고 부모의
+  // 테두리 기준으로 bottom:0을 잡는다 — 그래서 부모 View에 아무리
+  // paddingBottom(예: 탭바 높이만큼의 insets.bottom)을 줘도 이 오버레이는
+  // 그 밑까지 그대로 깔린다. 탭바 뒤에 가려지지 않게 하려면 그 높이를 여기
+  // 직접 넘겨야 한다.
+  embeddedBottomInset?: number;
   expanded?: boolean;
   initialHeightRatio?: number;
   // "펼침" 스와이프가 도달하는 높이 비율 — 생략하면 기존처럼 fullSheetHeight
@@ -67,9 +77,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     {
       visible,
       title,
+      headerExtra,
       fullHeight = false,
       fixedHeightRatio,
       embedded = false,
+      embeddedBottomInset = 0,
       expanded = false,
       initialHeightRatio = 1,
       expandedHeightRatio,
@@ -310,7 +322,15 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     if (!visible) return null;
 
     const sheetLayer = (
-      <View style={[styles.dim, embedded && styles.embeddedLayer]}>
+      <View
+        style={[
+          styles.dim,
+          embedded && styles.embeddedLayer,
+          embedded && embeddedBottomInset
+            ? { bottom: embeddedBottomInset }
+            : null,
+        ]}
+      >
         <Pressable
           accessibilityLabel="닫기"
           accessibilityRole="button"
@@ -355,6 +375,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                         </ThemedText>
                       </View>
                     )}
+                    {headerExtra}
                   </View>
                 </TouchableWithoutFeedback>
               </View>

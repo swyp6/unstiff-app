@@ -84,3 +84,13 @@ export type PlanPresetResponse = {
 export type PlanPresetListResponse = {
   planPresets: PlanPresetResponse[];
 };
+
+// GET /api/v1/exercise-types — 서비스가 정한 종류가 먼저, 유저가 직접
+// 입력했던 종류가 뒤에 온다.
+export type ExerciseTypeResponse = {
+  name: string;
+};
+
+export type ExerciseTypeListResponse = {
+  exerciseTypes: ExerciseTypeResponse[];
+};
