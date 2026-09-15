@@ -129,7 +129,7 @@ export function TimePickerBottomSheet({
   );
 }
 
-type PickerColumnProps = {
+export type PickerColumnProps = {
   items: { label: string; value: string }[];
   selected: string;
   onChange: (value: string) => void;
@@ -137,7 +137,7 @@ type PickerColumnProps = {
   loop?: boolean;
 };
 
-function PickerColumn({
+export function PickerColumn({
   items,
   selected,
   onChange,

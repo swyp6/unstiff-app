@@ -18,6 +18,10 @@ type ActualMeasureStepperProps = {
   // 처럼 라벨 앞에 붙인다(Figma 4173:31231). 직접 입력(MANUAL) 화면은
   // 비교 대상이 없어 그대로 "시간"을 쓴다(Figma 4173:30739).
   labelPrefix?: string;
+  // 주어지면 라벨을 눌러서(±1씩 조정하는 스테퍼 대신) 값을 직접 입력할 수
+  // 있게 한다 — 스테퍼로 큰 값을 맞추기 번거로운 타입에 호출부가 넘긴다
+  // (예: 예상 시작 시간 UI를 참고한 휠 피커).
+  onPressValue?: () => void;
 };
 
 // GoalStepper(계획/루틴 목표값 편집)와 시각적으로 동일하지만 실제 수행값
@@ -28,6 +32,7 @@ export function ActualMeasureStepper({
   value,
   onChange,
   labelPrefix = "",
+  onPressValue,
 }: ActualMeasureStepperProps) {
   const config = ACTUAL_MEASURE_CONFIG[type];
   const decrease = () => {
@@ -39,12 +44,26 @@ export function ActualMeasureStepper({
     onChange(type === "distance" ? Number(nextValue.toFixed(1)) : nextValue);
   };
 
+  const label = (
+    <ThemedText typography="body-2-bold">
+      {labelPrefix}
+      {config.label}
+    </ThemedText>
+  );
+
   return (
     <View style={styles.container}>
-      <ThemedText typography="body-2-bold">
-        {labelPrefix}
-        {config.label}
-      </ThemedText>
+      {onPressValue ? (
+        <Pressable
+          accessibilityLabel={`${config.label} 직접 입력`}
+          accessibilityRole="button"
+          onPress={onPressValue}
+        >
+          {label}
+        </Pressable>
+      ) : (
+        label
+      )}
       <View style={styles.controls}>
         <Pressable
           accessibilityLabel={`${config.label} 줄이기`}

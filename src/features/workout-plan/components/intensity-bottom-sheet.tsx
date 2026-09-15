@@ -15,6 +15,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 type IntensityBottomSheetProps = {
   visible: boolean;
   embedded?: boolean;
+  embeddedBottomInset?: number;
   value: Intensity;
   onClose: () => void;
   onConfirm: (value: Intensity) => void;
@@ -23,6 +24,7 @@ type IntensityBottomSheetProps = {
 export function IntensityBottomSheet({
   visible,
   embedded = false,
+  embeddedBottomInset,
   value,
   onClose,
   onConfirm,
@@ -32,6 +34,7 @@ export function IntensityBottomSheet({
   return (
     <BottomSheet
       embedded={embedded}
+      embeddedBottomInset={embeddedBottomInset}
       onClose={onClose}
       title="강도"
       visible={visible}

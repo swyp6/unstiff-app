@@ -23,6 +23,7 @@ const MAX_CUSTOM_LENGTH = 10;
 type WorkoutTypeBottomSheetProps = {
   visible: boolean;
   embedded?: boolean;
+  embeddedBottomInset?: number;
   value: string;
   onClose: () => void;
   onConfirm: (value: string) => void;
@@ -31,6 +32,7 @@ type WorkoutTypeBottomSheetProps = {
 export function WorkoutTypeBottomSheet({
   visible,
   embedded = false,
+  embeddedBottomInset,
   value,
   onClose,
   onConfirm,
@@ -119,6 +121,7 @@ export function WorkoutTypeBottomSheet({
   return (
     <BottomSheet
       embedded={embedded}
+      embeddedBottomInset={embeddedBottomInset}
       fixedHeightRatio={682 / 814}
       keyboardAvoiding={false}
       onClose={onClose}

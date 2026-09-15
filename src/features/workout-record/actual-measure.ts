@@ -35,7 +35,7 @@ export const ACTUAL_MEASURE_CONFIG: Record<
     // "1000.0"으로 반올림돼 max를 넘는 값이 만들어진다. step 배수로 맞춘다.
     maximum: 999.9,
   },
-  reps: { label: "횟수", unit: "회", step: 1, minimum: 1, maximum: 9999 },
+  reps: { label: "횟수", unit: "회", step: 1, minimum: 1, maximum: 50 },
   sets: { label: "세트", unit: "세트", step: 1, minimum: 1, maximum: 999 },
 };
 

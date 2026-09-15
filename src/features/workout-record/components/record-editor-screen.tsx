@@ -19,7 +19,7 @@ import ReanimatedAnimated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { completeMission } from "@/features/missions/api";
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
@@ -43,8 +43,10 @@ import { toActualMeasuresDto } from "../actual-measure";
 import { useRecordFlowStore } from "../record-flow-store";
 
 import { ActualMeasureStepper } from "./actual-measure-stepper";
+import { ActualMeasureValueBottomSheet } from "./actual-measure-value-bottom-sheet";
 
-const MEMO_MAX_LENGTH = 40;
+// 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
+const MEMO_MAX_LENGTH = 50;
 
 function todayLabel() {
   const today = new Date();
@@ -96,6 +98,10 @@ export function RecordEditorScreen() {
   }));
   const [intensity, setIntensity] = useState<Intensity>(null);
   const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
+  // 실제 시간/거리/횟수/세트 중 지금 휠 피커로 직접 입력 중인 항목(없으면
+  // null) — ActualMeasureStepper의 라벨을 누르면 그 타입으로 켜진다.
+  const [actualMeasureSheetType, setActualMeasureSheetType] =
+    useState<GoalType | null>(null);
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,7 +114,8 @@ export function RecordEditorScreen() {
     memo: string;
   } | null>(null);
 
-  const canSubmit = selectedTypes.length > 0 && !isSubmitting;
+  const isMemoTooLong = memo.length > MEMO_MAX_LENGTH;
+  const canSubmit = selectedTypes.length > 0 && !isMemoTooLong && !isSubmitting;
 
   function toggleType(type: GoalType) {
     setSelectedTypes((current) =>
@@ -310,6 +317,7 @@ export function RecordEditorScreen() {
                     >
                       <ActualMeasureStepper
                         labelPrefix="실제 "
+                        onPressValue={() => setActualMeasureSheetType(type)}
                         type={type}
                         value={values[type]}
                         onChange={(value) =>
@@ -325,7 +333,7 @@ export function RecordEditorScreen() {
               </View>
 
               <View style={{ gap: 4 }}>
-                <SectionLabel>강도</SectionLabel>
+                <SectionLabel optional>강도</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="강도 선택"
                   onPress={() => setIsIntensitySheetVisible(true)}
@@ -334,43 +342,72 @@ export function RecordEditorScreen() {
                 />
               </View>
 
-              <View style={{ gap: 6 }}>
-                <SectionLabel>한 줄 기록 (선택)</SectionLabel>
-                <View
+              <View>
+                <SectionLabel
+                  optional
+                  trailing={
+                    <ThemedText
+                      typography="caption-1-regular"
+                      style={{
+                        color: isMemoTooLong
+                          ? primitiveColors.red["6"]
+                          : semanticColors["label-disabled"],
+                      }}
+                    >
+                      {memo.length} / {MEMO_MAX_LENGTH}
+                    </ThemedText>
+                  }
+                >
+                  한 줄 기록
+                </SectionLabel>
+                <TextInput
+                  accessibilityLabel="한 줄 기록"
+                  multiline
+                  onChangeText={setMemo}
+                  placeholder="기록을 남겨보세요"
+                  placeholderTextColor={semanticColors["label-disabled"]}
+                  returnKeyType="done"
                   style={{
                     backgroundColor: semanticColors["fill-subtle"],
+                    borderColor: isMemoTooLong
+                      ? primitiveColors.red["6"]
+                      : "transparent",
                     borderRadius: 12,
-                    height: 52,
+                    borderWidth: 1,
+                    color: semanticColors["label-normal"],
+                    fontFamily: "Pretendard-Medium",
+                    fontSize: 16,
+                    lineHeight: 24,
+                    minHeight: 50,
+                    paddingBottom: 14,
                     paddingHorizontal: 16,
-                    justifyContent: "center",
+                    paddingTop: 10,
+                    textAlignVertical: "top",
                   }}
-                >
-                  <TextInput
-                    accessibilityLabel="한 줄 기록"
-                    maxLength={MEMO_MAX_LENGTH}
-                    onChangeText={setMemo}
-                    placeholder="기록을 남겨보세요"
-                    placeholderTextColor={semanticColors["label-disabled"]}
-                    returnKeyType="done"
+                  value={memo}
+                />
+                {isMemoTooLong && (
+                  <View
                     style={{
-                      color: semanticColors["label-normal"],
-                      fontFamily: "Pretendard-Bold",
-                      fontSize: 13,
-                      paddingRight: 48,
-                    }}
-                    value={memo}
-                  />
-                  <ThemedText
-                    typography="caption-2-regular"
-                    style={{
-                      position: "absolute",
-                      right: 16,
-                      color: semanticColors["label-disabled"],
+                      alignItems: "center",
+                      flexDirection: "row",
+                      gap: 4,
+                      marginTop: 6,
                     }}
                   >
-                    {memo.length} / {MEMO_MAX_LENGTH}
-                  </ThemedText>
-                </View>
+                    <Ionicons
+                      color={primitiveColors.red["6"]}
+                      name="alert-circle"
+                      size={14}
+                    />
+                    <ThemedText
+                      typography="caption-1-regular"
+                      style={{ color: primitiveColors.red["6"] }}
+                    >
+                      {MEMO_MAX_LENGTH}자까지 쓸 수 있어요
+                    </ThemedText>
+                  </View>
+                )}
               </View>
 
               {error && (
@@ -400,24 +437,47 @@ export function RecordEditorScreen() {
             />
           </ReanimatedAnimated.View>
         </KeyboardAvoidingView>
-      </View>
 
-      {isIntensitySheetVisible && (
-        // 하단 카메라 탭에서 들어온 경우 이 화면은 그 탭의 nested route라
-        // Native TabBar가 함께 보인다 — RN Modal(기본값)은 그 탭바까지
-        // 덮어버리므로 inline(embedded)으로 띄운다(capture/target.tsx의
-        // 시트 처리와 같은 이유).
-        <IntensityBottomSheet
-          embedded
-          onClose={() => setIsIntensitySheetVisible(false)}
-          onConfirm={(value) => {
-            setIntensity(value);
-            setIsIntensitySheetVisible(false);
-          }}
-          value={intensity}
-          visible
-        />
-      )}
+        {isIntensitySheetVisible && (
+          // 하단 카메라 탭에서 들어온 경우 이 화면은 그 탭의 nested route라
+          // Native TabBar가 함께 보인다 — RN Modal(기본값)은 그 탭바까지
+          // 덮어버리므로 inline(embedded)으로 띄운다(capture/target.tsx의
+          // 시트 처리와 같은 이유). embedded의 absoluteFill은 RN에서 부모의
+          // padding을 무시하고 부모 테두리 기준 bottom:0을 잡아서, 이 View의
+          // insets.bottom padding 안에 두는 것만으론 탭바 높이를 못 피한다 —
+          // embeddedBottomInset으로 그 높이를 직접 넘겨야 시트가 탭바 위에서
+          // 멈춘다.
+          <IntensityBottomSheet
+            embedded
+            embeddedBottomInset={insets.bottom}
+            onClose={() => setIsIntensitySheetVisible(false)}
+            onConfirm={(value) => {
+              setIntensity(value);
+              setIsIntensitySheetVisible(false);
+            }}
+            value={intensity}
+            visible
+          />
+        )}
+
+        {actualMeasureSheetType && (
+          <ActualMeasureValueBottomSheet
+            embedded
+            embeddedBottomInset={insets.bottom}
+            onClose={() => setActualMeasureSheetType(null)}
+            onConfirm={(nextValue) => {
+              setValues((current) => ({
+                ...current,
+                [actualMeasureSheetType]: nextValue,
+              }));
+              setActualMeasureSheetType(null);
+            }}
+            type={actualMeasureSheetType}
+            value={values[actualMeasureSheetType]}
+            visible
+          />
+        )}
+      </View>
     </View>
   );
 }

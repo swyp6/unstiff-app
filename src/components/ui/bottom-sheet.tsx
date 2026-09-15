@@ -38,6 +38,12 @@ type BottomSheetProps = PropsWithChildren<{
   fullHeight?: boolean;
   fixedHeightRatio?: number;
   embedded?: boolean;
+  // embedded일 때 RN의 position:absolute는 부모의 padding을 무시하고 부모의
+  // 테두리 기준으로 bottom:0을 잡는다 — 그래서 부모 View에 아무리
+  // paddingBottom(예: 탭바 높이만큼의 insets.bottom)을 줘도 이 오버레이는
+  // 그 밑까지 그대로 깔린다. 탭바 뒤에 가려지지 않게 하려면 그 높이를 여기
+  // 직접 넘겨야 한다.
+  embeddedBottomInset?: number;
   expanded?: boolean;
   initialHeightRatio?: number;
   // "펼침" 스와이프가 도달하는 높이 비율 — 생략하면 기존처럼 fullSheetHeight
@@ -75,6 +81,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       fullHeight = false,
       fixedHeightRatio,
       embedded = false,
+      embeddedBottomInset = 0,
       expanded = false,
       initialHeightRatio = 1,
       expandedHeightRatio,
@@ -315,7 +322,15 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     if (!visible) return null;
 
     const sheetLayer = (
-      <View style={[styles.dim, embedded && styles.embeddedLayer]}>
+      <View
+        style={[
+          styles.dim,
+          embedded && styles.embeddedLayer,
+          embedded && embeddedBottomInset
+            ? { bottom: embeddedBottomInset }
+            : null,
+        ]}
+      >
         <Pressable
           accessibilityLabel="닫기"
           accessibilityRole="button"
