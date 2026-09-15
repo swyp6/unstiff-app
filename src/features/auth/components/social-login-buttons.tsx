@@ -48,8 +48,28 @@ async function routeAfterSignIn({
   );
 }
 
+// 로그인 실패 로그 — AxiosError 전체(config.headers.Authorization, 요청
+// body의 idToken/identityToken 등)나 응답 본문 전문은 남기지 않고, 개발
+// 빌드에서 status/code/message만 남긴다.
+function logSignInError(provider: string, error: unknown) {
+  if (!__DEV__) return;
+  if (axios.isAxiosError(error)) {
+    console.error(`${provider} login failed`, {
+      status: error.response?.status,
+      code: error.code,
+      message: error.message,
+    });
+  } else if (error instanceof Error) {
+    console.error(`${provider} login failed`, {
+      name: error.name,
+      message: error.message,
+    });
+  } else {
+    console.error(`${provider} login failed`);
+  }
+}
+
 async function handleGoogleLogin() {
-  console.log("구글 로그인 클릭");
   try {
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
@@ -63,40 +83,19 @@ async function handleGoogleLogin() {
       throw new Error("Google sign-in did not return an idToken");
     }
 
-    console.log(
-      "google credential:",
-      "len:",
-      googleIdToken.length,
-      "dots:",
-      (googleIdToken.match(/\./g) || []).length,
-      "head:",
-      googleIdToken.slice(0, 20),
-    );
-
     const signInResponse = await signIn("google", googleIdToken);
-    console.log("google login success!");
     await routeAfterSignIn(signInResponse);
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return;
     }
 
-    if (axios.isAxiosError(error)) {
-      console.error("google login failed", {
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url,
-        message: error.message,
-      });
-    } else {
-      console.error("google login failed", error);
-    }
+    logSignInError("google", error);
     Alert.alert("로그인 실패", "Google 로그인 중 문제가 발생했습니다.");
   }
 }
 
 async function handleAppleLogin() {
-  console.log("애플 로그인 클릭");
   try {
     const credential = await AppleAuthentication.signInAsync({
       requestedScopes: [
@@ -109,18 +108,7 @@ async function handleAppleLogin() {
       throw new Error("Apple sign-in did not return an identityToken");
     }
 
-    console.log(
-      "apple credential:",
-      "len:",
-      credential.identityToken.length,
-      "dots:",
-      (credential.identityToken.match(/\./g) || []).length,
-      "head:",
-      credential.identityToken.slice(0, 20),
-    );
-
     const signInResponse = await signIn("apple", credential.identityToken);
-    console.log("apple login success! ");
     await routeAfterSignIn(signInResponse);
   } catch (error) {
     if (
@@ -132,22 +120,12 @@ async function handleAppleLogin() {
       return;
     }
 
-    if (axios.isAxiosError(error)) {
-      console.error("apple login failed", {
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url,
-        message: error.message,
-      });
-    } else {
-      console.error("apple login failed", error);
-    }
+    logSignInError("apple", error);
     Alert.alert("로그인 실패", "Apple 로그인 중 문제가 발생했습니다.");
   }
 }
 
 async function handleKakaoLogin() {
-  console.log("카카오 로그인 클릭");
   try {
     // Backend verifies Kakao sign-in via the OIDC ID token, not the OAuth
     // access token (unlike Apple, this isn't obvious from the SDK alone —
@@ -158,30 +136,10 @@ async function handleKakaoLogin() {
       throw new Error("Kakao sign-in did not return an idToken");
     }
 
-    console.log(
-      "kakao credential:",
-      "len:",
-      kakaoIdToken.length,
-      "dots:",
-      (kakaoIdToken.match(/\./g) || []).length,
-      "head:",
-      kakaoIdToken.slice(0, 20),
-    );
-
     const signInResponse = await signIn("kakao", kakaoIdToken);
-    console.log("kakao login success!");
     await routeAfterSignIn(signInResponse);
   } catch (error) {
-    if (axios.isAxiosError(error)) {
-      console.error("kakao login failed", {
-        status: error.response?.status,
-        data: error.response?.data,
-        url: error.config?.url,
-        message: error.message,
-      });
-    } else {
-      console.error("kakao login failed", error);
-    }
+    logSignInError("kakao", error);
     Alert.alert("로그인 실패", "카카오 로그인 중 문제가 발생했습니다.");
   }
 }

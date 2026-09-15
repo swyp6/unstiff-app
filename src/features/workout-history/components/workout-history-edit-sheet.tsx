@@ -16,14 +16,16 @@ import {
   toApiMeasureValue,
 } from "@/features/workout-plan/measure-units";
 import {
-  formatGoalValue,
   getIntensityLabel,
-  GOAL_CONFIG,
   toApiIntensity,
   type GoalType,
   type Intensity,
 } from "@/features/workout-plan/model";
 import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
+import {
+  ACTUAL_MEASURE_CONFIG,
+  formatActualMeasureValue,
+} from "@/features/workout-record/actual-measure";
 
 import { updateWorkoutHistory } from "../api";
 import type { WorkoutHistoryResponse } from "../types";
@@ -79,9 +81,23 @@ function MeasureFieldRow({
   onChange: (value: number) => void;
   onPressValue: () => void;
 }) {
-  const config = GOAL_CONFIG[type];
+  // 여기서 고치는 값은 계획 목표값이 아니라 "실제로 한" 기록값이라, 신규
+  // 기록 화면(ActualMeasureStepper)과 같은 ACTUAL_MEASURE_CONFIG의
+  // step/최소/최대를 쓴다 — GOAL_CONFIG(시간 5분 단위·최소 5분)를 쓰면
+  // 3분 기록에서 -를 눌렀을 때 5분으로 올라가는 식으로 어긋난다.
+  const config = ACTUAL_MEASURE_CONFIG[type];
   const displayValue =
-    type === "time" ? formatTimeMinSec(value) : formatGoalValue(type, value);
+    type === "time"
+      ? formatTimeMinSec(value)
+      : formatActualMeasureValue(type, value);
+  const decrease = () => {
+    const nextValue = Math.max(config.minimum, value - config.step);
+    onChange(type === "distance" ? Number(nextValue.toFixed(1)) : nextValue);
+  };
+  const increase = () => {
+    const nextValue = Math.min(config.maximum, value + config.step);
+    onChange(type === "distance" ? Number(nextValue.toFixed(1)) : nextValue);
+  };
 
   return (
     <View className="flex-row items-center gap-2.5 rounded-[14px] bg-fill-subtle py-2.5 pl-[18px] pr-3.5">
@@ -95,7 +111,7 @@ function MeasureFieldRow({
         accessibilityLabel={`${config.label} 줄이기`}
         accessibilityRole="button"
         className="h-10 w-10 items-center justify-center rounded-full bg-background-normal"
-        onPress={() => onChange(Math.max(config.minimum, value - config.step))}
+        onPress={decrease}
       >
         <Ionicons
           color={semanticColors["label-normal"]}
@@ -110,7 +126,7 @@ function MeasureFieldRow({
         accessibilityLabel={`${config.label} 늘리기`}
         accessibilityRole="button"
         className="h-10 w-10 items-center justify-center rounded-full bg-background-normal"
-        onPress={() => onChange(value + config.step)}
+        onPress={increase}
       >
         <Ionicons color={semanticColors["label-normal"]} name="add" size={15} />
       </Pressable>
@@ -213,8 +229,8 @@ export function WorkoutHistoryEditSheet({
         quickAddAmounts={
           activeFieldSheet === "distance" ? [1, 3, 5, 10] : undefined
         }
-        title={GOAL_CONFIG[activeFieldSheet].label}
-        unit={GOAL_CONFIG[activeFieldSheet].unit}
+        title={ACTUAL_MEASURE_CONFIG[activeFieldSheet].label}
+        unit={ACTUAL_MEASURE_CONFIG[activeFieldSheet].unit}
       />
     );
   }

@@ -1003,9 +1003,22 @@ export default function HomeScreen() {
     setIsRecordMethodModalVisible(true);
   }
 
+  // 서버에서 이미 COMPLETED인 미션(=pendingRecordPlanItemId가 미션이
+  // 아닌 completed)은 실제 기록(POST /api/v1/workouts)과 미션 완료 처리가
+  // 이미 끝났으므로 체크를 다시 눌러 되돌릴 수 없다 — 되돌린 뒤 다시
+  // 완료하면 같은 refId로 기록이 중복 생성된다. 체크 탭 직후 아직 기록
+  // 방식을 고르기 전(낙관적 completed, pendingRecordPlanItemId가 미션)에만
+  // 기존처럼 즉시 되돌린다. MissionCard도 이 조건으로 체크 버튼을
+  // 비활성화하지만, 여기서도 한 번 더 막아둔다.
+  const isMissionCompletedOnServer =
+    missionStatus === "completed" &&
+    pendingRecordPlanItemId !== MISSION_PLAN_ITEM_ID;
+
   function handleMissionCompletePress() {
     if (missionStatus === "completed") {
-      setMissionStatus("accepted");
+      if (isMissionCompletedOnServer) return;
+      setIsRecordMethodModalVisible(false);
+      revertPendingRecord();
       return;
     }
     setMissionStatus("completed");
@@ -1206,7 +1219,11 @@ export default function HomeScreen() {
             onAccept={handleMissionAccept}
             onDismiss={handleMissionDismiss}
             onReveal={handleMissionReveal}
-            onToggleComplete={handleMissionCompletePress}
+            onToggleComplete={
+              isMissionCompletedOnServer
+                ? undefined
+                : handleMissionCompletePress
+            }
             status={missionStatus}
             title={missionTitle}
           />

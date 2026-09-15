@@ -47,7 +47,9 @@ type MissionCardProps = {
   description: string;
   onReveal: () => void;
   onAccept: () => void;
-  onToggleComplete: () => void;
+  // 없으면(서버에서 이미 완료된 미션) 체크를 다시 눌러 되돌릴 수 없다 —
+  // TodayWorkoutRow의 onToggle과 같은 규칙.
+  onToggleComplete?: () => void;
   onDismiss: () => void;
 };
 
@@ -152,14 +154,24 @@ export function MissionCard({
       {isAccepted && (
         <View className="flex-row items-center gap-3 pt-4">
           <Pressable
-            accessibilityLabel={isCompleted ? "미션 완료 취소" : "미션 완료"}
+            accessibilityLabel={
+              !onToggleComplete
+                ? "미션 완료됨"
+                : isCompleted
+                  ? "미션 완료 취소"
+                  : "미션 완료"
+            }
             accessibilityRole="checkbox"
-            accessibilityState={{ checked: isCompleted }}
+            accessibilityState={{
+              checked: isCompleted,
+              disabled: !onToggleComplete,
+            }}
             className={
               isCompleted
                 ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500"
                 : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
             }
+            disabled={!onToggleComplete}
             hitSlop={8}
             onPress={onToggleComplete}
           >

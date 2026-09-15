@@ -8,6 +8,15 @@ import {
 } from "@/features/notifications/push-token";
 import { useAuthStore } from "@/store/auth-store";
 
+// 등록 실패 로그 — AxiosError 전체를 넘기면 config.data(FCM device token)와
+// config.headers.Authorization까지 찍히므로, 개발 빌드에서 message만 남긴다.
+function logPushRegisterError(context: string, error: unknown) {
+  if (!__DEV__) return;
+  console.log(`[push] ${context}`, {
+    message: error instanceof Error ? error.message : undefined,
+  });
+}
+
 // Registers this device's FCM token with the backend once the user is
 // signed in, and re-registers whenever FCM rotates the token or the app
 // returns to the foreground. The foreground check matters because the FCM
@@ -34,7 +43,7 @@ export function useRegisterPushToken() {
           return registerPushDevice(token);
         })
         .catch((error) =>
-          console.log("[push] failed to register device token", error),
+          logPushRegisterError("failed to register device token", error),
         );
     }
 
@@ -42,7 +51,7 @@ export function useRegisterPushToken() {
 
     const unsubscribeRefresh = subscribeToFcmTokenRefresh((token) => {
       registerPushDevice(token).catch((error) =>
-        console.log("[push] failed to register refreshed token", error),
+        logPushRegisterError("failed to register refreshed token", error),
       );
     });
 

@@ -27,6 +27,7 @@ import {
   formatStartTime,
   getIntensityLabel,
   type GoalType,
+  PLAN_MEMO_MAX_LENGTH,
   toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
@@ -330,7 +331,7 @@ export function WorkoutPlanDetailBottomSheet({
           <SectionLabel>한 줄 메모</SectionLabel>
           <TextInput
             accessibilityLabel="한 줄 메모"
-            maxLength={20}
+            maxLength={PLAN_MEMO_MAX_LENGTH}
             onChangeText={(memo) =>
               setDetailDraft((current) => ({ ...current, memo }))
             }

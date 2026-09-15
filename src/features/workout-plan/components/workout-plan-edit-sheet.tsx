@@ -27,6 +27,7 @@ import {
   formatStartTime,
   getIntensityLabel,
   type GoalType,
+  PLAN_MEMO_MAX_LENGTH,
   toggleGoalTypeSelection,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
@@ -86,7 +87,7 @@ export function WorkoutPlanEditSheet({
   const displayedSaveLabel =
     showAddToTodayToggle && saveAsRoutine ? "루틴으로 추가하기" : saveLabel;
   const isTitleTooLong = draft.title.length > 20;
-  const isMemoTooLong = draft.memo.length > 50;
+  const isMemoTooLong = draft.memo.length > PLAN_MEMO_MAX_LENGTH;
   // 운동명·운동 종류·기록할 항목(4개 중 하나 이상) 셋 다 있어야 저장 가능.
   const canSubmit =
     draft.title.trim().length > 0 &&
@@ -319,7 +320,7 @@ export function WorkoutPlanEditSheet({
                 ]}
                 typography="caption-1-regular"
               >
-                {draft.memo.length} / 50
+                {draft.memo.length} / {PLAN_MEMO_MAX_LENGTH}
               </ThemedText>
             }
           >
@@ -362,7 +363,7 @@ export function WorkoutPlanEditSheet({
                 style={styles.errorText}
                 typography="caption-1-regular"
               >
-                50자까지 쓸 수 있어요
+                {PLAN_MEMO_MAX_LENGTH}자까지 쓸 수 있어요
               </ThemedText>
             </View>
           )}

@@ -66,12 +66,24 @@ function toAssistantMessage(response: AiChatMessageResponse) {
   };
 }
 
+// AxiosError 전체(config.headers.Authorization, 요청 body)나 응답 본문
+// 전문은 콘솔에 남기지 않는다 — 개발 빌드에서 status/code/message만 남긴다.
 function logChatError(context: string, error: unknown) {
+  if (!__DEV__) return;
   if (isAxiosError(error)) {
-    console.log(`[chat:${context}] status:`, error.response?.status);
-    console.log(`[chat:${context}] data:`, error.response?.data);
+    console.error(`[chat:${context}] failed`, {
+      status: error.response?.status,
+      code: error.code,
+      message: error.message,
+    });
+  } else if (error instanceof Error) {
+    console.error(`[chat:${context}] failed`, {
+      name: error.name,
+      message: error.message,
+    });
+  } else {
+    console.error(`[chat:${context}] failed`);
   }
-  console.error(`[chat:${context}] failed`, error);
 }
 
 // 채팅 진입 단계. enter 응답의 externalAiAgreed가 gate다 — false면 오늘 대화

@@ -37,6 +37,10 @@ export function canUseStopwatch(plan: WorkoutPlanDraft) {
 
 export const GOAL_TYPES: GoalType[] = ["time", "distance", "reps", "sets"];
 
+// 한 줄 메모 최대 길이 — 신규 계획 작성(workout-plan-edit-sheet)과 기존 계획
+// 수정(workout-plan-detail-bottom-sheet)이 같은 필드를 다루므로 한 값을 쓴다.
+export const PLAN_MEMO_MAX_LENGTH = 50;
+
 // 칩을 누른 순서가 아니라 항상 GOAL_TYPES 순서(시간/거리/횟수/세트)로 보이도록
 // 정렬해서 반환한다 — 세 군데(계획 편집/상세/새 루틴 추가)에서 토글 로직이
 // 똑같이 중복돼 있어서 여기 하나로 모았다.
