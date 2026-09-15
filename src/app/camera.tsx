@@ -386,7 +386,7 @@ export default function CameraScreen() {
           {photo ? (
             <View className="flex-row gap-3.5">
               <Pressable
-                className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white/[0.16]"
+                className="h-[52px] flex-1 items-center justify-center rounded-full bg-white/[0.16]"
                 accessibilityRole="button"
                 disabled={isUploading}
                 // CameraView는 photo가 있는 동안에도 계속 mount돼 있으므로
@@ -402,7 +402,7 @@ export default function CameraScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable
-                className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white"
+                className="h-[52px] flex-1 items-center justify-center rounded-full bg-white"
                 accessibilityRole="button"
                 disabled={isUploading}
                 onPress={handleUsePhoto}
