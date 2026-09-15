@@ -30,14 +30,14 @@ const HEADER_HEIGHT = 72;
 const SETTINGS_ICON_SIZE = 24;
 const SETTINGS_ICON_RIGHT = 375 - 325 - SETTINGS_ICON_SIZE;
 
-// 탭 아래 콘텐츠 영역. 뱃지 탭은 Figma 뱃지 영역(4573:35563) 그대로
-// pt 12 / px 20 / pb 24 — NativeWind rem=14라 rem 클래스(pt-3 등)는 0.875배로
-// 렌더되므로 px 값으로 쓴다. 활동 기록·리포트 탭은 기존 클래스(gap-4/px-5/
-// pb-5)를 그대로 옮겨 기존 렌더 결과를 유지한다.
+// 탭 아래 콘텐츠 영역. 뱃지 탭(Figma 4573:35563)과 활동 리포트 탭(Figma
+// 4573:35652)은 pt 12 / px 20 / pb 24 — NativeWind rem=14라 rem 클래스(pt-3
+// 등)는 0.875배로 렌더되므로 px 값으로 쓴다. 활동 기록 탭은 기존 클래스
+// (gap-4/px-5/pb-5)를 그대로 옮겨 기존 렌더 결과를 유지한다.
 const TAB_REGION_CLASS: Record<MyPageTab, string> = {
   streak: "px-5 pb-5 pt-4",
   badges: "px-[20px] pb-[24px] pt-[12px]",
-  summary: "px-5 pb-5 pt-4",
+  summary: "px-[20px] pb-[24px] pt-[12px]",
 };
 
 export default function MyPageScreen() {
@@ -48,6 +48,9 @@ export default function MyPageScreen() {
   // (which unmounts StreakTab) doesn't drop the data and refetch — the
   // hook itself refreshes on every focus of this screen.
   const workoutActivity = useWorkoutActivity();
+  // 활동 리포트의 이동 범위 하한(가입일). 아래 /me 응답에서 같이 꺼내 두고
+  // 별도 요청은 하지 않는다 — 받기 전/실패 시 null이면 탭이 화살표를 잠근다.
+  const [createdAt, setCreatedAt] = useState<string | null>(null);
 
   // GET is the source of truth for nickname/profileImageUrl — this runs
   // once per mount (the tab bar keeps this screen mounted across tab
@@ -68,6 +71,7 @@ export default function MyPageScreen() {
     getMyProfile()
       .then((profile) => {
         if (cancelled) return;
+        setCreatedAt(profile.createdAt);
         useMyProfileStore
           .getState()
           .hydrate(profile.nickname, profile.profileImageUrl, requestRevision);
@@ -122,7 +126,7 @@ export default function MyPageScreen() {
           <View className={TAB_REGION_CLASS[tab]}>
             {tab === "streak" && <StreakTab {...workoutActivity} />}
             {tab === "badges" && <BadgesTab />}
-            {tab === "summary" && <ActivitySummaryTab />}
+            {tab === "summary" && <ActivitySummaryTab createdAt={createdAt} />}
           </View>
         </ScrollView>
       </SafeAreaView>
