@@ -369,7 +369,7 @@ function ActivityReportEmptyCard() {
         }}
         typography="body-3-regular"
       >
-        {"운동을 기록하면 이번 주 활동을\n한눈에 확인할 수 있어요"}
+        {"운동을 기록하면 활동을\n한눈에 확인할 수 있어요"}
       </ThemedText>
     </View>
   );
