@@ -12,24 +12,14 @@ import {
 import type { WorkoutActivityState } from "@/features/mypage/use-workout-activity";
 import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 
-const STREAK_MASCOT_ACTIVE = require("@/assets/mypage/streak-mascot-active.png");
-const STREAK_MASCOT_IDLE = require("@/assets/mypage/streak-mascot-idle.png");
+const STREAK_MASCOT = require("@/assets/mypage/streak_dwaeham_01.png");
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const CARD_SHADOW = "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)]";
 
-// The exported mascot PNGs are full illustration sheets, not single
-// cropped assets — Figma displays only a small window of each via an
-// oversized, offset <img> inside an overflow-hidden box. These mirror
-// that same crop (computed from Figma's own offset/scale percentages)
-// instead of showing the whole sheet.
+// 캐릭터 이미지는 Figma의 90×84 자리에 비율을 유지한 채(contain) 맞춘다 —
+// 정사각 원본이라 84×84로 그려지고 가로 여백은 가운데로 나뉜다.
 const MASCOT_BOX = { height: 84, width: 90 };
-const MASCOT_CROP = {
-  height: MASCOT_BOX.height * 8.503,
-  left: MASCOT_BOX.width * -4.9689,
-  top: MASCOT_BOX.height * -3.2869,
-  width: MASCOT_BOX.width * 11.7752,
-};
 
 // Figma's heatmap only pins levels 1/2/3/5 to specific Orange shades (see
 // HeatmapLevel in heatmap.ts) — level 4 reuses level 3's shade since no
@@ -89,19 +79,11 @@ function StreakCard({
           </ThemedText>
         </View>
       </View>
-      <View
-        style={{
-          height: MASCOT_BOX.height,
-          overflow: "hidden",
-          width: MASCOT_BOX.width,
-        }}
-      >
-        <Image
-          contentFit="fill"
-          source={active ? STREAK_MASCOT_ACTIVE : STREAK_MASCOT_IDLE}
-          style={{ position: "absolute", ...MASCOT_CROP }}
-        />
-      </View>
+      <Image
+        contentFit="contain"
+        source={STREAK_MASCOT}
+        style={{ height: MASCOT_BOX.height, width: MASCOT_BOX.width }}
+      />
     </View>
   );
 }
