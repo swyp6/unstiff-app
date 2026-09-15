@@ -9,7 +9,7 @@ const apsEnvironment =
   process.env.EAS_BUILD_PROFILE === "production" ? "production" : "development";
 
 const config: ExpoConfig = {
-  name: "unstiff",
+  name: "찌뿌두둥",
   slug: "unstiff",
   owner: "yerimi00",
   version: "1.0.0",
