@@ -2,6 +2,7 @@ import { apiClient } from "@/lib/api-client";
 
 import type {
   WorkoutHistoryListResponse,
+  WorkoutHistoryResponse,
   WorkoutHistoryUpdateRequest,
 } from "./types";
 
@@ -10,6 +11,16 @@ export async function getWorkoutHistory(date: string) {
   const { data } = await apiClient.get<WorkoutHistoryListResponse>(
     "/api/v1/workouts",
     { params: { date } },
+  );
+  return data;
+}
+
+// GET /api/v1/workouts/{id} — 운동 기록 단건 조회. 날짜별 조회 응답의
+// 항목과 같은 형태다(record-complete.tsx가 방금 저장한 기록을 exerciseType/
+// iconUrl까지 채워서 다시 읽어올 때 쓴다).
+export async function getWorkoutHistoryById(id: number) {
+  const { data } = await apiClient.get<WorkoutHistoryResponse>(
+    `/api/v1/workouts/${id}`,
   );
   return data;
 }

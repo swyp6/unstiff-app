@@ -8,64 +8,64 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ReanimatedAnimated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { RecordActionsMenu } from "@/components/ui/record-actions-menu";
+import { RecordScreenHeader } from "@/components/ui/record-screen-header";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
-import {
-  apiMetersToKm,
-  apiSecondsToMinutes,
-} from "@/features/workout-plan/measure-units";
+import { getWorkoutHistoryById } from "@/features/workout-history/api";
+import { WorkoutHistoryEditSheet } from "@/features/workout-history/components/workout-history-edit-sheet";
+import { formatMeasureValue } from "@/features/workout-history/model";
+import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
+import { usePhotoRecordActions } from "@/features/workout-history/use-photo-record-actions";
+import type {
+  ExerciseMeasuresDto,
+  IntensityDto,
+} from "@/features/workout-plan/types";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
-// confirmed.measures는 서버로 보낸 그대로의 API 단위(duration=초, distance=m)다.
-// 사용자에게는 앱의 UI 단위(분/km)로 되돌려 보여준다 — 변환을 빠뜨리면 20분이
-// 1200분, 3km가 3000km로 보인다.
-const MEASURE_DISPLAY: {
-  key: "duration" | "distance" | "count" | "sets";
-  label: string;
-  format: (apiValue: number) => string;
-}[] = [
-  {
-    key: "duration",
-    label: "시간",
-    format: (v) => `${apiSecondsToMinutes(v)}분`,
-  },
-  {
-    key: "distance",
-    label: "거리",
-    format: (v) => `${apiMetersToKm(v).toFixed(1)}km`,
-  },
-  { key: "count", label: "횟수", format: (v) => `${v}회` },
-  { key: "sets", label: "세트", format: (v) => `${v}세트` },
+const INTENSITY_LABELS: Record<IntensityDto, string> = {
+  LIGHT: "가볍게",
+  MODERATE: "보통",
+  HARD: "빡세게",
+};
+
+const MEASURE_LABELS: Record<keyof ExerciseMeasuresDto, string> = {
+  duration: "시간",
+  distance: "거리",
+  count: "횟수",
+  sets: "세트",
+};
+
+// day-record.tsx "통계 그리드"와 같은 순서 — 강도 단독 행(있으면) 다음에
+// 시간·거리, 횟수·세트를 각각 한 행으로 묶는다.
+const MEASURE_ROW_PAIRS: (keyof ExerciseMeasuresDto)[][] = [
+  ["duration", "distance"],
+  ["count", "sets"],
 ];
 
-// Figma 4173:30847 기준(375x812) 사진 영역의 top/height와, 그 안에서 각
-// 요소가 차지하는 상대 위치 — 사진 영역 자체는 flex:1(디바이스마다 실제
-// 높이가 다르다)이라, 절대 px 대신 이 비율로 앵커링해 같은 시각적 위치가
-// 나오게 한다.
-const PHOTO_TOP_FIGMA = 60;
-const PHOTO_HEIGHT_FIGMA = 620;
-// 그라데이션: top 380 ~ 사진 하단(680)까지, 즉 사진 높이의 아래쪽 48.4%.
+// Figma 4305:45365 기준(375x824) 사진 영역의 top/height 비율 — 사진 영역
+// 자체는 flex:1(디바이스마다 실제 높이가 다르다)이라, 절대 px 대신 이
+// 비율로 앵커링해 같은 시각적 위치가 나오게 한다.
+const PHOTO_TOP_FIGMA = 92;
+const PHOTO_HEIGHT_FIGMA = 588;
+// 그라데이션: top 380 ~ 사진 하단(680)까지, 즉 사진 높이의 아래쪽 51%.
 const GRADIENT_HEIGHT_PERCENT = `${((PHOTO_TOP_FIGMA + PHOTO_HEIGHT_FIGMA - 380) / PHOTO_HEIGHT_FIGMA) * 100}%`;
-const DATE_TOP_PERCENT = `${((470 - PHOTO_TOP_FIGMA) / PHOTO_HEIGHT_FIGMA) * 100}%`;
-const TITLE_TOP_PERCENT = `${((490 - PHOTO_TOP_FIGMA) / PHOTO_HEIGHT_FIGMA) * 100}%`;
-const MEASURES_TOP_PERCENT = `${((526 - PHOTO_TOP_FIGMA) / PHOTO_HEIGHT_FIGMA) * 100}%`;
-// 토스트는 사진 하단에서 17px 위(사진 bottom 680 - 토스트 bottom 663)에
-// 뜬다 — 디바이스별 사진 높이가 달라도 "사진이 끝나기 직전" 위치가
-// 유지되도록 사진 영역의 bottom 기준으로 고정 오프셋을 준다.
-const TOAST_BOTTOM_OFFSET = 17;
+// 통계 그리드/토스트는 사진 "하단"에서 고정 px만큼 떨어진 위치라(Figma
+// bottom 앵커), 굳이 비율로 바꾸지 않고 그대로 쓴다 — position:absolute의
+// bottom은 컨테이너 실제 높이에 상관없이 항상 그 가장자리 기준으로 계산된다.
+const STATS_BOTTOM_OFFSET = 28;
+const TOAST_BOTTOM_OFFSET = 15;
 
 const TOAST_ENTER_MS = 220;
 const TOAST_HOLD_MS = 1500;
 const TOAST_EXIT_MS = 190;
 
-function formatDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}. ${month}. ${day}`;
+function formatHeaderDate(date: Date) {
+  return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
 
-// Figma 4173:30847 "[완료] -> 홈으로" — POST /api/v1/workouts 성공 직후에만
+// Figma 4305:45365 "[완료] -> 홈으로" — POST /api/v1/workouts 성공 직후에만
 // 진입한다(record-editor.tsx 참고). confirmed는 저장에 실제 사용한 값의
 // 스냅샷이라, 이 화면이 떠 있는 동안 draft(photo/target)가 초기화돼도
 // 표시값에는 영향이 없다.
@@ -91,31 +91,107 @@ export default function RecordCompleteScreen() {
     if (!confirmed) router.dismissTo("/home");
   }, [confirmed]);
 
+  // 점세개 메뉴(사진 저장/변경/기록 수정/사진 삭제)는 day-record.tsx와 같은
+  // WorkoutHistoryResponse 모양이 있어야 동작한다 — confirmed 스냅샷엔
+  // exerciseType/iconUrl 등이 없어서, 방금 저장한 기록을 id로 다시 읽어온다.
+  // 로드되기 전까지는 화면 자체는 confirmed 값으로 바로 보여준다(아래
+  // display* 값 참고).
+  const [entry, setEntry] = useState<WorkoutHistoryResponse | null>(null);
+  useEffect(() => {
+    if (!confirmed) return;
+    getWorkoutHistoryById(confirmed.id)
+      .then(setEntry)
+      .catch((error) => {
+        console.error("Failed to load saved workout record", error);
+      });
+  }, [confirmed]);
+
+  const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const [isEditSheetVisible, setIsEditSheetVisible] = useState(false);
+  const [isDeleteConfirmVisible, setIsDeleteConfirmVisible] = useState(false);
+  const {
+    isPhotoActionPending,
+    handleSavePhoto,
+    handleChangePhoto,
+    handleDeletePhoto,
+  } = usePhotoRecordActions(entry, setEntry);
+
   if (!confirmed) return null;
 
-  const measureEntries = MEASURE_DISPLAY.filter(
-    ({ key }) => confirmed.measures[key] != null,
-  );
+  // entry가 로드된 뒤로는(수정/사진 변경이 반영되도록) entry를 우선한다 —
+  // 로드 전까지는 confirmed 스냅샷을 그대로 보여준다.
+  const displayImageUrl = entry ? entry.imageUrl : confirmed.secureUrl;
+  const displayMeasures = entry ? entry.measures : confirmed.measures;
+  const displayIntensity = entry ? entry.intensity : confirmed.intensity;
+
+  const measureRows = MEASURE_ROW_PAIRS.map((pair) =>
+    pair.filter((key) => displayMeasures[key] != null),
+  ).filter((row) => row.length > 0);
 
   // 성공 흐름의 명시적 마무리: draft를 지운 뒤 dismissTo("/home")로
   // record-complete/record-editor/camera(및 standalone 경로의 capture 탭
   // nested stack에 남아있는 target)까지 전부 걷어내고 홈으로 이동한다.
   // 다른 화면(target 등)이 store 변화를 감시하다가 알아서 자신을
   // pop하는 방식은 쓰지 않는다 — 이 확인 동작 하나에서 끝까지 명시적으로
-  // 처리한다.
+  // 처리한다. 헤더의 X도 같은 동작이다 — 이미 저장이 끝난 화면이라
+  // "닫기"와 "선택 완료"가 다른 곳으로 갈 이유가 없다.
   function handleConfirm() {
     reset();
     router.dismissTo("/home");
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: semanticColors["label-normal"] }}>
+    <View style={{ flex: 1, backgroundColor: primitiveColors.charcoal["12"] }}>
       <View style={{ paddingTop: insets.top, flex: 1 }}>
+        <RecordScreenHeader
+          dateLabel={formatHeaderDate(confirmed.date)}
+          onClose={handleConfirm}
+          onMenuPress={() => setIsMenuVisible(true)}
+          variant="dark"
+        />
+
+        <RecordActionsMenu
+          hasPhoto={Boolean(displayImageUrl)}
+          isPhotoActionPending={isPhotoActionPending || !entry}
+          onChangePhoto={handleChangePhoto}
+          onClose={() => setIsMenuVisible(false)}
+          onDeletePhoto={() => setIsDeleteConfirmVisible(true)}
+          onEditRecord={() => setIsEditSheetVisible(true)}
+          onSavePhoto={handleSavePhoto}
+          topOffset={insets.top + 52}
+          visible={isMenuVisible}
+        />
+
+        <ConfirmModal
+          cancelLabel="취소하기"
+          confirmColor={semanticColors["status-negative-normal"]}
+          confirmLabel="삭제하기"
+          description="기록은 남고 스티커로 바뀌어요"
+          onCancel={() => setIsDeleteConfirmVisible(false)}
+          onConfirm={() => {
+            setIsDeleteConfirmVisible(false);
+            handleDeletePhoto();
+          }}
+          swapButtons
+          title="사진을 삭제할까요?"
+          visible={isDeleteConfirmVisible}
+        />
+
+        {entry && (
+          <WorkoutHistoryEditSheet
+            entry={entry}
+            key={entry.id}
+            onClose={() => setIsEditSheetVisible(false)}
+            onSaved={setEntry}
+            visible={isEditSheetVisible}
+          />
+        )}
+
         <View style={{ flex: 1 }}>
-          {confirmed.secureUrl ? (
+          {displayImageUrl ? (
             <Image
               source={{
-                uri: getOptimizedImageUrl(confirmed.secureUrl, {
+                uri: getOptimizedImageUrl(displayImageUrl, {
                   width: 750,
                 }),
               }}
@@ -140,51 +216,48 @@ export default function RecordCompleteScreen() {
             }}
           />
 
-          <ThemedText
-            typography="caption-2-bold"
-            style={{
-              position: "absolute",
-              left: 24,
-              top: DATE_TOP_PERCENT,
-              color: "rgba(255,255,255,0.7)",
-            }}
-          >
-            {formatDate(confirmed.date)}
-          </ThemedText>
-          <ThemedText
-            typography="title-3-bold"
-            style={{
-              position: "absolute",
-              left: 24,
-              top: TITLE_TOP_PERCENT,
-              color: "#ffffff",
-            }}
-          >
-            {confirmed.target.title}
-          </ThemedText>
           <View
             style={{
               position: "absolute",
               left: 24,
-              top: MEASURES_TOP_PERCENT,
-              flexDirection: "row",
-              gap: 24,
+              bottom: STATS_BOTTOM_OFFSET,
+              gap: 14,
             }}
           >
-            {measureEntries.map(({ key, label, format }) => (
-              <View key={key}>
+            {displayIntensity && (
+              <View style={{ width: 100 }}>
                 <ThemedText
-                  typography="title-2-bold"
+                  typography="display-1-bold"
                   style={{ color: "#ffffff" }}
                 >
-                  {format(confirmed.measures[key]!)}
+                  {INTENSITY_LABELS[displayIntensity]}
                 </ThemedText>
                 <ThemedText
                   typography="caption-2-regular"
-                  style={{ color: "rgba(255,255,255,0.7)" }}
+                  style={{ color: "#c3c3c6" }}
                 >
-                  {label}
+                  강도
                 </ThemedText>
+              </View>
+            )}
+            {measureRows.map((row) => (
+              <View key={row.join("-")} style={{ flexDirection: "row" }}>
+                {row.map((key) => (
+                  <View key={key} style={{ width: 100 }}>
+                    <ThemedText
+                      typography="display-1-bold"
+                      style={{ color: "#ffffff" }}
+                    >
+                      {formatMeasureValue(key, displayMeasures[key]!)}
+                    </ThemedText>
+                    <ThemedText
+                      typography="caption-2-regular"
+                      style={{ color: "#c3c3c6" }}
+                    >
+                      {MEASURE_LABELS[key]}
+                    </ThemedText>
+                  </View>
+                ))}
               </View>
             ))}
           </View>
@@ -205,22 +278,22 @@ export default function RecordCompleteScreen() {
                 style={{
                   flexDirection: "row",
                   alignItems: "center",
-                  gap: 8,
-                  height: 48,
-                  paddingHorizontal: 16,
+                  gap: 10,
+                  paddingHorizontal: 20,
+                  paddingVertical: 14,
                   borderRadius: 999,
-                  backgroundColor: semanticColors["label-normal"],
-                  shadowColor: "#000000",
-                  shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.24,
-                  shadowRadius: 20,
+                  backgroundColor: primitiveColors.charcoal["11"],
+                  shadowColor: "#001736",
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.16,
+                  shadowRadius: 24,
                   elevation: 6,
                 }}
               >
                 <View
                   style={{
-                    width: 27,
-                    height: 27,
+                    width: 20,
+                    height: 20,
                     borderRadius: 999,
                     backgroundColor: "#ffffff",
                     alignItems: "center",
@@ -229,8 +302,8 @@ export default function RecordCompleteScreen() {
                 >
                   <Ionicons
                     name="checkmark"
-                    size={13}
-                    color={semanticColors["label-normal"]}
+                    size={11}
+                    color={primitiveColors.charcoal["11"]}
                   />
                 </View>
                 <ThemedText
@@ -264,14 +337,16 @@ export default function RecordCompleteScreen() {
             <View
               style={{
                 height: 54,
-                borderRadius: 14,
-                backgroundColor: semanticColors["background-normal"],
+                borderRadius: 999,
+                backgroundColor: primitiveColors.orange["500"],
                 alignItems: "center",
                 justifyContent: "center",
                 marginBottom: Math.max(insets.bottom, 12),
               }}
             >
-              <ThemedText typography="body-2-bold">확인</ThemedText>
+              <ThemedText typography="body-1-bold" style={{ color: "#ffffff" }}>
+                선택 완료
+              </ThemedText>
             </View>
           </Pressable>
         </View>

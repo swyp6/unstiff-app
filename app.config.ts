@@ -9,7 +9,7 @@ const apsEnvironment =
   process.env.EAS_BUILD_PROFILE === "production" ? "production" : "development";
 
 const config: ExpoConfig = {
-  name: "unstiff",
+  name: "찌뿌두둥",
   slug: "unstiff",
   owner: "yerimi00",
   version: "1.0.0",
@@ -33,7 +33,7 @@ const config: ExpoConfig = {
 
   android: {
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#FF6326",
       foregroundImage: "./assets/images/android-icon-foreground.png",
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
@@ -79,7 +79,7 @@ const config: ExpoConfig = {
     [
       "expo-splash-screen",
       {
-        backgroundColor: "#208AEF",
+        backgroundColor: "#FF6326",
         image: "./assets/images/splash-icon.png",
         imageWidth: 76,
       },

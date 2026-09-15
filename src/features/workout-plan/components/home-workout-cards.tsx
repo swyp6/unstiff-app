@@ -88,7 +88,12 @@ export function MissionCard({
           "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
       {isAccepted && (
         <View className="min-h-8 flex-row items-center justify-between">
-          <ThemedText typography="body-3-bold" themeColor="textSecondary">
+          {/* TodayWorkoutCard의 "오늘의 운동" 헤딩과 같은 타이포/색상 —
+              홈 화면에 나란히 쌓이는 두 카드 헤더가 같은 무게로 보여야 한다. */}
+          <ThemedText
+            style={{ color: primitiveColors.charcoal["11"] }}
+            typography="heading-1-bold"
+          >
             오늘의 미션
           </ThemedText>
           {closeButton}
@@ -229,6 +234,9 @@ type TodayWorkoutCardProps = {
   // 있어서, 상세/수정도 그 사본을 직접 연다 — onOpenSavedPlan과 달리
   // savedWorkoutPlans 목록을 조회하지 않는다.
   onOpenWorkoutDetail: (instanceId: string) => void;
+  // 완료된 항목을 탭했을 때 — 점세개(수정) 대신 그 운동의 실제 기록
+  // (day-record 화면)을 연다.
+  onOpenWorkoutRecord: (instanceId: string) => void;
   // 오늘이 아닌 미래 날짜를 보고 있을 때(Figma node 2910-4774/2918-4983):
   // 제목·빈 상태 문구가 바뀌고, 아직 안 지난 날이라 완료 체크는 없앤다 —
   // 수정(⋮)은 미래 날짜에도 그대로 가능해야 한다.
@@ -250,6 +258,7 @@ export function TodayWorkoutCard({
   onAddSavedPlan,
   onOpenSavedPlan,
   onOpenWorkoutDetail,
+  onOpenWorkoutRecord,
   title = "오늘의 운동",
   emptyStateLabel = "오늘 담은 운동이 없어요",
   readOnly = false,
@@ -294,15 +303,27 @@ export function TodayWorkoutCard({
               </ThemedText>
             </View>
           ) : (
-            todayWorkouts.map((workout) => {
+            todayWorkouts.map((workout, index) => {
               const hasStopwatch = workout.stopwatch != null;
               return (
                 <View key={workout.id}>
                   <TodayWorkoutRow
                     hideBottomBorder={hasStopwatch}
-                    onOpenDetail={() => onOpenWorkoutDetail(workout.id)}
+                    isLast={index === todayWorkouts.length - 1}
+                    onOpenDetail={
+                      workout.isDone
+                        ? undefined
+                        : () => onOpenWorkoutDetail(workout.id)
+                    }
+                    onOpenRecord={
+                      workout.isDone
+                        ? () => onOpenWorkoutRecord(workout.id)
+                        : undefined
+                    }
                     onToggle={
-                      readOnly || (hasStopwatch && !workout.isDone)
+                      readOnly ||
+                      workout.isDone ||
+                      (hasStopwatch && !workout.isDone)
                         ? undefined
                         : () => onToggleTodayWorkout(workout.id)
                     }
@@ -348,8 +369,9 @@ export function TodayWorkoutCard({
 
         {expanded && (
           <>
-            {savedWorkoutPlans.map((plan) => (
+            {savedWorkoutPlans.map((plan, index) => (
               <SavedWorkoutPlanRow
+                isLast={index === savedWorkoutPlans.length - 1}
                 key={plan.id}
                 plan={plan}
                 onAdd={() => onAddSavedPlan(plan)}
@@ -483,59 +505,65 @@ function TodayWorkoutRow({
   workout,
   onToggle,
   onOpenDetail,
+  onOpenRecord,
   hideBottomBorder = false,
+  isLast = false,
 }: {
   workout: TodayWorkoutInstance;
   onToggle?: () => void;
   onOpenDetail?: () => void;
+  // 완료된 항목 전용 — 점세개(수정) 대신 행 전체를 눌러 그 운동 기록
+  // (day-record) 화면으로 연다. "지난 운동" 카드와 같은 패턴.
+  onOpenRecord?: () => void;
   // 스톱워치 바가 바로 아래 붙어서 한 덩어리로 보여야 할 때, 이 행의 구분선을
   // 끈다(Figma 4331:25004 — 행과 타이머 바가 하나의 카드처럼 이어진다).
   hideBottomBorder?: boolean;
+  // 목록의 마지막 행이면 구분선을 없애고, 바로 아래 "루틴" 헤더와의 간격도
+  // 줄인다(그쪽에 이미 pt-3가 있어 좁힐 여지가 있다).
+  isLast?: boolean;
 }) {
-  return (
+  const rowClassName = hideBottomBorder
+    ? "flex-row items-center gap-3 py-3"
+    : isLast
+      ? "flex-row items-center gap-3 pt-3 pb-1"
+      : "flex-row items-center gap-3 border-b border-line-subtle py-3";
+
+  // 원(라디오 버튼)은 onToggle이 없어도(완료됐거나, 스톱워치가 완료 전이라
+  // 눌러서 완료 처리할 수 없는 상태) 항상 그려져야 한다 — 눌리는 것만 막고
+  // 시각적으로 사라지면 안 된다.
+  const circle = (
     <View
       className={
-        hideBottomBorder
-          ? "flex-row items-center gap-3 py-3"
-          : "flex-row items-center gap-3 border-b border-line-subtle py-3"
+        workout.isDone
+          ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500"
+          : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
       }
     >
-      {(() => {
-        // 원(라디오 버튼)은 onToggle이 없어도(스톱워치가 완료 전이라 눌러서
-        // 완료 처리할 수 없는 상태) 항상 그려져야 한다 — 눌리는 것만 막고
-        // 시각적으로 사라지면 안 된다.
-        const circle = (
-          <View
-            className={
-              workout.isDone
-                ? "h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500"
-                : "h-[34px] w-[34px] items-center justify-center rounded-full border border-line-strong"
-            }
-          >
-            {workout.isDone && (
-              <Ionicons
-                color={semanticColors["label-inverse"]}
-                name="checkmark"
-                size={16}
-              />
-            )}
-          </View>
-        );
+      {workout.isDone && (
+        <Ionicons
+          color={semanticColors["label-inverse"]}
+          name="checkmark"
+          size={16}
+        />
+      )}
+    </View>
+  );
 
-        return onToggle ? (
-          <Pressable
-            accessibilityLabel={workout.isDone ? "완료 취소" : "완료로 표시"}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: workout.isDone }}
-            hitSlop={8}
-            onPress={onToggle}
-          >
-            {circle}
-          </Pressable>
-        ) : (
-          circle
-        );
-      })()}
+  const rowContent = (
+    <>
+      {onToggle ? (
+        <Pressable
+          accessibilityLabel="완료로 표시"
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: workout.isDone }}
+          hitSlop={8}
+          onPress={onToggle}
+        >
+          {circle}
+        </Pressable>
+      ) : (
+        circle
+      )}
       <View className="flex-1 gap-0.5">
         <ThemedText
           typography="body-3-bold"
@@ -570,21 +598,44 @@ function TodayWorkoutRow({
           />
         </Pressable>
       )}
-    </View>
+    </>
   );
+
+  if (onOpenRecord) {
+    return (
+      <Pressable
+        accessibilityLabel={`${workout.plan.title} 운동 기록 보기`}
+        accessibilityRole="button"
+        className={rowClassName}
+        onPress={onOpenRecord}
+      >
+        {rowContent}
+      </Pressable>
+    );
+  }
+
+  return <View className={rowClassName}>{rowContent}</View>;
 }
 
 function SavedWorkoutPlanRow({
   plan,
   onAdd,
   onOpenDetail,
+  isLast = false,
 }: {
   plan: WorkoutPlanDraft;
   onAdd: () => void;
   onOpenDetail: () => void;
+  isLast?: boolean;
 }) {
   return (
-    <View className="flex-row items-center gap-3 border-b border-line-subtle py-3">
+    <View
+      className={
+        isLast
+          ? "flex-row items-center gap-3 pb-1 pt-3"
+          : "flex-row items-center gap-3 border-b border-line-subtle py-3"
+      }
+    >
       <Pressable
         accessibilityLabel={`${plan.title} 오늘의 운동에 추가`}
         accessibilityRole="button"

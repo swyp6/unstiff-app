@@ -297,19 +297,19 @@ export default function CameraScreen() {
       >
         <View className="h-[54px] flex-row items-center justify-center px-[14px]">
           <Pressable
-            className="absolute left-[18px] size-12 items-center justify-center"
+            className="absolute left-5 size-11 items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="닫기"
             onPress={() => router.back()}
           >
             <Ionicons name="close" size={24} color="#ffffff" />
           </Pressable>
-          <ThemedText typography="body-3-bold" style={{ color: "#ffffff" }}>
+          <ThemedText typography="heading-1-bold" style={{ color: "#ffffff" }}>
             {title ?? "오늘의 기록"}
           </ThemedText>
         </View>
 
-        <View className="relative mt-6 flex-1 overflow-hidden bg-[#292e33]">
+        <View className="relative flex-1 overflow-hidden bg-[#292e33]">
           {permission?.granted && isFocused ? (
             // photo 유무와 무관하게 계속 mount된 상태로 둔다 — "다시
             // 찍기"마다 이 CameraView를 unmount/remount하면(예전엔 photo가
@@ -386,7 +386,7 @@ export default function CameraScreen() {
           {photo ? (
             <View className="flex-row gap-3.5">
               <Pressable
-                className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white/[0.16]"
+                className="h-[52px] flex-1 items-center justify-center rounded-full bg-white/[0.16]"
                 accessibilityRole="button"
                 disabled={isUploading}
                 // CameraView는 photo가 있는 동안에도 계속 mount돼 있으므로
@@ -402,7 +402,7 @@ export default function CameraScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable
-                className="h-[52px] flex-1 items-center justify-center rounded-[14px] bg-white"
+                className="h-[52px] flex-1 items-center justify-center rounded-full bg-white"
                 accessibilityRole="button"
                 disabled={isUploading}
                 onPress={handleUsePhoto}
@@ -423,7 +423,7 @@ export default function CameraScreen() {
                 accessibilityLabel="갤러리에서 선택"
                 onPress={handlePickFromLibrary}
               >
-                <Ionicons name="images-outline" size={24} color="#ffffff" />
+                <Ionicons name="images-outline" size={28} color="#ffffff" />
               </Pressable>
 
               <Pressable
@@ -440,7 +440,7 @@ export default function CameraScreen() {
               </Pressable>
 
               <Pressable
-                className="size-12 items-center justify-center rounded-full bg-white/[0.16]"
+                className="size-[59px] items-center justify-center rounded-full bg-white/[0.16]"
                 accessibilityRole="button"
                 accessibilityLabel="카메라 전환"
                 onPress={() => {
@@ -452,7 +452,7 @@ export default function CameraScreen() {
               >
                 <Ionicons
                   name="camera-reverse-outline"
-                  size={22}
+                  size={28}
                   color="#ffffff"
                 />
               </Pressable>

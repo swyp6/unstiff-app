@@ -112,6 +112,7 @@ export function RecordEditorScreen() {
   // 된다. 첫 시도에서 저장에 성공한 payload를 보관해두고, 재시도는 이 값이
   // 있으면 저장을 건너뛰고 completeMission만 다시 호출한다.
   const savedWorkoutRef = useRef<{
+    id: number;
     measures: ReturnType<typeof toActualMeasuresDto>;
     memo: string;
   } | null>(null);
@@ -137,6 +138,7 @@ export function RecordEditorScreen() {
     try {
       let measures: ReturnType<typeof toActualMeasuresDto>;
       let trimmedMemo: string;
+      let savedId: number;
 
       if (savedWorkoutRef.current) {
         // 이전 시도에서 workout record는 이미 저장됐다(MISSION의
@@ -145,6 +147,7 @@ export function RecordEditorScreen() {
         // 쓴다.
         measures = savedWorkoutRef.current.measures;
         trimmedMemo = savedWorkoutRef.current.memo;
+        savedId = savedWorkoutRef.current.id;
       } else {
         const apiIntensity = toApiIntensity(intensity);
         measures = toActualMeasuresDto(selectedTypes, values);
@@ -152,7 +155,7 @@ export function RecordEditorScreen() {
         // 여기서 고른 강도는 "실제로 이렇게 수행했다"는 기록값이라 이 요청에만
         // 싣는다 — 연결된 daily-plan의 계획 강도는 건드리지 않는다(PUT 없음).
         // UI에서 강도는 선택 사항이라 고르지 않았으면 필드를 생략한다.
-        await saveWorkoutRecord({
+        const saved = await saveWorkoutRecord({
           refType: target.refType,
           refId: target.refId,
           measures,
@@ -160,7 +163,8 @@ export function RecordEditorScreen() {
           ...(photo ? { imageUrl: photo.secureUrl } : null),
           ...(trimmedMemo ? { memo: trimmedMemo } : null),
         });
-        savedWorkoutRef.current = { measures, memo: trimmedMemo };
+        savedId = saved.id;
+        savedWorkoutRef.current = { id: savedId, measures, memo: trimmedMemo };
       }
 
       // 실제 수행 기록 저장이 성공한 뒤에만 미션 자체를 완료 처리한다 —
@@ -190,9 +194,14 @@ export function RecordEditorScreen() {
       }
 
       setConfirmed({
+        id: savedId,
         target,
         secureUrl: photo?.secureUrl,
         measures,
+        // apiIntensity는 위 else 블록 안에서만 선언돼 재시도(if 분기)
+        // 경로에선 범위 밖이다 — intensity(state) 자체는 재시도 중에도
+        // 그대로 남아있으니 여기서 다시 변환한다.
+        intensity: toApiIntensity(intensity),
         memo: trimmedMemo || undefined,
         date: new Date(),
       });

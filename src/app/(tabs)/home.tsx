@@ -41,6 +41,7 @@ import {
 import {
   MissionCard,
   type MissionStatus,
+  type StopwatchState,
   TodayWorkoutCard,
   type TodayWorkoutInstance,
 } from "@/features/workout-plan/components/home-workout-cards";
@@ -53,6 +54,10 @@ import {
   toPlanRequestFields,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
+import {
+  loadTodayStopwatchProgress,
+  saveTodayStopwatchProgress,
+} from "@/features/workout-plan/today-stopwatch-storage";
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
@@ -165,7 +170,11 @@ function DayRecordCard({
                 <Pressable
                   key={index}
                   accessibilityRole="button"
-                  className="flex-row items-center gap-3 border-b border-line-subtle py-3"
+                  className={
+                    index === entries.length - 1
+                      ? "flex-row items-center gap-3 pb-1 pt-3"
+                      : "flex-row items-center gap-3 border-b border-line-subtle py-3"
+                  }
                   onPress={() => onSelectRecord(index)}
                 >
                   <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500">
@@ -324,16 +333,46 @@ export default function HomeScreen() {
     return workoutsByDate[date.toDateString()] ?? [];
   }
 
+  // 앱을 재실행해도 스톱워치가 00:00으로 안 돌아가게, 오늘 날짜가 바뀔 때마다
+  // 진행 중인 값을 로컬에 스냅샷해둔다(today-stopwatch-storage.ts) — 자정이
+  // 지나면 그 파일이 날짜만 보고 알아서 버리므로 여기선 그냥 매번 저장만
+  // 하면 된다.
+  function persistTodayStopwatchProgress(workouts: TodayWorkoutInstance[]) {
+    const byInstanceId: Record<string, StopwatchState> = {};
+    for (const workout of workouts) {
+      if (workout.stopwatch) byInstanceId[workout.id] = workout.stopwatch;
+    }
+    saveTodayStopwatchProgress(byInstanceId);
+  }
+
   function updateWorkoutsForDate(
     date: Date,
     updater: (workouts: TodayWorkoutInstance[]) => TodayWorkoutInstance[],
   ) {
     const key = date.toDateString();
-    setWorkoutsByDate((current) => ({
-      ...current,
-      [key]: updater(current[key] ?? []),
-    }));
+    setWorkoutsByDate((current) => {
+      const updated = updater(current[key] ?? []);
+      if (key === new Date().toDateString()) {
+        persistTodayStopwatchProgress(updated);
+      }
+      return { ...current, [key]: updated };
+    });
   }
+
+  // 앱 시작 시 한 번, 전날 넘어가지 않은 로컬 스톱워치 스냅샷을 읽어 둔다 —
+  // 아래 loadWorkoutsForDate의 서버 재조회 병합에서 이 값을 되살린다. 네트워크
+  // 응답보다 이 로컬 읽기가 항상 먼저 끝난다는 보장은 없지만(둘 다 비동기),
+  // 실패해도 다음에 앱을 열 때 다시 시도되는 로컬 전용 복원 기능이라 그
+  // 드문 경합은 감수한다.
+  const persistedTodayStopwatchesRef = useRef<Record<
+    string,
+    StopwatchState
+  > | null>(null);
+  useEffect(() => {
+    loadTodayStopwatchProgress().then((progress) => {
+      persistedTodayStopwatchesRef.current = progress;
+    });
+  }, []);
 
   // GET /api/v1/daily-plans?date= 로 채운 날짜는 세션 동안 다시 불러오지
   // 않는다 — ref라 값이 바뀌어도 리렌더를 트리거하지 않고, 이미 로드된
@@ -358,22 +397,46 @@ export default function HomeScreen() {
             id: String(dailyPlan.id),
             plan,
             isDone: dailyPlan.status === "COMPLETED",
-            // 서버는 경과 시간을 들고 있지 않으니(스톱워치 진행 상태는
-            // 로컬 전용) 항상 00:00부터 다시 시작한다.
+            // 서버는 경과 시간을 들고 있지 않다(스톱워치 진행 상태는 로컬
+            // 전용) — 처음 로드될 때만 00:00부터 시작하고, 아래에서 이미
+            // 로컬에 진행 중이던 값이 있으면 그걸로 덮어써서 되살린다.
             stopwatch: plan.stopwatchEnabled
               ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
               : undefined,
           };
         });
         setWorkoutsByDate((current) => {
+          const existing = current[key] ?? [];
+          // dailyPlans 재조회는 "다른 오늘의 운동/미션을 완료해 savedRecordAt이
+          // 바뀔 때"마다도 일어난다 — 그때 아직 진행 중인 스톱워치까지 같이
+          // 00:00으로 리셋되면 안 되므로, 서버 응답에 로컬에 있던 진행값을
+          // 다시 얹는다. isDone 등 서버가 가진 값은 그대로 fetched를 따른다.
+          const existingById = new Map(
+            existing.map((workout) => [workout.id, workout]),
+          );
+          // 오늘 첫 로드(existing이 비어 있는 앱 재시작 직후)라면 in-memory
+          // prior가 없으니, 자정 전 로컬 스냅샷(persistedTodayStopwatchesRef)에서
+          // 되살린다 — 다른 날짜 목록엔 이 스냅샷을 적용하지 않는다.
+          const isToday = key === new Date().toDateString();
+          const merged = fetched.map((workout) => {
+            const prior = existingById.get(workout.id);
+            const restored =
+              prior?.stopwatch ??
+              (isToday
+                ? persistedTodayStopwatchesRef.current?.[workout.id]
+                : undefined);
+            return workout.stopwatch && restored
+              ? { ...workout, stopwatch: restored }
+              : workout;
+          });
           // 이 요청이 떠 있는 동안 addSavedPlanToDate 등으로 로컬에 먼저
           // 추가된 항목은 이 스냅샷에 없을 수 있다 — 통째로 덮어쓰면
           // 사라지므로, 응답에 없는 로컬 항목만 뒤에 이어붙인다.
           const fetchedIds = new Set(fetched.map((workout) => workout.id));
-          const localOnly = (current[key] ?? []).filter(
+          const localOnly = existing.filter(
             (workout) => !fetchedIds.has(workout.id),
           );
-          return { ...current, [key]: [...fetched, ...localOnly] };
+          return { ...current, [key]: [...merged, ...localOnly] };
         });
       })
       .catch((error) => {
@@ -740,31 +803,14 @@ export default function HomeScreen() {
   }
 
   // 오늘의 미션 체크와 동일한 패턴: 빈 체크를 탭하면 즉시 낙관적으로 완료
-  // 처리하는 동시에 같은 이벤트에서 기록 방식 선택 모달을 연다. 이미 완료된
-  // 항목을 다시 누르면(완료 취소) 모달 없이 즉시 되돌린다.
+  // 처리하는 동시에 같은 이벤트에서 기록 방식 선택 모달을 연다. 완료된
+  // 항목은 실제 기록(POST /api/v1/workouts)이 이미 만들어졌으므로 체크를
+  // 다시 눌러 되돌릴 수 없다 — UI(TodayWorkoutRow)가 isDone인 항목엔
+  // onToggle 자체를 안 넘겨서 이 함수는 항상 미완료 → 완료 방향으로만
+  // 호출된다.
   function toggleTodayWorkoutDone(instanceId: string) {
     const workout = todayWorkouts.find((item) => item.id === instanceId);
-    if (!workout) return;
-
-    if (workout.isDone) {
-      updateWorkoutsForDate(today, (workouts) =>
-        workouts.map((item) =>
-          item.id === instanceId
-            ? {
-                ...item,
-                isDone: false,
-                // 완료 취소는 스톱워치 항목도 깨끗한 상태(00:00)로 되돌린다 —
-                // 중간값이 남아있으면 다시 완료 처리할 때 뭘 기록한 건지
-                // 헷갈린다.
-                stopwatch: item.stopwatch
-                  ? { elapsedSeconds: 0, isRunning: false, startedAt: null }
-                  : undefined,
-              }
-            : item,
-        ),
-      );
-      return;
-    }
+    if (!workout || workout.isDone) return;
 
     updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) =>
@@ -772,6 +818,31 @@ export default function HomeScreen() {
       ),
     );
     openRecordMethodModal(instanceId, workout.plan.title);
+  }
+
+  // 완료된 "오늘의 운동" 항목을 탭하면 점세개(수정 시트) 대신 실제 운동
+  // 기록(day-record 화면)으로 이동한다. TodayWorkoutInstance(오늘의 운동
+  // id)와 GET /api/v1/workouts 응답(운동 기록 id)을 이어주는 필드가 없어서,
+  // 그 날 기록을 다시 불러와 제목으로 위치를 찾는다 — 못 찾으면 0번(첫
+  // 기록)으로 열되, day-record 화면 자체에서 좌우로 넘겨 볼 수 있다.
+  async function openTodayWorkoutRecord(instanceId: string) {
+    const workout = todayWorkouts.find((item) => item.id === instanceId);
+    let index = 0;
+    if (workout) {
+      try {
+        const { workouts } = await getWorkoutHistory(toDateKey(today));
+        const matchedIndex = workouts.findIndex(
+          (entry) => entry.name === workout.plan.title,
+        );
+        if (matchedIndex >= 0) index = matchedIndex;
+      } catch (error) {
+        console.error("Failed to resolve workout record index", error);
+      }
+    }
+    router.push({
+      pathname: "/day-record",
+      params: { date: toDateKey(today), index: String(index) },
+    });
   }
 
   // 스톱워치 시작/일시정지 — 확인창은 StopwatchBar가 띄우고, 여기선 상태만
@@ -869,11 +940,22 @@ export default function HomeScreen() {
         toPlanRequestFields(updatedPlan),
       );
       updateWorkoutsForDate(selectedCalendarDate, (workouts) =>
-        workouts.map((workout) =>
-          workout.id === planDetailTarget.instanceId
-            ? { ...workout, plan: updatedPlan }
-            : workout,
-        ),
+        workouts.map((workout) => {
+          if (workout.id !== planDetailTarget.instanceId) return workout;
+          // plan 교체만으론 부족하다 — TodayWorkoutRow/StopwatchBar는
+          // plan.stopwatchEnabled가 아니라 workout.stopwatch(런타임 값)의
+          // 존재 여부로 스톱워치 바를 그린다. 수정에서 새로 켰다면 채워
+          // 주고, 껐다면 지워야 켜기 전 상태로 만든 스톱워치가 계속 남지
+          // 않는다. 이미 켜져 있었다면 진행 중이던 값을 그대로 둔다.
+          const stopwatch = !updatedPlan.stopwatchEnabled
+            ? undefined
+            : (workout.stopwatch ?? {
+                elapsedSeconds: 0,
+                isRunning: false,
+                startedAt: null,
+              });
+          return { ...workout, plan: updatedPlan, stopwatch };
+        }),
       );
     } catch {
       Alert.alert("오류", "수정하지 못했습니다. 다시 시도해주세요.");
@@ -1148,6 +1230,7 @@ export default function HomeScreen() {
             onOpenWorkoutDetail={(instanceId) =>
               setPlanDetailTarget({ kind: "instance", instanceId })
             }
+            onOpenWorkoutRecord={openTodayWorkoutRecord}
             onToggleExpanded={() =>
               setIsTodayCardExpanded((expanded) => !expanded)
             }
