@@ -297,19 +297,19 @@ export default function CameraScreen() {
       >
         <View className="h-[54px] flex-row items-center justify-center px-[14px]">
           <Pressable
-            className="absolute left-[18px] size-12 items-center justify-center"
+            className="absolute left-5 size-11 items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="닫기"
             onPress={() => router.back()}
           >
             <Ionicons name="close" size={24} color="#ffffff" />
           </Pressable>
-          <ThemedText typography="body-3-bold" style={{ color: "#ffffff" }}>
+          <ThemedText typography="heading-1-bold" style={{ color: "#ffffff" }}>
             {title ?? "오늘의 기록"}
           </ThemedText>
         </View>
 
-        <View className="relative mt-6 flex-1 overflow-hidden bg-[#292e33]">
+        <View className="relative flex-1 overflow-hidden bg-[#292e33]">
           {permission?.granted && isFocused ? (
             // photo 유무와 무관하게 계속 mount된 상태로 둔다 — "다시
             // 찍기"마다 이 CameraView를 unmount/remount하면(예전엔 photo가
