@@ -273,8 +273,12 @@ export const useChatStore = create<ChatState>()((set, get) => {
       if (isLoading || isTyping || isConsenting) return;
       // 새 첫 페이지 조회는 이전 bootstrap/pagination 결과를 모두 무효화한다.
       const generation = ++sessionGeneration;
+      // 조회 중에는 동의 모달을 내린다 — 직전 enter가 미동의였더라도 결과가
+      // 오기 전에 동의(agreeToExternalAi)가 같은 세대에서 겹쳐 bootstrap이 두 번
+      // 돌지 않게 한다. 결과에 따라 consent-required/ready로 다시 정해진다.
       set({
         isLoading: true,
+        entryState: "loading",
         consentDeclined: false,
         failure: null,
         nextCursor: null,
@@ -368,8 +372,11 @@ export const useChatStore = create<ChatState>()((set, get) => {
     agreeToExternalAi: async () => {
       // 두 번 눌러도 POST /terms/agreements가 한 번만 나가도록 잠근다. 성공
       // 경로에서는 bootstrap까지 끝난 뒤(finally) 풀리는데, 그때는 이미
-      // entryState가 ready라 모달이 사라진 상태다.
-      if (get().isConsenting) return false;
+      // entryState가 ready라 모달이 사라진 상태다. 첫 페이지 조회
+      // (loadConversation)가 진행 중이면 그 enter → bootstrap과 겹치지 않도록
+      // 시작하지 않는다 — 두 흐름은 서로의 isLoading/isConsenting을 보고 배타적이다.
+      const { isLoading, isConsenting } = get();
+      if (isLoading || isConsenting) return false;
       const generation = sessionGeneration;
       set({ isConsenting: true });
       try {
