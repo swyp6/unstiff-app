@@ -22,13 +22,12 @@ import ReanimatedAnimated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
-import { IntensityBottomSheet } from "@/features/workout-plan/components/intensity-bottom-sheet";
 import { WorkoutTypeBottomSheet } from "@/features/workout-plan/components/workout-type-bottom-sheet";
 import {
-  PrimaryActionButton,
   SectionLabel,
   SelectionRow,
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
@@ -43,8 +42,8 @@ import {
 import { toActualMeasuresDto } from "@/features/workout-record/actual-measure";
 import { saveWorkoutRecord } from "@/features/workout-record/api";
 import { ActualMeasureStepper } from "@/features/workout-record/components/actual-measure-stepper";
-import { ActualMeasureValueBottomSheet } from "@/features/workout-record/components/actual-measure-value-bottom-sheet";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
+import { useMeasureSheets } from "@/features/workout-record/use-measure-sheets";
 
 const TITLE_MAX_LENGTH = 20;
 // 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
@@ -72,11 +71,14 @@ export default function ManualRecordScreen() {
     sets: 1,
   });
   const [intensity, setIntensity] = useState<Intensity>(null);
-  const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
-  // 실제 시간/거리/횟수/세트 중 지금 휠 피커로 직접 입력 중인 항목(없으면
-  // null) — ActualMeasureStepper의 라벨을 누르면 그 타입으로 켜진다.
-  const [actualMeasureSheetType, setActualMeasureSheetType] =
-    useState<GoalType | null>(null);
+  const { intensitySheet, measureSheet, openIntensitySheet, openMeasureSheet } =
+    useMeasureSheets({
+      embeddedBottomInset: insets.bottom,
+      intensity,
+      onChangeIntensity: setIntensity,
+      onChangeValues: setValues,
+      values,
+    });
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -331,7 +333,7 @@ export default function ManualRecordScreen() {
                       layout={LinearTransition}
                     >
                       <ActualMeasureStepper
-                        onPressValue={() => setActualMeasureSheetType(type)}
+                        onPressValue={() => openMeasureSheet(type)}
                         type={type}
                         value={values[type]}
                         onChange={(value) =>
@@ -353,7 +355,7 @@ export default function ManualRecordScreen() {
                 <SectionLabel optional>강도</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="강도 선택"
-                  onPress={() => setIsIntensitySheetVisible(true)}
+                  onPress={openIntensitySheet}
                   placeholder="선택해주세요"
                   value={getIntensityLabel(intensity)}
                 />
@@ -446,7 +448,7 @@ export default function ManualRecordScreen() {
             entering={FadeInDown.duration(220)}
             style={{ paddingHorizontal: 20, paddingBottom: 16 }}
           >
-            <PrimaryActionButton
+            <ActionButton
               disabled={!canSubmit}
               label={isSubmitting ? "저장 중..." : "운동 완료하기"}
               onPress={handleSubmit}
@@ -474,37 +476,11 @@ export default function ManualRecordScreen() {
           />
         )}
 
-        {isIntensitySheetVisible && (
-          <IntensityBottomSheet
-            embedded
-            embeddedBottomInset={insets.bottom}
-            onClose={() => setIsIntensitySheetVisible(false)}
-            onConfirm={(value) => {
-              setIntensity(value);
-              setIsIntensitySheetVisible(false);
-            }}
-            value={intensity}
-            visible
-          />
-        )}
-
-        {actualMeasureSheetType && (
-          <ActualMeasureValueBottomSheet
-            embedded
-            embeddedBottomInset={insets.bottom}
-            onClose={() => setActualMeasureSheetType(null)}
-            onConfirm={(nextValue) => {
-              setValues((current) => ({
-                ...current,
-                [actualMeasureSheetType]: nextValue,
-              }));
-              setActualMeasureSheetType(null);
-            }}
-            type={actualMeasureSheetType}
-            value={values[actualMeasureSheetType]}
-            visible
-          />
-        )}
+        {/* 강도·실제값 시트는 record-editor-screen.tsx와 공유한다
+            (use-measure-sheets.tsx) — embeddedBottomInset으로 탭바 위에서
+            멈추는 처리도 거기 한 군데에만 있다. */}
+        {intensitySheet}
+        {measureSheet}
       </SafeAreaView>
     </View>
   );

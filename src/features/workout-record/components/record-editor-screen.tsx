@@ -19,14 +19,13 @@ import ReanimatedAnimated, {
 } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
+import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { completeMission } from "@/features/missions/api";
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
-import { IntensityBottomSheet } from "@/features/workout-plan/components/intensity-bottom-sheet";
 import {
-  PrimaryActionButton,
   SectionLabel,
   SelectionRow,
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
@@ -41,9 +40,9 @@ import {
 import { saveWorkoutRecord } from "../api";
 import { toActualMeasuresDto } from "../actual-measure";
 import { useRecordFlowStore } from "../record-flow-store";
+import { useMeasureSheets } from "../use-measure-sheets";
 
 import { ActualMeasureStepper } from "./actual-measure-stepper";
-import { ActualMeasureValueBottomSheet } from "./actual-measure-value-bottom-sheet";
 
 // 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
 const MEMO_MAX_LENGTH = 50;
@@ -97,11 +96,14 @@ export function RecordEditorScreen() {
     ...(target?.mode === "LINKED" ? target.initialGoalValues : null),
   }));
   const [intensity, setIntensity] = useState<Intensity>(null);
-  const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
-  // 실제 시간/거리/횟수/세트 중 지금 휠 피커로 직접 입력 중인 항목(없으면
-  // null) — ActualMeasureStepper의 라벨을 누르면 그 타입으로 켜진다.
-  const [actualMeasureSheetType, setActualMeasureSheetType] =
-    useState<GoalType | null>(null);
+  const { intensitySheet, measureSheet, openIntensitySheet, openMeasureSheet } =
+    useMeasureSheets({
+      embeddedBottomInset: insets.bottom,
+      intensity,
+      onChangeIntensity: setIntensity,
+      onChangeValues: setValues,
+      values,
+    });
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -317,7 +319,7 @@ export function RecordEditorScreen() {
                     >
                       <ActualMeasureStepper
                         labelPrefix="실제 "
-                        onPressValue={() => setActualMeasureSheetType(type)}
+                        onPressValue={() => openMeasureSheet(type)}
                         type={type}
                         value={values[type]}
                         onChange={(value) =>
@@ -336,7 +338,7 @@ export function RecordEditorScreen() {
                 <SectionLabel optional>강도</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="강도 선택"
-                  onPress={() => setIsIntensitySheetVisible(true)}
+                  onPress={openIntensitySheet}
                   placeholder="선택해주세요"
                   value={getIntensityLabel(intensity)}
                 />
@@ -430,7 +432,7 @@ export function RecordEditorScreen() {
             entering={FadeInDown.duration(220)}
             style={{ paddingHorizontal: 20, paddingBottom: 16 }}
           >
-            <PrimaryActionButton
+            <ActionButton
               disabled={!canSubmit}
               label={isSubmitting ? "저장 중..." : "운동 완료하기"}
               onPress={handleSubmit}
@@ -438,45 +440,16 @@ export function RecordEditorScreen() {
           </ReanimatedAnimated.View>
         </KeyboardAvoidingView>
 
-        {isIntensitySheetVisible && (
-          // 하단 카메라 탭에서 들어온 경우 이 화면은 그 탭의 nested route라
-          // Native TabBar가 함께 보인다 — RN Modal(기본값)은 그 탭바까지
-          // 덮어버리므로 inline(embedded)으로 띄운다(capture/target.tsx의
-          // 시트 처리와 같은 이유). embedded의 absoluteFill은 RN에서 부모의
-          // padding을 무시하고 부모 테두리 기준 bottom:0을 잡아서, 이 View의
-          // insets.bottom padding 안에 두는 것만으론 탭바 높이를 못 피한다 —
-          // embeddedBottomInset으로 그 높이를 직접 넘겨야 시트가 탭바 위에서
-          // 멈춘다.
-          <IntensityBottomSheet
-            embedded
-            embeddedBottomInset={insets.bottom}
-            onClose={() => setIsIntensitySheetVisible(false)}
-            onConfirm={(value) => {
-              setIntensity(value);
-              setIsIntensitySheetVisible(false);
-            }}
-            value={intensity}
-            visible
-          />
-        )}
-
-        {actualMeasureSheetType && (
-          <ActualMeasureValueBottomSheet
-            embedded
-            embeddedBottomInset={insets.bottom}
-            onClose={() => setActualMeasureSheetType(null)}
-            onConfirm={(nextValue) => {
-              setValues((current) => ({
-                ...current,
-                [actualMeasureSheetType]: nextValue,
-              }));
-              setActualMeasureSheetType(null);
-            }}
-            type={actualMeasureSheetType}
-            value={values[actualMeasureSheetType]}
-            visible
-          />
-        )}
+        {/* 하단 카메라 탭에서 들어온 경우 이 화면은 그 탭의 nested route라
+            Native TabBar가 함께 보인다 — RN Modal(기본값)은 그 탭바까지
+            덮어버리므로 inline(embedded)으로 띄운다(capture/target.tsx의
+            시트 처리와 같은 이유). embedded의 absoluteFill은 RN에서 부모의
+            padding을 무시하고 부모 테두리 기준 bottom:0을 잡아서, 이 View의
+            insets.bottom padding 안에 두는 것만으론 탭바 높이를 못 피한다 —
+            useMeasureSheets에 넘긴 embeddedBottomInset이 그 높이를 직접
+            반영한다. manual-record.tsx와 이 시트들(강도·실제값)을 공유한다. */}
+        {intensitySheet}
+        {measureSheet}
       </View>
     </View>
   );
