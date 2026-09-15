@@ -1,12 +1,11 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors } from "@/constants/tokens";
 import { getMyProfile } from "@/features/auth/api";
 import { ActivitySummaryTab } from "@/features/mypage/components/activity-summary-tab";
 import { BadgesTab } from "@/features/mypage/components/badges-tab";
@@ -18,6 +17,28 @@ import { ProfileCard } from "@/features/mypage/components/profile-card";
 import { StreakTab } from "@/features/mypage/components/streak-tab";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
 import { useWorkoutActivity } from "@/features/mypage/use-workout-activity";
+
+// Figma surface/background. tokens.ts(auto-generated)에 대응 semantic 토큰이
+// 없어 notifications.tsx와 같은 방식으로 화면 로컬 상수로 둔다.
+const SURFACE_BACKGROUND = "#fafafa";
+
+// Figma "Navigation / Top" (4573:35558) — 72px, 배경 없음(화면의
+// surface/background가 비침). 제목은 heading/1/bold charcoal/12를 화면 전체
+// 폭 기준 가운데, 설정 아이콘 24×24는 x325/y24(오른쪽 inset 26). Figma에
+// 별도 터치 영역 노드는 없어 hitSlop으로만 넓힌다.
+const HEADER_HEIGHT = 72;
+const SETTINGS_ICON_SIZE = 24;
+const SETTINGS_ICON_RIGHT = 375 - 325 - SETTINGS_ICON_SIZE;
+
+// 탭 아래 콘텐츠 영역. 뱃지 탭은 Figma 뱃지 영역(4573:35563) 그대로
+// pt 12 / px 20 / pb 24 — NativeWind rem=14라 rem 클래스(pt-3 등)는 0.875배로
+// 렌더되므로 px 값으로 쓴다. 활동 기록·리포트 탭은 기존 클래스(gap-4/px-5/
+// pb-5)를 그대로 옮겨 기존 렌더 결과를 유지한다.
+const TAB_REGION_CLASS: Record<MyPageTab, string> = {
+  streak: "px-5 pb-5 pt-4",
+  badges: "px-[20px] pb-[24px] pt-[12px]",
+  summary: "px-5 pb-5 pt-4",
+};
 
 export default function MyPageScreen() {
   const [tab, setTab] = useState<MyPageTab>("streak");
@@ -58,46 +79,53 @@ export default function MyPageScreen() {
   }, []);
 
   return (
-    <ThemedView style={{ flex: 1 }}>
+    <View style={{ backgroundColor: SURFACE_BACKGROUND, flex: 1 }}>
       <SafeAreaView style={{ flex: 1 }}>
-        <View className="flex-row items-center justify-between px-4 py-3">
-          <View style={{ width: 20 }} />
-          <ThemedText themeColor="textSecondary" typography="body-1-medium">
+        <View
+          className="items-center justify-center"
+          style={{ height: HEADER_HEIGHT }}
+        >
+          <ThemedText
+            style={{ color: primitiveColors.charcoal["12"] }}
+            typography="heading-1-bold"
+          >
             마이페이지
           </ThemedText>
           <Pressable
             accessibilityLabel="설정"
             accessibilityRole="button"
-            hitSlop={8}
+            className="absolute"
+            hitSlop={12}
             onPress={() => router.push("/mypage/settings")}
+            style={{
+              right: SETTINGS_ICON_RIGHT,
+              top: (HEADER_HEIGHT - SETTINGS_ICON_SIZE) / 2,
+            }}
           >
-            <Ionicons
-              color={semanticColors["label-normal"]}
-              name="settings-outline"
-              size={20}
+            <Image
+              contentFit="contain"
+              source={require("@/assets/mypage/icon-settings.svg")}
+              style={{ height: SETTINGS_ICON_SIZE, width: SETTINGS_ICON_SIZE }}
             />
           </Pressable>
         </View>
 
-        <ScrollView
-          className="flex-1 bg-fill-subtle"
-          contentContainerClassName="gap-4 pb-5"
-        >
+        <ScrollView className="flex-1">
           <ProfileCard
             avatar={avatar}
             nickname={nickname}
             onEditPress={() => router.push("/mypage/edit-profile")}
           />
 
-          <View className="gap-4 px-5">
-            <MyPageTabs onChange={setTab} value={tab} />
+          <MyPageTabs onChange={setTab} value={tab} />
 
+          <View className={TAB_REGION_CLASS[tab]}>
             {tab === "streak" && <StreakTab {...workoutActivity} />}
             {tab === "badges" && <BadgesTab />}
             {tab === "summary" && <ActivitySummaryTab />}
           </View>
         </ScrollView>
       </SafeAreaView>
-    </ThemedView>
+    </View>
   );
 }
