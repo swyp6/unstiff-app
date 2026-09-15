@@ -30,9 +30,12 @@ export type AiChatMessageResponse = {
   createdAt: string;
 };
 
-// POST /api/v1/chat/ai/enter
+// POST /api/v1/chat/ai/enter — available(오늘 더 보낼 수 있는지)과
+// externalAiAgreed(외부 AI 개인정보 처리 약관 동의 여부)는 별개의 상태다.
+// 미동의면 available과 무관하게 채팅을 시작할 수 없고 동의 UI를 먼저 거친다.
 export type AiChatEnterResponse = {
   available: boolean;
+  externalAiAgreed: boolean;
 };
 
 // GET /api/v1/chat/ai/messages
