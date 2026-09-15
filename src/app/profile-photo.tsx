@@ -28,9 +28,10 @@ import {
 import { pickImage } from "@/features/upload/use-image-upload";
 import { useSignupStore } from "@/store/signup-store";
 
-// Figma 402 프레임(4501:44949 등록 전 / 4501:44969 등록 완료)은 콘텐츠 세로
-// 중심이 화면 50% - 54, 375 프레임(4501:44747)은 50% - 34에 있다.
-const HERO_CENTER_OFFSET_WIDE = 54;
+// Figma 402 프레임(4501:44949 등록 전: top 269 / h 229, 4501:44969 등록 완료:
+// top 267 / h 233)은 콘텐츠 세로 중심이 둘 다 383.5 = 화면 50% - 53.5에 있고,
+// 375 프레임(4501:44747)은 50% - 34에 있다.
+const HERO_CENTER_OFFSET_WIDE = 53.5;
 const HERO_CENTER_OFFSET_COMPACT = 34;
 const HERO_AVATAR_TEXT_GAP = 24;
 const HERO_TITLE_DESCRIPTION_GAP = 8;
