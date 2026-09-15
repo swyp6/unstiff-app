@@ -318,7 +318,6 @@ export function RecordEditorScreen() {
                       layout={LinearTransition}
                     >
                       <ActualMeasureStepper
-                        labelPrefix="실제 "
                         onPressValue={() => openMeasureSheet(type)}
                         type={type}
                         value={values[type]}

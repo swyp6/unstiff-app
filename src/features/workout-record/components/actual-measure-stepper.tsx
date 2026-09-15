@@ -14,10 +14,6 @@ type ActualMeasureStepperProps = {
   type: GoalType;
   value: number;
   onChange: (value: number) => void;
-  // 기존 계획/미션에 연결된 기록 화면은 계획의 목표값과 구분되게 "실제 시간"
-  // 처럼 라벨 앞에 붙인다(Figma 4173:31231). 직접 입력(MANUAL) 화면은
-  // 비교 대상이 없어 그대로 "시간"을 쓴다(Figma 4173:30739).
-  labelPrefix?: string;
   // 주어지면 -/+ 버튼을 뺀 회색 영역 전체를 눌러서(±1씩 조정하는 스테퍼
   // 대신) 값을 직접 입력할 수 있게 한다 — 스테퍼로 큰 값을 맞추기 번거로운
   // 타입에 호출부가 넘긴다(예: 예상 시작 시간 UI를 참고한 휠 피커).
@@ -26,12 +22,12 @@ type ActualMeasureStepperProps = {
 
 // GoalStepper(계획/루틴 목표값 편집)와 시각적으로 동일하지만 실제 수행값
 // 전용 범위(ACTUAL_MEASURE_CONFIG)를 쓴다 — 두 설정을 섞어 쓰지 않도록
-// 별도 컴포넌트로 둔다.
+// 별도 컴포넌트로 둔다. 라벨은 신규 기록·연결된 기록 화면 둘 다 "실제 ○○"로
+// 동일하다.
 export function ActualMeasureStepper({
   type,
   value,
   onChange,
-  labelPrefix = "",
   onPressValue,
 }: ActualMeasureStepperProps) {
   const config = ACTUAL_MEASURE_CONFIG[type];
@@ -54,10 +50,7 @@ export function ActualMeasureStepper({
       onPress={onPressValue}
       style={styles.container}
     >
-      <ThemedText typography="body-2-bold">
-        {labelPrefix}
-        {config.label}
-      </ThemedText>
+      <ThemedText typography="body-2-bold">실제 {config.label}</ThemedText>
       <View style={styles.controls}>
         <Pressable
           accessibilityLabel={`${config.label} 줄이기`}
