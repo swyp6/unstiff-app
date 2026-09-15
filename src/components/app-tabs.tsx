@@ -23,8 +23,11 @@ export default function AppTabs() {
     .join("/")
     .includes("mypage/settings/legal");
   // Figma node 3502:36518 (Nav / 하단 탭): selected tab uses brand/primary
-  // orange instead of the default textSecondary.
+  // orange, unselected uses charcoal/5 — neither maps to theme.ts's
+  // textDisabled (label-disabled, a lighter blue-gray), so both are pulled
+  // straight from the primitive scale to match the design.
   const selectedColor = primitiveColors.orange["500"];
+  const unselectedColor = primitiveColors.charcoal["5"];
 
   return (
     <NativeTabs
@@ -35,11 +38,11 @@ export default function AppTabs() {
       // border prop) — the top divider only renders there.
       shadowColor={colors.border}
       iconColor={{
-        default: colors.textDisabled,
+        default: unselectedColor,
         selected: selectedColor,
       }}
       labelStyle={{
-        default: { color: colors.textDisabled },
+        default: { color: unselectedColor },
         selected: { color: selectedColor },
       }}
     >
