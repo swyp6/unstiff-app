@@ -13,6 +13,10 @@ export type WorkoutHistoryResponse = {
   targetDate: string; // "YYYY-MM-DD"
   name: string;
   exerciseType: string | null;
+  // 서버가 운동 종류(미션/운동/커스텀)에 맞춰 골라준 아이콘 URL — 전용
+  // 아이콘이 없으면 기본 아이콘 URL을 내려주므로 항상 채워진다. 프론트에서
+  // refType/exerciseType으로 아이콘을 다시 추론하지 않는다.
+  iconUrl: string;
   measures: ExerciseMeasuresDto;
   intensity?: IntensityDto;
   imageUrl?: string;

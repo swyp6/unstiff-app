@@ -1,5 +1,5 @@
-// No backend API exists yet for badges/recent activity/activity summary
-// (streak + monthly heatmap now come from GET /api/v1/workouts/activity —
+// No backend API exists yet for badges/activity summary (streak, monthly
+// heatmap and recent activity now come from GET /api/v1/workouts/activity —
 // see api.ts) — this file stands in for the rest until the real endpoints
 // land.
 
@@ -18,6 +18,9 @@ export const MOCK_BADGES: Badge[] = [
   { id: "6", name: "뱃지명", acquired: false },
 ];
 
+// 활동 리포트 탭의 "최근 활동" 목록에서 아직 사용 중 — 마이페이지 활동 기록
+// 탭의 최근 활동 카드는 GET /api/v1/workouts/activity의 recentActivities를
+// 쓴다.
 export type RecentActivityRow = {
   date: string;
   category: string;

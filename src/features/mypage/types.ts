@@ -1,3 +1,5 @@
+import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
+
 // DTOs mirroring the 마이페이지 활동 기록 API (see swagger:
 // /api/v1/workouts/activity). `days` only includes dates that have at least
 // one record — any other date in the requested month is absent from the array
@@ -15,7 +17,8 @@ export type WorkoutActivityResponse = {
   // 지금까지의 최장 연속 활동 일수. streakDays와 마찬가지로 서버 계산값.
   maxStreakDays: number;
   days: WorkoutActivityDay[];
-  // The response also carries `recentActivities` (최근 활동), but the UI still
-  // renders MOCK_RECENT_ACTIVITY for that card — its shape is left untyped
-  // until that card is wired up, so nothing depends on it by accident.
+  // 요청 시점 기준 최근 운동 기록 최대 5건, 최신 순. 서버가 이미 정렬/제한한
+  // 그대로 렌더링한다 — 프론트에서 다시 정렬하거나 slice하지 않는다. 항목
+  // 구조는 GET /api/v1/workouts?date=의 WorkoutHistoryResponse와 같다.
+  recentActivities: WorkoutHistoryResponse[];
 };

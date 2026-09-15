@@ -25,7 +25,9 @@ export function formatMeasureValue(
   }
 }
 
-function summarizeMeasures(measures: ExerciseMeasuresDto): string {
+// 대표 기록값 하나만 — duration → distance → count → sets 순으로 처음
+// 있는 값을 포맷한다. 아무것도 없으면 빈 문자열.
+export function summarizeMeasures(measures: ExerciseMeasuresDto): string {
   for (const key of MEASURE_ORDER) {
     const value = measures[key];
     if (value != null) return formatMeasureValue(key, value);

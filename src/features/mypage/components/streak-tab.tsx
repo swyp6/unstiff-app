@@ -5,19 +5,22 @@ import { ActivityIndicator, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { type DayCell, buildHeatmapWeeks } from "@/features/mypage/heatmap";
-import { MOCK_RECENT_ACTIVITY } from "@/features/mypage/mock-data";
+import {
+  describeRecentActivity,
+  formatRecentActivityDate,
+} from "@/features/mypage/recent-activity";
 import type { WorkoutActivityState } from "@/features/mypage/use-workout-activity";
+import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 
 const STREAK_MASCOT_ACTIVE = require("@/assets/mypage/streak-mascot-active.png");
 const STREAK_MASCOT_IDLE = require("@/assets/mypage/streak-mascot-idle.png");
-const RECENT_ACTIVITY_ICON = require("@/assets/mypage/recent-activity-icon.png");
 
 const WEEKDAY_LABELS = ["일", "월", "화", "수", "목", "금", "토"];
 const CARD_SHADOW = "shadow-[0px_4px_12px_0px_rgba(0,0,0,0.04)]";
 
-// The exported mascot/icon PNGs are full illustration sheets, not
-// single cropped assets — Figma displays only a small window of each via
-// an oversized, offset <img> inside an overflow-hidden box. These mirror
+// The exported mascot PNGs are full illustration sheets, not single
+// cropped assets — Figma displays only a small window of each via an
+// oversized, offset <img> inside an overflow-hidden box. These mirror
 // that same crop (computed from Figma's own offset/scale percentages)
 // instead of showing the whole sheet.
 const MASCOT_BOX = { height: 84, width: 90 };
@@ -27,7 +30,6 @@ const MASCOT_CROP = {
   top: MASCOT_BOX.height * -3.2869,
   width: MASCOT_BOX.width * 11.7752,
 };
-const RECENT_ICON_CROP = { height: 84, left: -45, top: 0, width: 247 };
 
 // Figma's heatmap only pins levels 1/2/3/5 to specific Orange shades (see
 // HeatmapLevel in heatmap.ts) — level 4 reuses level 3's shade since no
@@ -160,7 +162,11 @@ function MonthlyRecordCard({
   );
 }
 
-function RecentActivityCard() {
+function RecentActivityCard({
+  activities,
+}: {
+  activities: WorkoutHistoryResponse[];
+}) {
   return (
     <View
       className={`gap-4 rounded-[20px] bg-background-normal p-6 ${CARD_SHADOW}`}
@@ -174,32 +180,40 @@ function RecentActivityCard() {
         </ThemedText>
       </View>
       <View className="gap-3">
-        {MOCK_RECENT_ACTIVITY.map((row, index) => (
-          <View
-            className={`h-[76px] flex-row items-center gap-4 rounded-[20px] bg-fill-subtle px-4 ${CARD_SHADOW}`}
-            key={index}
-          >
-            <View className="size-[52px] overflow-hidden rounded-full bg-background-normal">
-              <Image
-                contentFit="fill"
-                source={RECENT_ACTIVITY_ICON}
-                style={{ position: "absolute", ...RECENT_ICON_CROP }}
-              />
+        {activities.map((activity) => {
+          const { title, detail } = describeRecentActivity(activity);
+          return (
+            <View
+              className={`h-[76px] flex-row items-center gap-4 rounded-[20px] bg-fill-subtle px-4 ${CARD_SHADOW}`}
+              key={activity.id}
+            >
+              <View className="size-[52px] overflow-hidden rounded-full bg-background-normal">
+                <Image
+                  contentFit="cover"
+                  source={{ uri: activity.iconUrl }}
+                  style={{ height: "100%", width: "100%" }}
+                />
+              </View>
+              <View className="flex-1 gap-0.5">
+                <ThemedText numberOfLines={1} typography="body-1-bold">
+                  {title}
+                </ThemedText>
+                <ThemedText
+                  numberOfLines={1}
+                  style={{ color: primitiveColors.charcoal["5"] }}
+                  typography="body-1-bold"
+                >
+                  {detail}
+                </ThemedText>
+              </View>
+              <View className="rounded-xl border border-[#c9e2ff] bg-background-normal px-2.5 py-1">
+                <ThemedText typography="caption-1-medium">
+                  {formatRecentActivityDate(activity.targetDate)}
+                </ThemedText>
+              </View>
             </View>
-            <View className="flex-1 gap-0.5">
-              <ThemedText typography="body-1-bold">{row.category}</ThemedText>
-              <ThemedText
-                style={{ color: primitiveColors.charcoal["5"] }}
-                typography="body-1-bold"
-              >
-                {row.detail}
-              </ThemedText>
-            </View>
-            <View className="rounded-xl border border-[#c9e2ff] bg-background-normal px-2.5 py-1">
-              <ThemedText typography="caption-1-medium">{row.date}</ThemedText>
-            </View>
-          </View>
-        ))}
+          );
+        })}
       </View>
     </View>
   );
@@ -244,7 +258,9 @@ export function StreakTab({ activity, loadError }: WorkoutActivityState) {
           <ActivityIndicator color={semanticColors["label-normal"]} />
         </View>
       )}
-      <RecentActivityCard />
+      {activity && (
+        <RecentActivityCard activities={activity.response.recentActivities} />
+      )}
     </View>
   );
 }
