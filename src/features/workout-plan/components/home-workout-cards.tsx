@@ -303,12 +303,13 @@ export function TodayWorkoutCard({
               </ThemedText>
             </View>
           ) : (
-            todayWorkouts.map((workout) => {
+            todayWorkouts.map((workout, index) => {
               const hasStopwatch = workout.stopwatch != null;
               return (
                 <View key={workout.id}>
                   <TodayWorkoutRow
                     hideBottomBorder={hasStopwatch}
+                    isLast={index === todayWorkouts.length - 1}
                     onOpenDetail={
                       workout.isDone
                         ? undefined
@@ -368,8 +369,9 @@ export function TodayWorkoutCard({
 
         {expanded && (
           <>
-            {savedWorkoutPlans.map((plan) => (
+            {savedWorkoutPlans.map((plan, index) => (
               <SavedWorkoutPlanRow
+                isLast={index === savedWorkoutPlans.length - 1}
                 key={plan.id}
                 plan={plan}
                 onAdd={() => onAddSavedPlan(plan)}
@@ -505,6 +507,7 @@ function TodayWorkoutRow({
   onOpenDetail,
   onOpenRecord,
   hideBottomBorder = false,
+  isLast = false,
 }: {
   workout: TodayWorkoutInstance;
   onToggle?: () => void;
@@ -515,10 +518,15 @@ function TodayWorkoutRow({
   // 스톱워치 바가 바로 아래 붙어서 한 덩어리로 보여야 할 때, 이 행의 구분선을
   // 끈다(Figma 4331:25004 — 행과 타이머 바가 하나의 카드처럼 이어진다).
   hideBottomBorder?: boolean;
+  // 목록의 마지막 행이면 구분선을 없애고, 바로 아래 "루틴" 헤더와의 간격도
+  // 줄인다(그쪽에 이미 pt-3가 있어 좁힐 여지가 있다).
+  isLast?: boolean;
 }) {
   const rowClassName = hideBottomBorder
     ? "flex-row items-center gap-3 py-3"
-    : "flex-row items-center gap-3 border-b border-line-subtle py-3";
+    : isLast
+      ? "flex-row items-center gap-3 pt-3 pb-1"
+      : "flex-row items-center gap-3 border-b border-line-subtle py-3";
 
   // 원(라디오 버튼)은 onToggle이 없어도(완료됐거나, 스톱워치가 완료 전이라
   // 눌러서 완료 처리할 수 없는 상태) 항상 그려져야 한다 — 눌리는 것만 막고
@@ -613,13 +621,21 @@ function SavedWorkoutPlanRow({
   plan,
   onAdd,
   onOpenDetail,
+  isLast = false,
 }: {
   plan: WorkoutPlanDraft;
   onAdd: () => void;
   onOpenDetail: () => void;
+  isLast?: boolean;
 }) {
   return (
-    <View className="flex-row items-center gap-3 border-b border-line-subtle py-1.5">
+    <View
+      className={
+        isLast
+          ? "flex-row items-center gap-3 pb-1 pt-3"
+          : "flex-row items-center gap-3 border-b border-line-subtle py-3"
+      }
+    >
       <Pressable
         accessibilityLabel={`${plan.title} 오늘의 운동에 추가`}
         accessibilityRole="button"

@@ -170,7 +170,11 @@ function DayRecordCard({
                 <Pressable
                   key={index}
                   accessibilityRole="button"
-                  className="flex-row items-center gap-3 border-b border-line-subtle py-1.5"
+                  className={
+                    index === entries.length - 1
+                      ? "flex-row items-center gap-3 pb-1 pt-3"
+                      : "flex-row items-center gap-3 border-b border-line-subtle py-3"
+                  }
                   onPress={() => onSelectRecord(index)}
                 >
                   <View className="h-[34px] w-[34px] items-center justify-center rounded-full bg-orange-500">
