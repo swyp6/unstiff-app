@@ -17,11 +17,16 @@ import {
 import { ProfileCard } from "@/features/mypage/components/profile-card";
 import { StreakTab } from "@/features/mypage/components/streak-tab";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
+import { useWorkoutActivity } from "@/features/mypage/use-workout-activity";
 
 export default function MyPageScreen() {
   const [tab, setTab] = useState<MyPageTab>("streak");
   const nickname = useMyProfileStore((state) => state.nickname);
   const avatar = useMyProfileStore((state) => state.avatar);
+  // Lives here rather than in StreakTab so switching between mypage tabs
+  // (which unmounts StreakTab) doesn't drop the data and refetch — the
+  // hook itself refreshes on every focus of this screen.
+  const workoutActivity = useWorkoutActivity();
 
   // GET is the source of truth for nickname/profileImageUrl — this runs
   // once per mount (the tab bar keeps this screen mounted across tab
@@ -87,7 +92,7 @@ export default function MyPageScreen() {
           <View className="gap-4 px-5">
             <MyPageTabs onChange={setTab} value={tab} />
 
-            {tab === "streak" && <StreakTab />}
+            {tab === "streak" && <StreakTab {...workoutActivity} />}
             {tab === "badges" && <BadgesTab />}
             {tab === "summary" && <ActivitySummaryTab />}
           </View>

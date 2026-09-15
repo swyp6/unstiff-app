@@ -1,13 +1,12 @@
 import { Image } from "expo-image";
-import { View } from "react-native";
+import { useMemo } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
-import {
-  type DayCell,
-  MOCK_RECENT_ACTIVITY,
-  getStreakDataForMonth,
-} from "@/features/mypage/mock-data";
+import { type DayCell, buildHeatmapWeeks } from "@/features/mypage/heatmap";
+import { MOCK_RECENT_ACTIVITY } from "@/features/mypage/mock-data";
+import type { WorkoutActivityState } from "@/features/mypage/use-workout-activity";
 
 const STREAK_MASCOT_ACTIVE = require("@/assets/mypage/streak-mascot-active.png");
 const STREAK_MASCOT_IDLE = require("@/assets/mypage/streak-mascot-idle.png");
@@ -31,7 +30,7 @@ const MASCOT_CROP = {
 const RECENT_ICON_CROP = { height: 84, left: -45, top: 0, width: 247 };
 
 // Figma's heatmap only pins levels 1/2/3/5 to specific Orange shades (see
-// HeatmapLevel in mock-data.ts) — level 4 reuses level 3's shade since no
+// HeatmapLevel in heatmap.ts) — level 4 reuses level 3's shade since no
 // distinct swatch was specified between orange-400 and orange-500.
 const HEATMAP_LEVEL_CLASSES: Record<number, string> = {
   0: "bg-charcoal-1",
@@ -206,21 +205,45 @@ function RecentActivityCard() {
   );
 }
 
-export function StreakTab() {
-  const now = new Date();
-  const { currentStreakDays, bestStreakDays, recordedDaysThisMonth, weeks } =
-    getStreakDataForMonth(now.getFullYear(), now.getMonth() + 1);
+export function StreakTab({ activity, loadError }: WorkoutActivityState) {
+  const weeks = useMemo(
+    () =>
+      activity
+        ? buildHeatmapWeeks(
+            activity.year,
+            activity.month,
+            activity.response.days,
+          )
+        : [],
+    [activity],
+  );
 
   return (
     <View className="gap-5">
-      <StreakCard
-        bestStreakDays={bestStreakDays}
-        currentStreakDays={currentStreakDays}
-      />
-      <MonthlyRecordCard
-        recordedDaysThisMonth={recordedDaysThisMonth}
-        weeks={weeks}
-      />
+      {activity ? (
+        <>
+          <StreakCard
+            bestStreakDays={activity.response.maxStreakDays}
+            currentStreakDays={activity.response.streakDays}
+          />
+          <MonthlyRecordCard
+            // 서버는 기록이 있는 날짜만 days에 담아주므로 "며칠 기록했는지"는
+            // 배열 길이 그대로다 (recordCount 합계가 아니다).
+            recordedDaysThisMonth={activity.response.days.length}
+            weeks={weeks}
+          />
+        </>
+      ) : loadError ? (
+        // 첫 응답을 아직 못 받은 채 실패한 경우에만 — 이미 받아둔 데이터가
+        // 있으면 재조회 실패에도 그대로 보여준다.
+        <ThemedText themeColor="textSecondary" typography="caption-1-medium">
+          활동 기록을 불러오지 못했어요
+        </ThemedText>
+      ) : (
+        <View className="items-center py-10">
+          <ActivityIndicator color={semanticColors["label-normal"]} />
+        </View>
+      )}
       <RecentActivityCard />
     </View>
   );
