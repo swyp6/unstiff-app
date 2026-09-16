@@ -319,7 +319,10 @@ export default function NotificationsScreen() {
         </View>
       ) : messages.length === 0 ? (
         <NotificationEmptyState
-          onOpenSettings={() => router.push("/mypage/settings/notification")}
+          // 마이페이지 탭의 nested Stack을 건드리지 않는 root Stack 사본으로
+          // 보낸다(app/notification-settings). replace라서 이 화면을 대신
+          // 차지하고, 거기서 뒤로가기를 누르면 지금처럼 홈으로 돌아간다.
+          onOpenSettings={() => router.replace("/notification-settings")}
         />
       ) : (
         <FlatList
