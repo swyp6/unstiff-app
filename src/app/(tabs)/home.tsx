@@ -15,7 +15,6 @@ import { toDateKey } from "@/features/calendar/date";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   acceptMission,
-  dismissMission,
   getDailyMission,
   prefetchDailyMission,
 } from "@/features/missions/api";
@@ -238,8 +237,8 @@ export default function HomeScreen() {
   const [missionTitle, setMissionTitle] = useState("");
   const [missionDescription, setMissionDescription] = useState("");
   const [missionArrivalLabel, setMissionArrivalLabel] = useState("");
-  // completeMission/dismissMission의 requireUserFeedback이 true였던 미션의
-  // id — mission-feedback-store가 화면 전환(RecordEditor → RecordComplete →
+  // completeMission의 requireUserFeedback이 true였던 미션의 id —
+  // mission-feedback-store가 화면 전환(RecordEditor → RecordComplete →
   // 홈)에도 살아남긴 하지만, 그 store 값 자체를 "이 화면에서 지금 모달을
   // 띄워야 하는가"로 직접 구독하면 된다(아래 렌더 부분 참고). 토스트는 이
   // local state로만 관리한다 — feedback 성공 이후에만 잠깐 켜지는 화면
@@ -288,22 +287,6 @@ export default function HomeScreen() {
       applyMissionResponse(await acceptMission(missionId));
     } catch {
       Alert.alert("오류", "미션을 수락하지 못했습니다. 다시 시도해주세요.");
-    }
-  }
-
-  async function handleMissionDismiss() {
-    if (missionId == null) return;
-    try {
-      const response = await dismissMission(missionId);
-      applyMissionResponse(response);
-      // "10번마다" 같은 주기 판단은 서버가 이미 끝낸 결과다 — 여기서는 그
-      // 값만 그대로 믿는다. dismiss API 자체가 실패하면(위 catch) 이 분기에
-      // 도달하지 않으므로 feedback pending도 만들어지지 않는다.
-      if (response.requireUserFeedback) {
-        useMissionFeedbackStore.getState().requestFeedback(missionId);
-      }
-    } catch {
-      Alert.alert("오류", "미션을 닫지 못했습니다. 다시 시도해주세요.");
     }
   }
 
@@ -695,9 +678,6 @@ export default function HomeScreen() {
   const selectedDateWorkouts = getWorkoutsForDate(selectedCalendarDate);
   const todayLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
-  const hasCompletedTodayWorkout = todayWorkouts.some(
-    (workout) => workout.isDone,
-  );
   // 로컬에서 아직 오늘 운동을 체크하지 않았어도, 서버 recordCount가 이미
   // 0보다 크면(다른 기기에서 기록했거나 앱을 재실행한 경우) 오늘을 이미
   // 기록된 날로 표시해야 한다 — recordCount는 그 날의 실제 기록 수이므로
@@ -825,28 +805,54 @@ export default function HomeScreen() {
     openRecordMethodModal(instanceId, workout.plan.title);
   }
 
-  // 완료된 "오늘의 운동" 항목을 탭하면 점세개(수정 시트) 대신 실제 운동
-  // 기록(day-record 화면)으로 이동한다. TodayWorkoutInstance(오늘의 운동
-  // id)와 GET /api/v1/workouts 응답(운동 기록 id)을 이어주는 필드가 없어서,
-  // 그 날 기록을 다시 불러와 제목으로 위치를 찾는다 — 못 찾으면 0번(첫
-  // 기록)으로 열되, day-record 화면 자체에서 좌우로 넘겨 볼 수 있다.
-  async function openTodayWorkoutRecord(instanceId: string) {
-    const workout = todayWorkouts.find((item) => item.id === instanceId);
+  // 오늘의 실제 운동 기록(day-record 화면)을 연다. day-record는 기록 id가
+  // 아니라 날짜와 그 날 기록 목록에서의 위치(index)를 받으므로, 오늘 기록을
+  // 다시 불러와 findIndex로 위치를 찾는다 — 못 찾으면 0번(첫 기록)으로
+  // 열되, day-record 화면 자체에서 좌우로 넘겨 볼 수 있다. 사진 유무는
+  // 진입 조건이 아니다(사진 없는 기록은 상세 화면이 빈 사진 영역으로 보여준다).
+  async function openTodayRecord(
+    findIndex: (workouts: WorkoutHistoryResponse[]) => number,
+  ) {
     let index = 0;
-    if (workout) {
-      try {
-        const { workouts } = await getWorkoutHistory(toDateKey(today));
-        const matchedIndex = workouts.findIndex(
-          (entry) => entry.name === workout.plan.title,
-        );
-        if (matchedIndex >= 0) index = matchedIndex;
-      } catch (error) {
-        console.error("Failed to resolve workout record index", error);
-      }
+    try {
+      const { workouts } = await getWorkoutHistory(toDateKey(today));
+      const matchedIndex = findIndex(workouts);
+      if (matchedIndex >= 0) index = matchedIndex;
+    } catch (error) {
+      console.error("Failed to resolve workout record index", error);
     }
     router.push({
       pathname: "/day-record",
       params: { date: toDateKey(today), index: String(index) },
+    });
+  }
+
+  // 완료된 "오늘의 운동" 항목을 탭하면 점세개(수정 시트) 대신 실제 운동
+  // 기록으로 이동한다. TodayWorkoutInstance(오늘의 운동 id)와 GET
+  // /api/v1/workouts 응답(운동 기록 id)을 이어주는 필드가 없어서 제목으로
+  // 위치를 찾는다.
+  function openTodayWorkoutRecord(instanceId: string) {
+    const workout = todayWorkouts.find((item) => item.id === instanceId);
+    return openTodayRecord((workouts) =>
+      workout
+        ? workouts.findIndex((entry) => entry.name === workout.plan.title)
+        : 0,
+    );
+  }
+
+  // 서버에서 완료된 "오늘의 미션"을 탭하면 그 미션으로 남긴 실제 운동
+  // 기록으로 이동한다. DailyMissionResponse에는 기록 id가 없지만 GET
+  // /api/v1/workouts 응답이 refType("MISSION")을 내려주고 하루 미션은 하나뿐
+  // 이라, refType으로 위치를 찾는다(같은 refType이 여럿이면 제목까지 맞는
+  // 항목을 우선한다).
+  function openMissionRecord() {
+    return openTodayRecord((workouts) => {
+      const matchedByTitle = workouts.findIndex(
+        (entry) => entry.refType === "MISSION" && entry.name === missionTitle,
+      );
+      return matchedByTitle >= 0
+        ? matchedByTitle
+        : workouts.findIndex((entry) => entry.refType === "MISSION");
     });
   }
 
@@ -1219,10 +1225,11 @@ export default function HomeScreen() {
         {isSelectedDateToday && (
           <MissionCard
             arrivalLabel={missionArrivalLabel}
-            canDismiss={hasCompletedTodayWorkout}
             description={missionDescription}
             onAccept={handleMissionAccept}
-            onDismiss={handleMissionDismiss}
+            onOpenRecord={
+              isMissionCompletedOnServer ? openMissionRecord : undefined
+            }
             onReveal={handleMissionReveal}
             onToggleComplete={
               isMissionCompletedOnServer
