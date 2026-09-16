@@ -62,6 +62,11 @@ import { RecordMethodModal } from "@/features/upload/components/record-method-mo
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 
+// Figma 홈 화면 바탕(surface/background #fafafa, node 4305:33601). Screen의
+// 기본 배경(background-normal #ffffff)과 같으면 흰색 카드·"운동 추가하기"
+// 버튼이 바탕과 구분되지 않는다. 토큰에 없는 Figma 고정값이라 로컬 상수.
+const HOME_SURFACE_BACKGROUND = "#fafafa";
+
 // DailyMissionResponse.status → MissionCard가 쓰는 상태값.
 const DAILY_MISSION_STATUS_MAP: Record<
   DailyMissionResponse["status"],
@@ -1180,7 +1185,7 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen>
+    <Screen style={{ backgroundColor: HOME_SURFACE_BACKGROUND }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
