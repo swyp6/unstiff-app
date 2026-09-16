@@ -1,6 +1,9 @@
 import { create } from "zustand";
 
-import type { AvatarSelection } from "@/features/mypage/avatar-presets";
+import {
+  type AvatarSelection,
+  avatarFromProfileImageUrl,
+} from "@/features/mypage/avatar-presets";
 
 // GET /api/v1/users/me is this store's source of truth — hydrated once per
 // app session from mypage/index.tsx on mount. nickname can genuinely be
@@ -8,7 +11,9 @@ import type { AvatarSelection } from "@/features/mypage/avatar-presets";
 // features/auth/types.ts) and is shown as-is, never replaced with a fake
 // placeholder name. profileImageUrl is never null (a default-*.png
 // character is assigned at signup), so avatar only stays null before the
-// very first hydrate()/setAvatar() call of the session.
+// very first hydrate()/setAvatar() call of the session. A default-character
+// URL hydrates as a "preset" (the same sticker the picker sheet offers);
+// any other URL — a Cloudinary upload — as a "photo".
 //
 // setNickname/setAvatar are also called directly (not via hydrate) right
 // after a PUT /users/me/profile succeeds, in nickname.tsx (onboarding) and
@@ -50,7 +55,7 @@ export const useMyProfileStore = create<MyProfileState>((set) => ({
   hydrate: (nickname, profileImageUrl, expectedRevision) =>
     set((state) => {
       if (state.revision !== expectedRevision) return state;
-      return { nickname, avatar: { type: "photo", uri: profileImageUrl } };
+      return { nickname, avatar: avatarFromProfileImageUrl(profileImageUrl) };
     }),
   // Not persisted, but the store instance itself outlives any one user's
   // session — without this, logging out and into a different account on

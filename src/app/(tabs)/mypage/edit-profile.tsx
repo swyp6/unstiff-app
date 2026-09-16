@@ -24,7 +24,10 @@ import {
 } from "@/features/auth/nickname-validation";
 import type { UpdateProfileRequest } from "@/features/auth/types";
 import { useNicknameAvailability } from "@/features/auth/use-nickname-availability";
-import { avatarsEqual } from "@/features/mypage/avatar-presets";
+import {
+  avatarsEqual,
+  getAvatarPresetImageUrl,
+} from "@/features/mypage/avatar-presets";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import { ProfileImagePickerSheet } from "@/features/mypage/components/profile-image-picker-sheet";
 import { useMyProfileStore } from "@/features/mypage/profile-store";
@@ -114,15 +117,12 @@ export default function EditProfileScreen() {
 
     setIsSaving(true);
     try {
-      // A preset (bundled sticker) avatar has no server representation —
-      // the API only accepts a real Cloudinary/workers.dev image URL — so
-      // it's never uploaded/sent, and (below) never confirmed into the
-      // local store as if it had been saved. Only a "photo" pick is
-      // persistable.
-      const avatarSavable = avatarChanged && draftAvatar?.type === "photo";
-
+      // The API takes a profileImageUrl either way: a picked photo is
+      // uploaded to Cloudinary first and its secure_url sent, while a
+      // preset (one of the server's own default characters) is sent as
+      // that character's address as-is — see avatar-presets.ts.
       let profileImageUrl: string | undefined;
-      if (avatarSavable && draftAvatar.type === "photo") {
+      if (avatarChanged && draftAvatar?.type === "photo") {
         if (uploadedPhotoRef.current?.uri === draftAvatar.uri) {
           profileImageUrl = uploadedPhotoRef.current.secureUrl;
         } else {
@@ -135,25 +135,24 @@ export default function EditProfileScreen() {
             secureUrl: profileImageUrl,
           };
         }
+      } else if (avatarChanged && draftAvatar?.type === "preset") {
+        profileImageUrl = getAvatarPresetImageUrl(draftAvatar.presetId);
       }
 
       const body: UpdateProfileRequest = {};
       if (nicknameChanged) body.nickname = draftNickname;
       if (profileImageUrl) body.profileImageUrl = profileImageUrl;
 
-      // A preset-only change (or no change at all) leaves this empty —
-      // nothing to save, so the PUT is skipped entirely rather than
-      // sending an empty/invalid body.
+      // Guards against sending an empty body (a 400 server-side) if a
+      // change somehow resolved to nothing persistable.
       if (Object.keys(body).length > 0) {
         await updateMyProfile(body);
       }
 
-      // Only confirm into local state what was actually persisted above —
-      // a preset selection is never reflected here, so the profile card
-      // keeps showing the last real (server-backed) avatar instead of a
-      // choice that only ever lived in this screen's draft state.
+      // Only confirm into local state what was actually persisted above,
+      // so the profile card never shows an avatar the server doesn't have.
       if (nicknameChanged) setNickname(draftNickname);
-      if (avatarSavable) setAvatar(draftAvatar);
+      if (profileImageUrl) setAvatar(draftAvatar);
       router.back();
     } catch (error) {
       if (isNicknameAlreadyUsedError(error)) {
