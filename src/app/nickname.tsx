@@ -3,7 +3,6 @@ import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   TextInput,
   View,
@@ -144,7 +143,11 @@ export default function NicknameScreen() {
     >
       <OnboardingHeader onBack={handleBack} title="프로필 설정" />
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // windowSoftInputMode="adjustResize"에 기대 Android는 undefined로 뒀었는데,
+        // edge-to-edge에서는 adjustResize가 안 먹어 키보드가 CTA를 덮는다.
+        // behavior="height"는 Android에서 키보드가 닫혀 있어도 컨테이너 높이를
+        // 실측보다 작게 잡는 부작용이 있어 두 플랫폼 다 padding으로 통일한다.
+        behavior="padding"
         style={styles.flex}
       >
         <OnboardingContent style={styles.content}>

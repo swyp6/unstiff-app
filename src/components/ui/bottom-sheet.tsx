@@ -346,9 +346,11 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
           ]}
         >
           <KeyboardAvoidingView
-            behavior={
-              keyboardAvoiding && Platform.OS === "ios" ? "padding" : undefined
-            }
+            // edge-to-edge에서 adjustResize가 안 먹어 Android도 키보드가 시트
+            // 하단 요소를 덮는다. behavior="height"는 Android에서 키보드가
+            // 닫혀 있어도 컨테이너 높이를 실측보다 작게 잡는 부작용이 있어
+            // padding으로 통일한다.
+            behavior={keyboardAvoiding ? "padding" : undefined}
             style={hasConstrainedHeight ? styles.flex : undefined}
           >
             <View style={hasConstrainedHeight ? styles.flex : undefined}>
