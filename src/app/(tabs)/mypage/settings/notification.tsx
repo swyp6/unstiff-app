@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from "expo-router";
+import { router, useFocusEffect, usePathname } from "expo-router";
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -88,6 +88,15 @@ export default function NotificationSettingsScreen() {
   const [isAllToggling, setIsAllToggling] = useState(false);
   const [missionOfferTime, setMissionOfferTime] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+
+  // 이 화면은 두 경로에서 렌더된다 — 마이페이지 탭의 nested Stack과, 빈 알림함
+  // 에서 들어오는 root Stack 사본(app/notification-settings). 미션 수신 시간은
+  // 자기가 서 있는 쪽으로 가야 한다. 반대쪽으로 push하면 root에서 온 사용자가
+  // 마이페이지 탭 Stack을 덮어쓰게 돼 사본을 둔 의미가 없어진다.
+  const pathname = usePathname();
+  const missionTimeHref = pathname.startsWith("/notification-settings")
+    ? "/notification-settings/mission-time"
+    : "/mypage/settings/mission-time";
 
   useEffect(() => {
     let cancelled = false;
@@ -286,7 +295,7 @@ export default function NotificationSettingsScreen() {
                   꺼도 그대로 두고, 켜면 저장돼 있던 시간을 다시 보여준다. */}
               <MissionReceiveTimeRow
                 enabled={configs.DAILY_MISSION}
-                onTimePress={() => router.push("/mypage/settings/mission-time")}
+                onTimePress={() => router.push(missionTimeHref)}
                 onToggle={(value) => handleToggle("DAILY_MISSION", value)}
                 timeLabel={
                   missionOfferTime
