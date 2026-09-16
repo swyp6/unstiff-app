@@ -91,6 +91,19 @@ type DayRecord = {
   workouts: { title: string; subtitle: string; isMission: boolean }[];
 };
 
+// 조건에 맞는 기록이 정확히 하나일 때만 그 위치를 돌려준다. 0개(아직/이미
+// 없음)든 2개 이상(어느 것이 탭한 항목의 기록인지 구분 불가)이든 -1 —
+// 다른 기록을 잘못 여는 것보다 안 여는 쪽을 택한다.
+function findUniqueRecordIndex(
+  workouts: WorkoutHistoryResponse[],
+  predicate: (entry: WorkoutHistoryResponse) => boolean,
+) {
+  const matchedIndexes = workouts.flatMap((entry, index) =>
+    predicate(entry) ? [index] : [],
+  );
+  return matchedIndexes.length === 1 ? matchedIndexes[0] : -1;
+}
+
 function createTodayWorkoutInstance(
   plan: WorkoutPlanDraft,
   instanceId: string,
@@ -807,19 +820,28 @@ export default function HomeScreen() {
 
   // 오늘의 실제 운동 기록(day-record 화면)을 연다. day-record는 기록 id가
   // 아니라 날짜와 그 날 기록 목록에서의 위치(index)를 받으므로, 오늘 기록을
-  // 다시 불러와 findIndex로 위치를 찾는다 — 못 찾으면 0번(첫 기록)으로
-  // 열되, day-record 화면 자체에서 좌우로 넘겨 볼 수 있다. 사진 유무는
-  // 진입 조건이 아니다(사진 없는 기록은 상세 화면이 빈 사진 영역으로 보여준다).
+  // 다시 불러와 위치를 찾는다. 조회에 실패하거나 위치를 확정하지 못하면
+  // (-1) 이동하지 않는다 — 0번(첫 기록)으로 fallback하면 탭한 항목과 다른
+  // 기록이 열린다. 사진 유무는 진입 조건이 아니다(사진 없는 기록은 상세
+  // 화면이 빈 사진 영역으로 보여준다).
   async function openTodayRecord(
-    findIndex: (workouts: WorkoutHistoryResponse[]) => number,
+    resolveIndex: (workouts: WorkoutHistoryResponse[]) => number,
   ) {
-    let index = 0;
+    let workouts: WorkoutHistoryResponse[];
     try {
-      const { workouts } = await getWorkoutHistory(toDateKey(today));
-      const matchedIndex = findIndex(workouts);
-      if (matchedIndex >= 0) index = matchedIndex;
+      ({ workouts } = await getWorkoutHistory(toDateKey(today)));
     } catch (error) {
-      console.error("Failed to resolve workout record index", error);
+      console.error("Failed to load workout history", error);
+      Alert.alert(
+        "오류",
+        "운동 기록을 불러오지 못했습니다. 다시 시도해주세요.",
+      );
+      return;
+    }
+    const index = resolveIndex(workouts);
+    if (index < 0) {
+      Alert.alert("오류", "해당 운동 기록을 찾지 못했습니다.");
+      return;
     }
     router.push({
       pathname: "/day-record",
@@ -828,32 +850,32 @@ export default function HomeScreen() {
   }
 
   // 완료된 "오늘의 운동" 항목을 탭하면 점세개(수정 시트) 대신 실제 운동
-  // 기록으로 이동한다. TodayWorkoutInstance(오늘의 운동 id)와 GET
-  // /api/v1/workouts 응답(운동 기록 id)을 이어주는 필드가 없어서 제목으로
-  // 위치를 찾는다.
+  // 기록으로 이동한다. 기록은 POST /api/v1/workouts에 refId(오늘의 운동 id
+  // = TodayWorkoutInstance.id)로 연결해 만들지만 GET /api/v1/workouts 응답
+  // (WorkoutHistoryResponse)은 그 refId를 돌려주지 않아 id로 직접 맞출 수
+  // 없다. 그래서 같은 제목의 PLAN 기록이 정확히 하나일 때만 연다 — 같은
+  // 제목이 둘 이상이면 어느 것이 이 항목의 기록인지 프론트에서 구분할 수
+  // 없으므로 열지 않는다. 정확히 맞추려면 서버가 refId를 내려줘야 한다.
   function openTodayWorkoutRecord(instanceId: string) {
     const workout = todayWorkouts.find((item) => item.id === instanceId);
+    if (!workout) return;
     return openTodayRecord((workouts) =>
-      workout
-        ? workouts.findIndex((entry) => entry.name === workout.plan.title)
-        : 0,
+      findUniqueRecordIndex(
+        workouts,
+        (entry) =>
+          entry.refType === "PLAN" && entry.name === workout.plan.title,
+      ),
     );
   }
 
   // 서버에서 완료된 "오늘의 미션"을 탭하면 그 미션으로 남긴 실제 운동
-  // 기록으로 이동한다. DailyMissionResponse에는 기록 id가 없지만 GET
-  // /api/v1/workouts 응답이 refType("MISSION")을 내려주고 하루 미션은 하나뿐
-  // 이라, refType으로 위치를 찾는다(같은 refType이 여럿이면 제목까지 맞는
-  // 항목을 우선한다).
+  // 기록으로 이동한다. GET /api/v1/missions/daily가 하루에 미션 하나만
+  // 내려주므로 오늘 기록 중 refType === "MISSION"인 것이 그 미션의 기록이다
+  // — 단 위와 같이 refId가 없어 MISSION 기록이 정확히 하나일 때만 연다.
   function openMissionRecord() {
-    return openTodayRecord((workouts) => {
-      const matchedByTitle = workouts.findIndex(
-        (entry) => entry.refType === "MISSION" && entry.name === missionTitle,
-      );
-      return matchedByTitle >= 0
-        ? matchedByTitle
-        : workouts.findIndex((entry) => entry.refType === "MISSION");
-    });
+    return openTodayRecord((workouts) =>
+      findUniqueRecordIndex(workouts, (entry) => entry.refType === "MISSION"),
+    );
   }
 
   // 스톱워치 시작/일시정지 — 확인창은 StopwatchBar가 띄우고, 여기선 상태만
