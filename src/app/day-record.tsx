@@ -48,7 +48,7 @@ const INTENSITY_LABELS: Record<IntensityDto, string> = {
   HARD: "빡세게",
 };
 
-const BOT_AVATAR = require("@/assets/chat/bot-avatar.png");
+const RECORD_CHARACTER = require("@/assets/images/characters/record-character.png");
 
 function parseDateParam(date: string): Date {
   const [year, month, day] = date.split("-").map(Number);
@@ -364,8 +364,8 @@ function RecordPage({
               }}
             >
               <Image
-                contentFit="cover"
-                source={BOT_AVATAR}
+                contentFit="contain"
+                source={RECORD_CHARACTER}
                 style={{ width: 63, height: 63 }}
               />
             </View>

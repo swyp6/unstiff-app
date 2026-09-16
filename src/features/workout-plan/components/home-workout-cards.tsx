@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -39,7 +39,6 @@ export type TodayWorkoutInstance = {
 
 type MissionCardProps = {
   status: MissionStatus;
-  canDismiss: boolean;
   // NOT_OFFERED 상태일 때만 쓰는 "오전 10시에 도착해요" 문구.
   arrivalLabel: string;
   // OFFERED 이후에만 서버가 내려주는 실제 미션 내용.
@@ -50,46 +49,34 @@ type MissionCardProps = {
   // 없으면(서버에서 이미 완료된 미션) 체크를 다시 눌러 되돌릴 수 없다 —
   // TodayWorkoutRow의 onToggle과 같은 규칙.
   onToggleComplete?: () => void;
-  onDismiss: () => void;
+  // 서버에서 이미 완료된 미션(실제 기록이 존재) 전용 — 미션 행 전체를
+  // 눌러 그 운동 기록(day-record) 화면을 연다. TodayWorkoutRow의
+  // onOpenRecord와 같은 패턴.
+  onOpenRecord?: () => void;
 };
 
 export function MissionCard({
   status,
-  canDismiss,
   arrivalLabel,
   title,
   description,
   onReveal,
   onAccept,
   onToggleComplete,
-  onDismiss,
+  onOpenRecord,
 }: MissionCardProps) {
   if (status === "dismissed") return null;
 
   const isAccepted = status === "accepted" || status === "completed";
   const isCompleted = status === "completed";
 
-  // 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
-  // 있으면(canDismiss) 미션 카드를 닫을 수 있다.
-  const closeButton = canDismiss && (
-    <Pressable
-      accessibilityLabel="오늘의 미션 닫기"
-      accessibilityRole="button"
-      className="size-8 items-center justify-center"
-      hitSlop={8}
-      onPress={onDismiss}
-    >
-      <Ionicons color={semanticColors["label-subtle"]} name="close" size={20} />
-    </Pressable>
-  );
-
   return (
     <View className="rounded-[24px] bg-background-normal p-5 shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
-      {/* accepted/completed만 좌측 라벨+우측 닫기의 헤더 줄을 쓴다 — Figma node
+      {/* accepted/completed만 좌측 라벨 헤더 줄을 쓴다 — Figma node
           3502:36610(scheduled)·4305:33908(revealed)에는 이 줄 자체가 없고,
           "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
       {isAccepted && (
-        <View className="min-h-8 flex-row items-center justify-between">
+        <View className="min-h-8 flex-row items-center">
           {/* TodayWorkoutCard의 "오늘의 운동" 헤딩과 같은 타이포/색상 —
               홈 화면에 나란히 쌓이는 두 카드 헤더가 같은 무게로 보여야 한다. */}
           <ThemedText
@@ -98,7 +85,6 @@ export function MissionCard({
           >
             오늘의 미션
           </ThemedText>
-          {closeButton}
         </View>
       )}
 
@@ -152,7 +138,7 @@ export function MissionCard({
       )}
 
       {isAccepted && (
-        <View className="flex-row items-center gap-3 pt-4">
+        <MissionRowContainer onOpenRecord={onOpenRecord} title={title}>
           <Pressable
             accessibilityLabel={
               !onToggleComplete
@@ -204,29 +190,54 @@ export function MissionCard({
               {description}
             </ThemedText>
           </View>
-        </View>
+        </MissionRowContainer>
       )}
 
-      {/* Figma 4305:33908: NEW뱃지·닫기 버튼은 우상단에 절대 위치로 뜬다 —
-          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다.
-          isAccepted는 이미 자기 헤더 줄에 닫기 버튼이 있으니 여기서 또 띄우지 않는다. */}
-      {!isAccepted && (status === "revealed" || closeButton) && (
-        <View className="absolute right-5 top-5 flex-row items-center gap-2">
-          {status === "revealed" && (
-            <View className="rounded-full bg-orange-50 px-[9px] py-1">
-              <ThemedText
-                typography="caption-1-bold"
-                style={{ color: primitiveColors.orange["500"] }}
-              >
-                NEW
-              </ThemedText>
-            </View>
-          )}
-          {closeButton}
+      {/* Figma 4305:33908: NEW뱃지는 우상단에 절대 위치로 뜬다 —
+          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다. */}
+      {status === "revealed" && (
+        <View className="absolute right-5 top-5 rounded-full bg-orange-50 px-[9px] py-1">
+          <ThemedText
+            typography="caption-1-bold"
+            style={{ color: primitiveColors.orange["500"] }}
+          >
+            NEW
+          </ThemedText>
         </View>
       )}
     </View>
   );
+}
+
+// 수락/완료된 미션 행 — onOpenRecord가 있으면(서버에서 완료돼 실제 기록이
+// 있는 미션) 행 전체가 버튼이 되어 운동 기록(day-record) 화면을 연다.
+// 그때 안쪽 체크는 disabled라 터치가 이 행으로 넘어오므로 동작이 겹치지
+// 않는다. TodayWorkoutRow의 onOpenRecord 분기와 같은 구조.
+function MissionRowContainer({
+  onOpenRecord,
+  title,
+  children,
+}: {
+  onOpenRecord?: () => void;
+  title: string;
+  children: ReactNode;
+}) {
+  const rowClassName = "flex-row items-center gap-3 pt-4";
+
+  if (onOpenRecord) {
+    return (
+      <Pressable
+        accessibilityLabel={`${title} 운동 기록 보기`}
+        accessibilityRole="button"
+        className={rowClassName}
+        onPress={onOpenRecord}
+      >
+        {children}
+      </Pressable>
+    );
+  }
+
+  return <View className={rowClassName}>{children}</View>;
 }
 
 type TodayWorkoutCardProps = {

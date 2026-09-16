@@ -47,14 +47,6 @@ export async function acceptMission(missionId: number) {
   return data;
 }
 
-// POST /api/v1/missions/{missionId}/dismiss — 오늘의 미션 무시
-export async function dismissMission(missionId: number) {
-  const { data } = await apiClient.post<DailyMissionResponse>(
-    `/api/v1/missions/${missionId}/dismiss`,
-  );
-  return data;
-}
-
 // POST /api/v1/missions/{missionId}/complete — 오늘의 미션 완료
 export async function completeMission(missionId: number) {
   const { data } = await apiClient.post<DailyMissionResponse>(
