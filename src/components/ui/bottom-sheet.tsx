@@ -384,7 +384,17 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                   styles.content,
                   hasConstrainedHeight && styles.constrainedContent,
                   contentMaxHeight != null && { maxHeight: contentMaxHeight },
-                  safeAreaEdges.includes("bottom") && styles.contentBottomInset,
+                  // iOS: 이 중첩 오버레이 구조에서 insets.bottom이 홈 인디케이터
+                  // (34)보다 훨씬 큰 값을 기기별로 다르게 반환해 고정 24를 쓴다.
+                  // Android: edge-to-edge 네비게이션 바(제스처/3버튼)가 24보다
+                  // 커서 고정값만 쓰면 버튼이 그 밑에 가려진다 — 실측 insets를
+                  // 반영한다.
+                  safeAreaEdges.includes("bottom") && {
+                    paddingBottom:
+                      Platform.OS === "android"
+                        ? Math.max(insets.bottom, 24)
+                        : 24,
+                  },
                 ]}
               >
                 {children}
@@ -463,12 +473,6 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: 16,
     paddingHorizontal: 20,
-  },
-  // useSafeAreaInsets()가 이 중첩된 embedded 오버레이 구조에서는 실제 홈
-  // 인디케이터 높이(34)보다 훨씬 큰 값을 반환해서(기기별로 다르게 어긋남),
-  // insets.bottom을 그대로 쓰는 대신 고정값으로 안전 여백만 살짝 더한다.
-  contentBottomInset: {
-    paddingBottom: 24,
   },
   constrainedContent: {
     flex: 1,
