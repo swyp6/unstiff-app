@@ -47,7 +47,11 @@ export type NicknameAvailabilityResponse = {
 
 // Server saves only whatever fields are sent — omit a field entirely to
 // leave it unchanged. Sending neither is a 400, and if both are sent, a
-// failure on either means neither is saved.
+// failure on either means neither is saved. profileImageUrl must be an
+// https://res.cloudinary.com/... upload URL or one of the server's own
+// default-character URLs (https://images.swyp-8team.workers.dev/profile/
+// default-N.png — see features/mypage/avatar-presets.ts); anything else is
+// rejected server-side.
 export type UpdateProfileRequest = {
   nickname?: string;
   profileImageUrl?: string;
