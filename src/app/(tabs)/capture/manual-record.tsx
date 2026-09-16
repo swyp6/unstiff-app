@@ -211,7 +211,10 @@ export default function ManualRecordScreen() {
             keyboardVerticalOffset이 필요 없고, 키보드가 닫혀 있으면 padding
             이 0이라 기존 레이아웃과 차이가 없다. */}
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          // edge-to-edge에서 adjustResize가 안 먹어 Android도 키보드가 CTA를
+          // 덮는다. behavior="height"는 Android에서 키보드가 닫혀 있어도
+          // 컨테이너 높이를 실측보다 작게 잡는 부작용이 있어 padding으로 통일한다.
+          behavior="padding"
           style={{ flex: 1 }}
         >
           <ScrollView

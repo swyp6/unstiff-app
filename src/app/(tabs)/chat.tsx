@@ -5,7 +5,6 @@ import {
   Alert,
   FlatList,
   KeyboardAvoidingView,
-  Platform,
   StyleSheet,
   View,
 } from "react-native";
@@ -292,7 +291,12 @@ export default function ChatScreen() {
           }
         />
         <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          // windowSoftInputMode="adjustResize"에 기대 Android는 undefined로 뒀었는데,
+          // edge-to-edge(targetSdk 36)에서는 adjustResize가 창을 안 줄여줘서 키보드가
+          // 뜨면 composer/옵션바가 가려진다. behavior="height"는 Android에서 키보드가
+          // 닫혀 있을 때도 컨테이너 높이를 실측보다 작게 잡아 마지막 말풍선이 옵션바에
+          // 붙어 보이는 부작용이 있어 두 플랫폼 다 padding으로 통일한다.
+          behavior="padding"
           style={styles.flex}
         >
           <FlatList
@@ -380,6 +384,10 @@ const styles = StyleSheet.create({
   listContent: {
     flexGrow: 1,
     justifyContent: "flex-end",
+    // inverted라 pre-flip paddingTop이 화면상 맨 아래(최신 말풍선) 여백이 된다.
+    // 그 여백이 0이면 말풍선 그림자(elevation, 살짝 밖으로 번짐)가 스크롤 콘텐츠
+    // 경계에서 그대로 잘려서 가장 최근 말풍선만 그림자가 안 보였다.
+    paddingTop: 8,
   },
   olderLoading: {
     paddingVertical: 12,

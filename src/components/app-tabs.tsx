@@ -34,6 +34,14 @@ export default function AppTabs() {
       hidden={isCameraCaptureScreen || isSettingsLegalScreen}
       backgroundColor={colors.background}
       indicatorColor={colors.backgroundElement}
+      // Android 전용: Material3 BottomNavigationView가 선택된 탭 아이콘 뒤에
+      // pill 모양 회색(backgroundElement) 인디케이터를 그려서 선택 시 배경이
+      // 생긴 것처럼 보인다 — Figma에는 없는 요소라 끈다. iOS는 이 prop이 없다.
+      disableIndicator
+      // Android 전용: 탭 4개(3개 초과)라 기본값(auto)이 Material3
+      // BottomNavigationView 규칙대로 선택된 탭 라벨만 보여준다 — Figma는
+      // 항상 라벨을 보여주므로 강제한다. iOS는 이 prop이 없다.
+      labelVisibilityMode="labeled"
       // shadowColor is iOS-only (react-native-screens has no Android tab bar
       // border prop) — the top divider only renders there.
       shadowColor={colors.border}

@@ -17,7 +17,14 @@ export function BotMessageRow({ children }: { children: ReactNode }) {
   return (
     <View style={[styles.row, styles.rowBot]}>
       <ChatAvatar size={BOT_AVATAR_SIZE} />
-      <View style={[styles.bubble, styles.bubbleAssistant]}>{children}</View>
+      {/* Android elevation shadows only draw for a rect/oval/uniform round-rect
+          outline — bubbleAssistant's mixed corner radii (2/18/18/18, the Figma
+          "tail") make Android skip the shadow entirely. Cast it from this
+          uniform-radius wrapper instead; same background so the sliver where
+          its corner is rounder than the bubble's stays invisible. */}
+      <View style={styles.bubbleAssistantShadow}>
+        <View style={[styles.bubble, styles.bubbleAssistant]}>{children}</View>
+      </View>
     </View>
   );
 }
@@ -82,6 +89,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
+  },
+  bubbleAssistantShadow: {
+    flexShrink: 1,
+    backgroundColor: semanticColors["background-normal"],
+    borderRadius: 18,
     elevation: 2,
   },
   bubbleUser: {

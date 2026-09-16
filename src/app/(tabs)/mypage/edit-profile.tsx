@@ -4,7 +4,6 @@ import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
-  Platform,
   Pressable,
   TextInput,
   View,
@@ -181,7 +180,10 @@ export default function EditProfileScreen() {
       <SettingsHeader onBack={() => router.back()} title="프로필 수정" />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        // edge-to-edge에서 adjustResize가 안 먹어 Android도 키보드가 하단
+        // 요소를 덮는다. behavior="height"는 Android에서 키보드가 닫혀 있어도
+        // 컨테이너 높이를 실측보다 작게 잡는 부작용이 있어 padding으로 통일한다.
+        behavior="padding"
         className="flex-1 px-5 pt-4"
       >
         <View className="items-center py-6">

@@ -2,12 +2,12 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { useState } from "react";
 import { Alert, Pressable, View } from "react-native";
 
+import { ActionButton } from "@/components/ui/action-button";
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { IntensityBottomSheet } from "@/features/workout-plan/components/intensity-bottom-sheet";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import {
-  PrimaryActionButton,
   SectionLabel,
   SelectionRow,
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
@@ -283,7 +283,7 @@ export function WorkoutHistoryEditSheet({
           />
         </View>
 
-        <PrimaryActionButton
+        <ActionButton
           disabled={isSaving}
           label="수정하기"
           onPress={handleSubmit}
