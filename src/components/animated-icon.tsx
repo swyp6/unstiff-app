@@ -1,155 +1,151 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import * as SplashScreen from "expo-splash-screen";
 import { useState } from "react";
-import { Dimensions, StyleSheet, View } from "react-native";
+import { Modal, StyleSheet, View } from "react-native";
 import Animated, { Easing, Keyframe } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 
-const INITIAL_SCALE_FACTOR = Dimensions.get("screen").height / 90;
-const DURATION = 600;
-// The app's own /splash screen now owns the branded splash animation, so
-// this overlay only needs to bridge the native-splash handoff — it fades
-// out immediately (no held opacity=1 phase) so it doesn't mask /splash's
-// logo animation underneath for longer than necessary.
-const OVERLAY_FADE_DURATION_MS = 250;
+import { BrandMark } from "@/components/brand-mark";
 
+const ICON = require("@/assets/images/android-icon-foreground.png");
+// Matches app.config.ts's expo-splash-screen `imageWidth: 76` so the icon
+// doesn't visibly change size handing off from the native splash.
+const ICON_SIZE = 152;
+const LOGO_GAP = 16;
+
+const ICON_GROW_DURATION_MS = 400;
+const LOGO_DELAY_MS = 150;
+const LOGO_GROW_DURATION_MS = 700;
+const HOLD_MS = 5000;
+const FADE_DURATION_MS = 300;
+
+const iconGrowKeyframe = new Keyframe({
+  0: {
+    transform: [{ scale: 0.8 }],
+    opacity: 0,
+  },
+  100: {
+    transform: [{ scale: 1 }],
+    opacity: 1,
+    easing: Easing.elastic(0.7),
+  },
+});
+
+const logoGrowKeyframe = new Keyframe({
+  0: {
+    transform: [{ scale: 0.6 }],
+    opacity: 0,
+  },
+  100: {
+    transform: [{ scale: 1 }],
+    opacity: 1,
+    easing: Easing.elastic(0.7),
+  },
+});
+
+const fadeKeyframe = new Keyframe({
+  0: {
+    opacity: 1,
+  },
+  100: {
+    opacity: 0,
+    easing: Easing.out(Easing.ease),
+  },
+});
+
+// The icon sits at a fixed, absolutely-positioned anchor matching the native
+// splash's center exactly, and the logo is anchored independently below it —
+// so the logo growing in never shifts the icon. (A shared flex container
+// with `gap` would nudge the icon up the instant the logo's layout space is
+// reserved, even before the logo is visible — that was the "point jump".)
+function BrandContent() {
+  return (
+    <>
+      <View style={styles.iconAnchor}>
+        <Animated.View
+          entering={iconGrowKeyframe.duration(ICON_GROW_DURATION_MS)}
+        >
+          <Image
+            source={ICON}
+            style={{ width: ICON_SIZE, height: ICON_SIZE }}
+            contentFit="contain"
+          />
+        </Animated.View>
+      </View>
+      <View style={styles.logoAnchor}>
+        <Animated.View
+          entering={logoGrowKeyframe
+            .duration(LOGO_GROW_DURATION_MS)
+            .delay(LOGO_DELAY_MS)}
+        >
+          <BrandMark />
+        </Animated.View>
+      </View>
+    </>
+  );
+}
+
+// Bridges the native splash (same icon, same background) to whatever screen
+// is ready underneath. Rendered inside a Modal: expo-router's Stack uses
+// react-native-screens, whose native-stack screens paint over plain sibling
+// Views regardless of zIndex, so a non-Modal overlay gets silently covered.
 export function AnimatedSplashOverlay() {
-  const [animate, setAnimate] = useState(false);
+  const [fading, setFading] = useState(false);
   const [visible, setVisible] = useState(true);
 
   if (!visible) return null;
 
-  const splashKeyframe = new Keyframe({
-    0: {
-      transform: [{ scale: 1 }],
-      opacity: 1,
-    },
-    100: {
-      opacity: 0,
-      transform: [{ scale: 1 }],
-      easing: Easing.out(Easing.ease),
-    },
-  });
-
-  const image = <Ionicons name="people" size={64} color="#FFFFFF" />;
-
-  return animate ? (
-    <Animated.View
-      entering={splashKeyframe
-        .duration(OVERLAY_FADE_DURATION_MS)
-        .withCallback((finished) => {
-          "worklet";
-          if (finished) {
-            scheduleOnRN(setVisible, false);
-          }
-        })}
-      style={styles.splashOverlay}
-    >
-      {image}
-    </Animated.View>
-  ) : (
-    <View
-      onLayout={() => {
-        SplashScreen.hideAsync().finally(() => {
-          setAnimate(true);
-        });
-      }}
-      style={styles.splashOverlay}
-    >
-      {image}
-    </View>
-  );
-}
-
-const keyframe = new Keyframe({
-  0: {
-    transform: [{ scale: INITIAL_SCALE_FACTOR }],
-  },
-  100: {
-    transform: [{ scale: 1 }],
-    easing: Easing.elastic(0.7),
-  },
-});
-
-const logoKeyframe = new Keyframe({
-  0: {
-    transform: [{ scale: 1.3 }],
-    opacity: 0,
-  },
-  40: {
-    transform: [{ scale: 1.3 }],
-    opacity: 0,
-    easing: Easing.elastic(0.7),
-  },
-  100: {
-    opacity: 1,
-    transform: [{ scale: 1 }],
-    easing: Easing.elastic(0.7),
-  },
-});
-
-const glowKeyframe = new Keyframe({
-  0: {
-    transform: [{ rotateZ: "0deg" }],
-  },
-  100: {
-    transform: [{ rotateZ: "7200deg" }],
-  },
-});
-
-export function AnimatedIcon() {
   return (
-    <View style={styles.iconContainer}>
-      <Animated.View
-        entering={glowKeyframe.duration(60 * 1000 * 4)}
-        style={styles.glow}
-      />
-
-      <Animated.View
-        entering={keyframe.duration(DURATION)}
-        style={styles.background}
-      />
-      <Animated.View
-        style={styles.imageContainer}
-        entering={logoKeyframe.duration(DURATION)}
-      >
-        <Ionicons name="people" size={48} color="#FFFFFF" />
-      </Animated.View>
-    </View>
+    <Modal transparent visible animationType="none" statusBarTranslucent>
+      {fading ? (
+        <Animated.View
+          entering={fadeKeyframe
+            .duration(FADE_DURATION_MS)
+            .withCallback((finished) => {
+              "worklet";
+              if (finished) {
+                scheduleOnRN(setVisible, false);
+              }
+            })}
+          style={styles.splashOverlay}
+        >
+          <BrandContent />
+        </Animated.View>
+      ) : (
+        <View
+          onLayout={() => {
+            SplashScreen.hideAsync();
+            setTimeout(() => setFading(true), HOLD_MS);
+          }}
+          style={styles.splashOverlay}
+        >
+          <BrandContent />
+        </View>
+      )}
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  imageContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  glow: {
-    width: 201,
-    height: 201,
-    borderRadius: 201 / 2,
-    experimental_backgroundImage: `radial-gradient(circle, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0) 70%)`,
-    position: "absolute",
-  },
-  iconContainer: {
-    justifyContent: "center",
-    alignItems: "center",
-    width: 128,
-    height: 128,
-    zIndex: 100,
-  },
-  background: {
-    borderRadius: 40,
-    experimental_backgroundImage: `linear-gradient(180deg, #3C9FFE, #0274DF)`,
-    width: 128,
-    height: 128,
-    position: "absolute",
-  },
   splashOverlay: {
     ...StyleSheet.absoluteFill,
-    backgroundColor: "#208AEF",
-    alignItems: "center",
-    justifyContent: "center",
+    backgroundColor: "#FFFFFF",
     zIndex: 1000,
+  },
+  iconAnchor: {
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    transform: [{ translateY: -ICON_SIZE / 2 }],
+  },
+  logoAnchor: {
+    position: "absolute",
+    top: "50%",
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    transform: [{ translateY: ICON_SIZE / 2 + LOGO_GAP }],
   },
 });
