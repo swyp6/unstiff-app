@@ -11,7 +11,7 @@ import { Spacing } from "@/constants/theme";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getCalendarMonth } from "@/features/calendar/api";
 import { HomeCalendar } from "@/features/calendar/components/home-calendar";
-import { toDateKey } from "@/features/calendar/date";
+import { addDays, toDateKey } from "@/features/calendar/date";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   acceptMission,
@@ -46,6 +46,12 @@ import {
 } from "@/features/workout-plan/components/home-workout-cards";
 import { WorkoutPlanDetailBottomSheet } from "@/features/workout-plan/components/workout-plan-detail-bottom-sheet";
 import { WorkoutPlanEditSheet } from "@/features/workout-plan/components/workout-plan-edit-sheet";
+import { WorkoutLimitModal } from "@/features/workout-plan/components/workout-limit-modal";
+import {
+  isDailyPlanLimitError,
+  isWorkoutLimitReached,
+} from "@/features/workout-plan/daily-plan-limit";
+import { useHomeDateRequestStore } from "@/features/workout-plan/home-date-request-store";
 import {
   createBlankWorkoutPlanDraft,
   fromDailyPlanResponse,
@@ -102,6 +108,11 @@ function findUniqueRecordIndex(
     predicate(entry) ? [index] : [],
   );
   return matchedIndexes.length === 1 ? matchedIndexes[0] : -1;
+}
+
+// 홈 곳곳에서 날짜 키로 쓰는 toDateString 비교 — 시각(time-of-day)은 무시한다.
+function isSameDay(a: Date, b: Date) {
+  return a.toDateString() === b.toDateString();
 }
 
 function createTodayWorkoutInstance(
@@ -498,6 +509,10 @@ export default function HomeScreen() {
   const [newPlanDraft, setNewPlanDraft] = useState<WorkoutPlanDraft | null>(
     null,
   );
+  // 오늘의 운동이 이미 5개일 때 추가 진입을 막으며 띄우는 제한 모달. boolean
+  // 하나라 연속 탭으로 여러 번 열려도 인스턴스는 하나다.
+  const [isWorkoutLimitModalVisible, setIsWorkoutLimitModalVisible] =
+    useState(false);
   // 헤더 알림 아이콘이 가리키는 안 읽은 알림 개수 — 화면이 포커스를 받을
   // 때마다 다시 조회되므로 알림함에서 읽고 돌아오면 바로 반영된다.
   const unreadPushCount = useUnreadPushCount();
@@ -768,6 +783,15 @@ export default function HomeScreen() {
         createTodayWorkoutInstance(plan, String(id)),
       ]);
     } catch (error) {
+      // 4개에서 빠르게 연타하는 등 아래 pre-check(handleAddWorkoutPress/
+      // handleAddSavedPlan)가 stale한 개수로 통과시켰더라도 서버가 상한
+      // (DAILY_PLAN_LIMIT_EXCEEDED)을 지킨다 — 그 경우만 generic 오류 대신
+      // 같은 제한 모달로 보낸다. 모달 문구가 "오늘" 기준이라 오늘 날짜에
+      // 담을 때만 그렇게 하고, 다른 날짜/다른 실패는 기존 Alert 그대로다.
+      if (isDailyPlanLimitError(error) && isSameDay(date, new Date())) {
+        setIsWorkoutLimitModalVisible(true);
+        return;
+      }
       console.error("Failed to create daily plan", error);
       Alert.alert(
         "오류",
@@ -779,6 +803,65 @@ export default function HomeScreen() {
   function openNewPlanSheet() {
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
+
+  // 오늘(캘린더에서 오늘을 보고 있을 때)에 한해 오늘의 운동이 이미 상한이면
+  // 추가 흐름(시트/루틴 추가 API)에 들어가지 않고 제한 모달만 띄운다. 미래
+  // 날짜는 이 모달의 "오늘" 문구가 맞지 않아 기존 흐름(서버 거절 시 Alert)을
+  // 그대로 둔다. 개수 기준은 홈 헤더 "N / N"과 같은 todayWorkouts(GET
+  // /api/v1/daily-plans?date=오늘 응답 + 이 세션에서 담은 항목)다.
+  function guardTodayWorkoutLimit() {
+    if (!isSelectedDateToday) return false;
+    if (!isWorkoutLimitReached(todayWorkouts.length)) return false;
+    setIsWorkoutLimitModalVisible(true);
+    return true;
+  }
+
+  function handleAddWorkoutPress() {
+    if (guardTodayWorkoutLimit()) return;
+    openNewPlanSheet();
+  }
+
+  function handleAddSavedPlan(plan: WorkoutPlanDraft) {
+    if (guardTodayWorkoutLimit()) return;
+    return addSavedPlanToDate(plan, selectedCalendarDate);
+  }
+
+  // 캘린더에서 그 날짜를 탭한 것과 같은 상태로 만든다(달이 다르면 캘린더도
+  // 그 달로 넘긴다). openAddSheet면 이어서 "운동 추가하기" 시트까지 연다 —
+  // 제한 모달의 "내일 운동 미리 계획하기"는 기존 미래 날짜 계획 흐름(날짜
+  // 선택 → 운동 추가하기 → addSavedPlanToDate(plan, selectedCalendarDate))을
+  // 내일 날짜로 그대로 타는 것이다.
+  // 아래 store 구독 콜백이 첫 렌더의 이 함수를 붙잡고 있으므로 render-time
+  // 값(selectedCalendarDate 등)은 읽지 않고 함수형 setState만 쓴다.
+  function showDateOnHome(date: Date, openAddSheet: boolean) {
+    setSelectedCalendarDate((current) =>
+      isSameDay(current, date) ? current : date,
+    );
+    setViewedMonth((current) =>
+      current.getFullYear() === date.getFullYear() &&
+      current.getMonth() === date.getMonth()
+        ? current
+        : new Date(date.getFullYear(), date.getMonth(), 1),
+    );
+    if (openAddSheet) openNewPlanSheet();
+  }
+
+  // 카메라 탭에서 띄운 제한 모달의 버튼은 홈으로 탭을 옮기면서 store에 날짜를
+  // 남긴다(home-date-request-store). 홈은 네이티브 탭이라 항상 마운트돼 있어
+  // 요청이 들어오는 즉시 소비하고 지운다 — selector로 구독해 effect 본문에서
+  // setState하는 대신 store.subscribe 콜백에서 처리한다(set-state-in-effect
+  // 린트). 콜백이 붙잡는 showDateOnHome은 함수형 setState만 써서 stale해도
+  // 안전하다.
+  useEffect(
+    () =>
+      useHomeDateRequestStore.subscribe(({ pending }) => {
+        if (!pending) return;
+        useHomeDateRequestStore.getState().clear();
+        showDateOnHome(pending.date, pending.openAddSheet);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   async function saveNewPlan(plan: WorkoutPlanDraft, saveAsRoutine: boolean) {
     // "루틴으로 할래요"(saveAsRoutine)가 꺼져 있으면(기본값) 1회성 운동이므로
@@ -1272,9 +1355,7 @@ export default function HomeScreen() {
                 : "담은 운동이 없어요"
             }
             expanded={isTodayCardExpanded}
-            onAddSavedPlan={(plan) =>
-              addSavedPlanToDate(plan, selectedCalendarDate)
-            }
+            onAddSavedPlan={handleAddSavedPlan}
             onOpenSavedPlan={(planId) =>
               setPlanDetailTarget({ kind: "saved", planId })
             }
@@ -1316,7 +1397,10 @@ export default function HomeScreen() {
         )}
 
         {(isSelectedDateToday || isSelectedDateFuture) && (
-          <AddItemButton label="운동 추가하기" onPress={openNewPlanSheet} />
+          <AddItemButton
+            label="운동 추가하기"
+            onPress={handleAddWorkoutPress}
+          />
         )}
       </ScrollView>
 
@@ -1338,6 +1422,17 @@ export default function HomeScreen() {
         title={recordModalTitle}
         visible={isRecordMethodModalVisible}
       />
+
+      {/* 이미 홈이므로 탭 전환 없이 날짜만 바꾼다 — "오늘 기록 보기"는 오늘을
+          보고 있을 때만 이 모달이 뜨므로 사실상 닫기만 한다. */}
+      {isFocused && (
+        <WorkoutLimitModal
+          onClose={() => setIsWorkoutLimitModalVisible(false)}
+          onPlanTomorrow={() => showDateOnHome(addDays(today, 1), true)}
+          onViewTodayRecords={() => showDateOnHome(today, false)}
+          visible={isWorkoutLimitModalVisible}
+        />
+      )}
 
       {isFocused && (
         <MissionFeedbackModal
