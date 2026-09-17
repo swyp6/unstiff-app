@@ -11,8 +11,6 @@ import { useOnboardingStore } from "@/store/onboarding-store";
 const GROW_DURATION_MS = 700;
 const AUTO_ADVANCE_MS = 3000;
 
-// Mirrors the scale-up keyframe already used for the native-splash-to-app
-// handoff in animated-icon.tsx, reused here for the logo screen itself.
 const growKeyframe = new Keyframe({
   0: {
     transform: [{ scale: 0.6 }],
