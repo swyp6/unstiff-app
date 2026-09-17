@@ -7,7 +7,11 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import { BrandMark } from "@/components/brand-mark";
 
-const ICON = require("@/assets/images/android-icon-foreground.png");
+// Not android-icon-foreground.png: that one is padded for Android's adaptive
+// icon safe zone (see app.config.ts), which would make the mascot look
+// small here — this bridge isn't circularly masked, so it can use the
+// full-bleed artwork.
+const ICON = require("@/assets/images/splash-icon.png");
 // Matches app.config.ts's expo-splash-screen `imageWidth: 76` so the icon
 // doesn't visibly change size handing off from the native splash.
 const ICON_SIZE = 152;
