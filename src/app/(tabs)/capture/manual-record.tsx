@@ -26,7 +26,9 @@ import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
+import { WorkoutLimitModal } from "@/features/workout-plan/components/workout-limit-modal";
 import { WorkoutTypeBottomSheet } from "@/features/workout-plan/components/workout-type-bottom-sheet";
+import { isDailyPlanLimitError } from "@/features/workout-plan/daily-plan-limit";
 import {
   SectionLabel,
   SelectionRow,
@@ -82,6 +84,11 @@ export default function ManualRecordScreen() {
   const [memo, setMemo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // target.tsx의 pre-check가 stale한 개수로 통과시켰어도 서버가 즉흥 계획
+  // 상한(INSTANT_PLAN_LIMIT_EXCEEDED)을 지킨다 — 그 경우 인라인 오류 문구
+  // 대신 같은 제한 모달을 띄운다.
+  const [isWorkoutLimitModalVisible, setIsWorkoutLimitModalVisible] =
+    useState(false);
   // isSubmitting은 setState라 같은 프레임의 연타에는 아직 false로 보인다 —
   // refId 없는 MANUAL 요청이 두 번 나가면 서버가 오늘의 운동과 기록을 둘 다
   // 중복 생성하므로, 응답이 오기 전까지 두 번째 진입을 동기적으로 막는다.
@@ -156,9 +163,13 @@ export default function ManualRecordScreen() {
       // 풀리면 그 사이 CTA를 다시 눌러 같은 요청이 한 번 더 나갈 수 있다.
       // 이 화면은 곧 unmount되므로 그때 함께 사라지게 둔다.
       router.replace("/record-complete");
-    } catch {
+    } catch (submitError) {
       submissionLockRef.current = false;
       setIsSubmitting(false);
+      if (isDailyPlanLimitError(submitError)) {
+        setIsWorkoutLimitModalVisible(true);
+        return;
+      }
       setError("기록을 저장하지 못했어요. 다시 시도해 주세요.");
     }
   }
@@ -487,6 +498,13 @@ export default function ManualRecordScreen() {
         {intensitySheet}
         {measureSheet}
       </SafeAreaView>
+
+      {/* Figma상 dim이 탭바까지 덮는 디자인이라 위 시트들과 달리 embedded가
+          아닌 RN Modal 그대로 띄운다. 닫아도 입력값/사진은 그대로 남는다. */}
+      <WorkoutLimitModal
+        onClose={() => setIsWorkoutLimitModalVisible(false)}
+        visible={isWorkoutLimitModalVisible}
+      />
     </View>
   );
 }

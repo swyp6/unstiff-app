@@ -16,6 +16,8 @@ import { useRecordFlowStore } from "@/features/workout-record/record-flow-store"
 import { getDailyMission } from "@/features/missions/api";
 import type { DailyMissionResponse } from "@/features/missions/types";
 import { getDailyPlans } from "@/features/workout-plan/api";
+import { WorkoutLimitModal } from "@/features/workout-plan/components/workout-limit-modal";
+import { isWorkoutLimitReached } from "@/features/workout-plan/daily-plan-limit";
 import {
   fromDailyPlanResponse,
   type GoalType,
@@ -59,6 +61,10 @@ export default function RecordTargetScreen() {
   // 넘어간다 — 사진은 그대로 두고 이 목록만 사라지는 전환이라, 무엇을 골랐는지
   // 확인할 짧은 여유를 준다.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // "+ 기록하기"는 새 오늘의 운동(즉흥 계획)을 만드는 진입이라, 오늘 운동이
+  // 이미 상한이면 신규 기록 화면으로 넘어가지 않고 이 모달만 띄운다.
+  const [isWorkoutLimitModalVisible, setIsWorkoutLimitModalVisible] =
+    useState(false);
   // bottom-sheet.tsx와 같은 방식 — useRef().current를 렌더 중에
   // 읽으면 lint(react-hooks)가 막아서 useState 초기화로 값을 만든다.
   const [listOpacity] = useState(() => new Animated.Value(1));
@@ -121,6 +127,19 @@ export default function RecordTargetScreen() {
       useRecordFlowStore.getState().setTarget({ mode: "LINKED", ...target });
       router.push("/capture/record-editor");
     }, SELECTION_HOLD_MS);
+  }
+
+  // 홈이 마운트돼 있지 않을 수 있어 홈 state가 아니라 이 화면이 진입할 때마다
+  // 새로 받아온 todayWorkouts(GET /api/v1/daily-plans?date=오늘)로 판정한다.
+  // 조회가 아직 안 끝났거나 실패해 통과하더라도 manual-record의 저장에서
+  // 서버가 INSTANT_PLAN_LIMIT_EXCEEDED로 거절하고 같은 모달을 띄운다. 모달을
+  // 닫아도 사진/이 화면은 그대로다.
+  function startManualRecord() {
+    if (isWorkoutLimitReached(todayWorkouts.length)) {
+      setIsWorkoutLimitModalVisible(true);
+      return;
+    }
+    router.push("/capture/manual-record");
   }
 
   function selectMission() {
@@ -247,7 +266,7 @@ export default function RecordTargetScreen() {
             {/* 기존 미션/오늘의 운동에 연결하지 않고 직접 입력하는 신규 기록 */}
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push("/capture/manual-record")}
+              onPress={startManualRecord}
               style={({ pressed }) => pressed && { opacity: 0.7 }}
             >
               <View
@@ -274,6 +293,11 @@ export default function RecordTargetScreen() {
           </Animated.View>
         </ScrollView>
       </SafeAreaView>
+
+      <WorkoutLimitModal
+        onClose={() => setIsWorkoutLimitModalVisible(false)}
+        visible={isWorkoutLimitModalVisible}
+      />
     </View>
   );
 }
