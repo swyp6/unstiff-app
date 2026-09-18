@@ -26,46 +26,37 @@ export function ChatAvatar({ size = 36, imageUri }: ChatAvatarProps) {
   };
 
   return (
-    // 원형 클립(overflow: hidden)과 그림자는 같은 뷰에 못 둔다 — 클립이 그림자도
-    // 같이 잘라버린다(iOS shadow, Android elevation 둘 다). ChatBubble의
-    // bubbleAssistantShadow와 같은 이유로 그림자 전용 바깥 뷰를 둔다.
-    <View style={[styles.shadowWrapper, containerStyle]}>
-      <View style={[styles.container, containerStyle]}>
-        {imageUri ? (
-          <Image
-            contentFit="cover"
-            source={{ uri: imageUri }}
-            style={containerStyle}
-          />
-        ) : (
-          <Image
-            contentFit="fill"
-            source={BOT_AVATAR}
-            style={{
-              height: size * BOT_IMAGE_HEIGHT_RATIO,
-              transform: [{ scaleX: -1 }],
-              width: size * BOT_IMAGE_WIDTH_RATIO,
-            }}
-          />
-        )}
-      </View>
+    <View style={[styles.container, containerStyle]}>
+      {imageUri ? (
+        <Image
+          contentFit="cover"
+          source={{ uri: imageUri }}
+          style={containerStyle}
+        />
+      ) : (
+        <Image
+          contentFit="fill"
+          source={BOT_AVATAR}
+          style={{
+            height: size * BOT_IMAGE_HEIGHT_RATIO,
+            transform: [{ scaleX: -1 }],
+            width: size * BOT_IMAGE_WIDTH_RATIO,
+          }}
+        />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  shadowWrapper: {
-    backgroundColor: primitiveColors.orange["400"],
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    elevation: 2,
-  },
+  // boxShadow(CSS Box Shadow, RN 0.80+)는 iOS shadow*/Android elevation과
+  // 달리 두 플랫폼에서 대칭으로 그려지고, 같은 뷰의 overflow: hidden에도
+  // 잘리지 않는다 — 그림자 전용 wrapper 뷰가 더 필요 없다.
   container: {
     alignItems: "center",
     backgroundColor: primitiveColors.orange["400"],
     justifyContent: "center",
     overflow: "hidden",
+    boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.04)",
   },
 });

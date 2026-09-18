@@ -17,14 +17,7 @@ export function BotMessageRow({ children }: { children: ReactNode }) {
   return (
     <View style={[styles.row, styles.rowBot]}>
       <ChatAvatar size={BOT_AVATAR_SIZE} />
-      {/* Android elevation shadows only draw for a rect/oval/uniform round-rect
-          outline — bubbleAssistant's mixed corner radii (2/18/18/18, the Figma
-          "tail") make Android skip the shadow entirely. Cast it from this
-          uniform-radius wrapper instead; same background so the sliver where
-          its corner is rounder than the bubble's stays invisible. */}
-      <View style={styles.bubbleAssistantShadow}>
-        <View style={[styles.bubble, styles.bubbleAssistant]}>{children}</View>
-      </View>
+      <View style={[styles.bubble, styles.bubbleAssistant]}>{children}</View>
     </View>
   );
 }
@@ -79,22 +72,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 8,
   },
+  // boxShadow(CSS Box Shadow, RN 0.80+)는 iOS shadow*/Android elevation과 달리
+  // 두 플랫폼에서 대칭으로 그려지고 mixed corner radii(2/18/18/18, Figma
+  // "tail")도 그대로 따라간다 — elevation 전용 uniform-radius wrapper가
+  // 더 필요 없다.
   bubbleAssistant: {
     backgroundColor: semanticColors["background-normal"],
     borderBottomLeftRadius: 2,
     borderBottomRightRadius: 18,
     borderTopLeftRadius: 18,
     borderTopRightRadius: 18,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-  },
-  bubbleAssistantShadow: {
-    flexShrink: 1,
-    backgroundColor: semanticColors["background-normal"],
-    borderRadius: 18,
-    elevation: 2,
+    boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.04)",
   },
   bubbleUser: {
     backgroundColor: primitiveColors.orange["500"],
