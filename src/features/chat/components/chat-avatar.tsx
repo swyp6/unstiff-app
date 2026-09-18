@@ -26,29 +26,42 @@ export function ChatAvatar({ size = 36, imageUri }: ChatAvatarProps) {
   };
 
   return (
-    <View style={[styles.container, containerStyle]}>
-      {imageUri ? (
-        <Image
-          contentFit="cover"
-          source={{ uri: imageUri }}
-          style={containerStyle}
-        />
-      ) : (
-        <Image
-          contentFit="fill"
-          source={BOT_AVATAR}
-          style={{
-            height: size * BOT_IMAGE_HEIGHT_RATIO,
-            transform: [{ scaleX: -1 }],
-            width: size * BOT_IMAGE_WIDTH_RATIO,
-          }}
-        />
-      )}
+    // 원형 클립(overflow: hidden)과 그림자는 같은 뷰에 못 둔다 — 클립이 그림자도
+    // 같이 잘라버린다(iOS shadow, Android elevation 둘 다). ChatBubble의
+    // bubbleAssistantShadow와 같은 이유로 그림자 전용 바깥 뷰를 둔다.
+    <View style={[styles.shadowWrapper, containerStyle]}>
+      <View style={[styles.container, containerStyle]}>
+        {imageUri ? (
+          <Image
+            contentFit="cover"
+            source={{ uri: imageUri }}
+            style={containerStyle}
+          />
+        ) : (
+          <Image
+            contentFit="fill"
+            source={BOT_AVATAR}
+            style={{
+              height: size * BOT_IMAGE_HEIGHT_RATIO,
+              transform: [{ scaleX: -1 }],
+              width: size * BOT_IMAGE_WIDTH_RATIO,
+            }}
+          />
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  shadowWrapper: {
+    backgroundColor: primitiveColors.orange["400"],
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 2,
+  },
   container: {
     alignItems: "center",
     backgroundColor: primitiveColors.orange["400"],
