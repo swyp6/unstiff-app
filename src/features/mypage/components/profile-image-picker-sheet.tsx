@@ -101,9 +101,7 @@ export function ProfileImagePickerSheet({
           accessibilityLabel={`${preset.id} 프로필 이미지`}
           accessibilityRole="button"
           accessibilityState={{ selected }}
-          className={`overflow-hidden rounded-full ${
-            selected ? "border-[1.5px] border-orange-500" : ""
-          }`}
+          className="rounded-full"
           key={preset.id}
           onPress={() => setPending({ type: "preset", presetId: preset.id })}
           style={{ height: OPTION_SIZE, width: OPTION_SIZE }}
@@ -111,6 +109,20 @@ export function ProfileImagePickerSheet({
           <AvatarCircle
             avatar={{ presetId: preset.id, type: "preset" }}
             size={OPTION_SIZE}
+          />
+          {/* 선택 링은 Pressable의 border가 아니라 이미지 위에 겹치는 overlay로
+              그린다(profile-photo-library.tsx와 같은 패턴). Pressable에 선택
+              시에만 1.5px border를 주면 Yoga가 72×72 자식 이미지를 border
+              안쪽 (1.5, 1.5)로 밀어 선택 전후 위치가 달라지고, Android는
+              overflow:hidden을 border 안쪽(padding box)으로 clip해서 이미지가
+              더 밀리고 잘려 보인다(iOS는 바깥 bounds로 clip해 차이가 작다).
+              링을 항상 렌더하고 색만 바꾸면 선택 여부와 무관하게 layout이
+              완전히 동일하다. */}
+          <View
+            className={`absolute inset-0 rounded-full border-[1.5px] ${
+              selected ? "border-orange-500" : "border-transparent"
+            }`}
+            pointerEvents="none"
           />
         </Pressable>
       );
