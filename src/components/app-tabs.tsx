@@ -38,6 +38,14 @@ export default function AppTabs() {
       // pill 모양 회색(backgroundElement) 인디케이터를 그려서 선택 시 배경이
       // 생긴 것처럼 보인다 — Figma에는 없는 요소라 끈다. iOS는 이 prop이 없다.
       disableIndicator
+      // Android 전용: disableIndicator는 인디케이터만 끄고 press ripple은 그대로
+      // 남긴다. 인디케이터가 없으면 Material NavigationBarItemView가 ripple의
+      // mask(인디케이터 pill)를 잃고 unbounded RippleDrawable을 아이템 배경으로
+      // 깔아서, 탭을 누르면 아이템 대각선 크기의 반투명 원이 탭바 밖까지 번진다
+      // (expo-router 기본값은 Material3 dynamic primary). Figma에 없는 효과라
+      // 투명으로 끈다 — 탭 전환/선택 색상/라벨/접근성과는 무관하다. iOS는 이
+      // prop이 없다.
+      rippleColor="transparent"
       // Android 전용: 탭 4개(3개 초과)라 기본값(auto)이 Material3
       // BottomNavigationView 규칙대로 선택된 탭 라벨만 보여준다 — Figma는
       // 항상 라벨을 보여주므로 강제한다. iOS는 이 prop이 없다.
