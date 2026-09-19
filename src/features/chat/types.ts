@@ -23,6 +23,8 @@ export type AiChatSendRequest = {
 };
 
 export type AiChatMessageResponse = {
+  // AI 콘텐츠 신고(AiContentComplaintRequest.refId)로 쓰는 실제 메시지 식별자.
+  id: number;
   role: AiChatApiRole;
   content: string;
   options?: string[];
@@ -58,4 +60,16 @@ export type CursorResponse<T> = {
   items: T[];
   nextCursor?: number;
   hasNext: boolean;
+};
+
+// POST /api/v1/complaints/ai-content — refType은 지금 CHAT_MESSAGE(AI 캐릭터
+// 답변)만 쓴다. detail 구조는 서버가 강제하지 않고("앱이 정한 구조를 그대로
+// 저장") 앱에서 정한 사유 코드 + 기타 입력이다.
+export type AiContentReportReason =
+  "HARMFUL_CONTENT" | "DANGEROUS_EXERCISE_INFO" | "PERSONAL_INFO" | "OTHER";
+
+export type AiContentComplaintRequest = {
+  refType: "CHAT_MESSAGE";
+  refId: number;
+  detail: { reason: AiContentReportReason; reasonText: string | null };
 };

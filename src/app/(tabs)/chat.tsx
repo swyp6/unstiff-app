@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from "expo-router";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedView } from "@/components/themed-view";
 import { semanticColors } from "@/constants/tokens";
+import { AiContentReportToast } from "@/features/chat/components/ai-content-report-toast";
 import {
   BotBubbleText,
   BotMessageRow,
@@ -181,6 +182,7 @@ export default function ChatScreen() {
   const retryFailure = useChatStore((state) => state.retryFailure);
   const agreeToExternalAi = useChatStore((state) => state.agreeToExternalAi);
   const declineExternalAi = useChatStore((state) => state.declineExternalAi);
+  const [showReportedToast, setShowReportedToast] = useState(false);
   const listRef = useRef<FlatList<ChatRow>>(null);
   const isNearBottomRef = useRef(true);
   const previousLastMessageIdRef = useRef<string | undefined>(undefined);
@@ -264,7 +266,12 @@ export default function ChatScreen() {
       case "divider":
         return <ChatDateDivider label={row.label} />;
       case "message":
-        return <ChatBubble message={row.message} />;
+        return (
+          <ChatBubble
+            message={row.message}
+            onReported={() => setShowReportedToast(true)}
+          />
+        );
       case "pending":
         return row.pending === "typing" ? (
           <TypingIndicator />
@@ -381,6 +388,9 @@ export default function ChatScreen() {
         termError={externalAiTermError}
         visible={entryState === "consent-required" && !consentDeclined}
       />
+      {showReportedToast && (
+        <AiContentReportToast onHide={() => setShowReportedToast(false)} />
+      )}
     </ThemedView>
   );
 }
