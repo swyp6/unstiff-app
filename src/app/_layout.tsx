@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { useNotificationLanding } from "@/features/notifications/use-notification-landing";
 import { useRegisterPushToken } from "@/features/notifications/use-register-push-token";
 
 SplashScreen.preventAutoHideAsync();
@@ -26,7 +27,11 @@ export default function RootLayout() {
     "Pretendard-Bold": require("../../assets/fonts/Pretendard-Bold.otf"),
   });
 
-  if (!fontsLoaded && !fontError) return null;
+  // 폰트 로딩 전에는 아래 Stack이 아직 없어 알림 랜딩을 시작하지 않는다.
+  const isNavigatorMounted = fontsLoaded || !!fontError;
+  useNotificationLanding(isNavigatorMounted);
+
+  if (!isNavigatorMounted) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
