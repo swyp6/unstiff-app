@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Platform, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { LEGAL_URLS } from "@/constants/legal-urls";
@@ -18,7 +18,17 @@ const CONTENT_PADDING_BOTTOM = 16;
 // 시행일 meta는 약관 전용이라 넣지 않는다(페이지 본문에 운영 주체가 있다).
 export default function SupportScreen() {
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
+    // 탭바가 보이는 화면. iOS는 NativeTabs가 탭바를 safe-area bottom으로 보고하고
+    // 정적 View는 자동 보정이 없어 bottom이 필요하고, 안드로이드는 탭바가 하단
+    // inset을 이미 처리해 bottom을 넣으면 여백이 중복된다(home.tsx·chat.tsx와 같다).
+    <SafeAreaView
+      edges={
+        Platform.OS === "android"
+          ? ["top", "left", "right"]
+          : ["top", "left", "right", "bottom"]
+      }
+      style={styles.screen}
+    >
       <SettingsHeader
         onBack={() => goBackOrReplace("/mypage/settings")}
         title="고객 지원"
