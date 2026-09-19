@@ -24,10 +24,7 @@ import { semanticColors } from "@/constants/tokens";
 
 type PermissionRowKey = "camera" | "photoLibrary" | "push";
 
-// Figma 4953:59814의 기기 권한 행 3개. 위치 권한(expo-location)은 이 화면에
-// 노출하지 않을 뿐 permissions/api의 함수와 다른 화면의 위치 기능은 그대로다.
-// 건강 데이터(HealthKit/Health Connect) 섹션도 최신 디자인에서 빠졌고, 그
-// 연동 모듈(features/healthkit, features/health-connect)은 다른 화면에서 쓴다.
+// Figma 4953:59814의 기기 권한 행 3개.
 const DEVICE_PERMISSION_ROWS = [
   {
     key: "camera" as const,

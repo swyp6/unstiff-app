@@ -62,6 +62,8 @@ function toAssistantMessage(response: AiChatMessageResponse) {
       options: response.options,
       stop: response.stop,
     }),
+    // 신고(refId)가 실제 서버 메시지 id를 가리켜야 해서 로컬 생성 id를 덮는다.
+    id: String(response.id),
     createdAt: response.createdAt,
   };
 }

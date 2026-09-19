@@ -42,10 +42,7 @@ const config: ExpoConfig = {
     package: "com.percent8.unstiff",
     googleServicesFile: "./google-services.json",
 
-    permissions: [
-      "android.permission.health.READ_STEPS",
-      "android.permission.POST_NOTIFICATIONS",
-    ],
+    permissions: ["android.permission.POST_NOTIFICATIONS"],
 
     blockedPermissions: [
       "android.permission.ACCESS_COARSE_LOCATION",
@@ -65,8 +62,6 @@ const config: ExpoConfig = {
     "@react-native-firebase/messaging",
 
     "expo-apple-authentication",
-
-    "react-native-health-connect",
 
     [
       "@react-native-google-signin/google-signin",
@@ -137,29 +132,6 @@ const config: ExpoConfig = {
           "운동 기록 사진을 촬영하기 위해 카메라 접근 권한이 필요합니다.",
         microphonePermission: false,
         recordAudioAndroid: false,
-      },
-    ],
-
-    "./modules/kakao-map/app.plugin.js",
-
-    [
-      "expo-location",
-      {
-        locationWhenInUsePermission:
-          "현재 위치를 지도 중심에 표시하기 위해 위치 권한이 필요합니다.",
-        locationAlwaysAndWhenInUsePermission: false,
-        locationAlwaysPermission: false,
-        isIosBackgroundLocationEnabled: false,
-      },
-    ],
-    [
-      "@kingstinct/react-native-healthkit",
-      {
-        NSHealthShareUsageDescription:
-          "걸음 수 데이터를 불러오기 위해 건강 데이터 접근 권한이 필요합니다.",
-        NSHealthUpdateUsageDescription:
-          "건강 데이터를 기록하기 위해 건강 데이터 쓰기 권한이 필요합니다.",
-        background: false,
       },
     ],
   ],
