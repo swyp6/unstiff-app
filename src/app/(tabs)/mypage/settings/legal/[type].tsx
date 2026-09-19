@@ -6,6 +6,7 @@ import {
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { LEGAL_URLS } from "@/constants/legal-urls";
 import { semanticColors } from "@/constants/tokens";
 import { getTerms } from "@/features/auth/api";
 import type { Term } from "@/features/auth/types";
@@ -27,6 +28,9 @@ const CONTENT_PADDING_BOTTOM = 16;
 // SERVICE / PRIVACY / EXTERNAL_AI 문서 상세(Figma 4953:59947 / 4953:59769 /
 // 4953:59986)가 같은 shell을 쓴다. 문서 주소는 GET /terms의 contentUrl이
 // source of truth라 여기서도 다시 조회하고, 앱에서 URL을 조합하지 않는다.
+// 예외는 PRIVACY 하나 — 서버 PRIVACY contentUrl은 회원가입용 개인정보 수집·이용
+// 동의서(privacy.html)라, 설정의 "개인정보 처리방침"은 앱 상수
+// LEGAL_URLS.privacyPolicy(privacy-policy.html)를 연다.
 export default function LegalDocumentScreen() {
   const { type } = useLocalSearchParams<{ type: string }>();
   const documentType = isLegalDocumentType(type) ? type : null;
@@ -39,7 +43,9 @@ export default function LegalDocumentScreen() {
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
-    if (!documentType) return;
+    // PRIVACY는 앱 상수 URL(LEGAL_URLS.privacyPolicy)을 열어 GET /terms가
+    // 필요 없다 — 실패해도 정적 문서를 막지 않도록 아예 호출하지 않는다.
+    if (!documentType || documentType === "PRIVACY") return;
     let cancelled = false;
     getTerms()
       .then((result) => {
@@ -61,11 +67,15 @@ export default function LegalDocumentScreen() {
   const copy = documentType ? LEGAL_DOCUMENT_COPY[documentType] : null;
   const term = terms && documentType ? findTerm(terms, documentType) : null;
   // 잘못된 type으로 들어오면(딥링크 등) crash 대신 "불러올 수 없음" 상태.
+  // PRIVACY는 서버 contentUrl 대신 개인정보 처리방침 URL을 열므로 GET /terms를
+  // 기다리지 않는다.
   const uri = !documentType
     ? null
-    : terms
-      ? (term?.contentUrl ?? null)
-      : undefined;
+    : documentType === "PRIVACY"
+      ? LEGAL_URLS.privacyPolicy
+      : terms
+        ? (term?.contentUrl ?? null)
+        : undefined;
 
   return (
     <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
