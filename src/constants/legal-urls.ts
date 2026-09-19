@@ -15,6 +15,8 @@ export const LEGAL_URLS = {
   ai: `${LEGAL_BASE_URL}/external-ai.html`,
   // 설정 전용 개인정보 처리방침. 회원가입 동의서(privacy)와 다른 문서다.
   privacyPolicy: `${LEGAL_BASE_URL}/privacy-policy.html`,
+  // 설정 메인 > 고객 지원. 약관이 아니라 GET /terms·동의와 무관한 정적 페이지다.
+  support: `${LEGAL_BASE_URL}/support.html`,
 } as const;
 
 // 회원가입 약관 노출 순서와 같다. title은 배포된 문서 제목에서 [필수]/[선택]

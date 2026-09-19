@@ -11,8 +11,9 @@ import {
 
 type LegalDocumentCardProps = {
   title: string;
-  // WebView 첫 줄에 끼우는 "시행일 … · 운영 주체 …" 문구.
-  metaText: string;
+  // WebView 첫 줄에 끼우는 "시행일 … · 운영 주체 …" 문구. 약관이 아닌 문서
+  // (고객 지원)는 생략한다.
+  metaText?: string;
   // undefined: 아직 GET /terms 응답 전. null: 서버가 전문(contentUrl)을 안 줌.
   uri: string | null | undefined;
   // GET /terms 자체가 실패한 상태 — 본문 영역에 다시 시도를 보여준다.
