@@ -1,6 +1,6 @@
 import Constants from "expo-constants";
 import { router } from "expo-router";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -32,7 +32,19 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
+    // 마이 탭의 다른 화면(계정/알림/앱 권한)과 같은 이유로 bottom을 iOS에서만
+    // 유지한다 — 이 화면도 항상 탭바 위에 떠 있고, 안드로이드
+    // edge-to-edge에서는 insets.bottom이 탭바 유무와 무관하게 잡혀 버전
+    // 텍스트 아래에 여백이 한 번 더 생긴다. iOS는 반대로 그 insets.bottom
+    // (탭바 높이)이 없으면 버전 텍스트가 탭바 아이콘 밑에 깔린다.
+    <SafeAreaView
+      edges={
+        Platform.OS === "android"
+          ? ["top", "left", "right"]
+          : ["top", "left", "right", "bottom"]
+      }
+      style={styles.screen}
+    >
       <SettingsHeader
         onBack={() => goBackOrReplace("/mypage")}
         title="설정"
