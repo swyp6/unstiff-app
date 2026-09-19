@@ -20,6 +20,7 @@ import {
 } from "@/features/missions/api";
 import { MissionFeedbackModal } from "@/features/missions/components/mission-feedback-modal";
 import { MissionFeedbackToast } from "@/features/missions/components/mission-feedback-toast";
+import { AiContentReportToast } from "@/features/reports/components/ai-content-report-toast";
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
 import type { DailyMissionResponse } from "@/features/missions/types";
@@ -271,6 +272,8 @@ export default function HomeScreen() {
     (state) => state.pendingMissionId,
   );
   const [isMissionFeedbackToastVisible, setIsMissionFeedbackToastVisible] =
+    useState(false);
+  const [isMissionReportedToastVisible, setIsMissionReportedToastVisible] =
     useState(false);
 
   function handleMissionFeedbackComplete() {
@@ -1341,10 +1344,12 @@ export default function HomeScreen() {
           <MissionCard
             arrivalLabel={missionArrivalLabel}
             description={missionDescription}
+            missionId={missionId}
             onAccept={handleMissionAccept}
             onOpenRecord={
               isMissionCompletedOnServer ? openMissionRecord : undefined
             }
+            onReported={() => setIsMissionReportedToastVisible(true)}
             onReveal={handleMissionReveal}
             onToggleComplete={
               isMissionCompletedOnServer
@@ -1457,6 +1462,12 @@ export default function HomeScreen() {
       {isFocused && isMissionFeedbackToastVisible && (
         <MissionFeedbackToast
           onHide={() => setIsMissionFeedbackToastVisible(false)}
+        />
+      )}
+
+      {isFocused && isMissionReportedToastVisible && (
+        <AiContentReportToast
+          onHide={() => setIsMissionReportedToastVisible(false)}
         />
       )}
 

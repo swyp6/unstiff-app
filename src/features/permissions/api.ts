@@ -6,13 +6,12 @@ import {
 } from "@react-native-firebase/messaging";
 import { Camera } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
-import * as Location from "expo-location";
 import { Linking, PermissionsAndroid, Platform } from "react-native";
 
 // A permission whose OS API reports both a current grant and whether asking
-// again would even show a prompt — camera/photos/location (via expo) are
-// consistent on this shape already; push notifications aren't (see below),
-// so we normalize it to the same shape everyone else uses.
+// again would even show a prompt — camera/photos (via expo) are consistent
+// on this shape already; push notifications aren't (see below), so we
+// normalize it to the same shape everyone else uses.
 export type OsPermissionStatus = {
   granted: boolean;
   canAskAgain: boolean;
@@ -37,18 +36,6 @@ export async function getPhotoLibraryPermissionStatus(): Promise<OsPermissionSta
 export async function requestPhotoLibraryPermission(): Promise<OsPermissionStatus> {
   const { granted, canAskAgain } =
     await ImagePicker.requestMediaLibraryPermissionsAsync();
-  return { granted, canAskAgain };
-}
-
-export async function getLocationPermissionStatus(): Promise<OsPermissionStatus> {
-  const { granted, canAskAgain } =
-    await Location.getForegroundPermissionsAsync();
-  return { granted, canAskAgain };
-}
-
-export async function requestLocationPermission(): Promise<OsPermissionStatus> {
-  const { granted, canAskAgain } =
-    await Location.requestForegroundPermissionsAsync();
   return { granted, canAskAgain };
 }
 

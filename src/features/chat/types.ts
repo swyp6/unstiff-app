@@ -23,6 +23,8 @@ export type AiChatSendRequest = {
 };
 
 export type AiChatMessageResponse = {
+  // AI 콘텐츠 신고(AiContentComplaintRequest.refId)로 쓰는 실제 메시지 식별자.
+  id: number;
   role: AiChatApiRole;
   content: string;
   options?: string[];
