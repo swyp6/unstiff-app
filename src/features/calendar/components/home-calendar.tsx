@@ -36,6 +36,9 @@ const MONTH_SWIPE_THRESHOLD = 60;
 // (w200_h200 등)은 정사각형 프로필용이라 이 좁고 긴 셀 비율에 맞지 않는다.
 const CALENDAR_DAY_THUMBNAIL_SIZE = { width: 86, height: 120 };
 
+// "사진 없이 기록하기"로 사진이 없는 날 셀에 사진 자리 대신 보여주는 스탬프.
+const STAMP_IMAGE = require("@/assets/home/stamp.png");
+
 function buildCalendarWeeks(reference: Date): (number | null)[][] {
   const year = reference.getFullYear();
   const month = reference.getMonth();
@@ -258,6 +261,9 @@ export function HomeCalendar({
           // 오늘 셀만 로컬 상태에서 사진을 찾던 이전 방식은 그 필드가 실제로
           // 채워지는 경로가 없어 오늘 사진이 영영 안 뜨는 버그였다.
           const hasPhoto = dayEntry?.imageUrl != null;
+          // "사진 없이 기록하기"로 남긴 날 — 기록은 있지만 사진이 없어
+          // 사진 대신 스탬프를 보여준다.
+          const hasRecordWithoutPhoto = dayRecordCount > 0 && !hasPhoto;
           // recordCount는 "그 날 남긴 기록 수"이지 사진 수가 아니다 — API에
           // 사진 개수 필드가 없어서 이 값으로 "여러 장 사진" 스택 UI를 채우면
           // 사진이 하나도 없는 날에도 스택이 보이는 등 의미가 달라진다. 정확한
@@ -318,7 +324,7 @@ export function HomeCalendar({
                           ? "border-solid border-orange-500 bg-fill-normal"
                           : "border-dashed border-orange-500"
                       }`
-                    : hasPhoto
+                    : hasPhoto || hasRecordWithoutPhoto
                       ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
                       : "h-[60px] w-[43px] items-start p-1.5"
                 }
@@ -350,20 +356,28 @@ export function HomeCalendar({
                     )}
                   </>
                 )}
+                {hasRecordWithoutPhoto && (
+                  <Image
+                    source={STAMP_IMAGE}
+                    style={{ position: "absolute", inset: 0, borderRadius: 6 }}
+                    contentFit="cover"
+                  />
+                )}
                 {/* Figma 4305:34469 "장수 배지" — 그 날 기록이 여러 건일 때만
                     개수를 보여준다(1건이면 굳이 셀 필요가 없다). 오늘도 다른
                     날짜와 같은 서버 필드(recordCount)를 쓰므로 제외할 이유가
                     없다. */}
-                {hasPhoto && (dayEntry?.recordCount ?? 0) > 1 && (
-                  <View className="absolute bottom-1 right-1 h-4 w-4 items-center justify-center rounded-full bg-charcoal-12">
-                    <ThemedText
-                      style={{ color: semanticColors["label-inverse"] }}
-                      typography="caption-2-bold"
-                    >
-                      {dayEntry!.recordCount}
-                    </ThemedText>
-                  </View>
-                )}
+                {(hasPhoto || hasRecordWithoutPhoto) &&
+                  (dayEntry?.recordCount ?? 0) > 1 && (
+                    <View className="absolute bottom-1 right-1 h-4 w-4 items-center justify-center rounded-full bg-charcoal-12">
+                      <ThemedText
+                        style={{ color: semanticColors["label-inverse"] }}
+                        typography="caption-2-bold"
+                      >
+                        {dayEntry!.recordCount}
+                      </ThemedText>
+                    </View>
+                  )}
                 <ThemedText
                   typography={isToday ? "caption-1-bold" : "caption-1-regular"}
                   style={{ color: textColor }}

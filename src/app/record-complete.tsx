@@ -61,6 +61,9 @@ const TOAST_ENTER_MS = 220;
 const TOAST_HOLD_MS = 1500;
 const TOAST_EXIT_MS = 190;
 
+// "사진 없이 기록하기"로 사진이 없을 때 사진 자리에 대신 보여주는 스탬프.
+const STAMP_IMAGE = require("@/assets/home/stamp.png");
+
 function formatHeaderDate(date: Date) {
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
 }
@@ -199,22 +202,35 @@ export default function RecordCompleteScreen() {
               contentFit="cover"
             />
           ) : (
-            <View style={{ flex: 1 }} />
+            <View
+              style={{
+                flex: 1,
+                backgroundColor: primitiveColors.charcoal["12"],
+              }}
+            >
+              <Image
+                source={STAMP_IMAGE}
+                style={{ flex: 1 }}
+                contentFit="cover"
+              />
+            </View>
           )}
 
-          <LinearGradient
-            colors={["rgba(13,15,20,0)", "rgba(13,15,20,0.9)"]}
-            end={{ x: 0, y: 1 }}
-            pointerEvents="none"
-            start={{ x: 0, y: 0 }}
-            style={{
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: GRADIENT_HEIGHT_PERCENT,
-            }}
-          />
+          {displayImageUrl && (
+            <LinearGradient
+              colors={["rgba(13,15,20,0)", "rgba(13,15,20,0.9)"]}
+              end={{ x: 0, y: 1 }}
+              pointerEvents="none"
+              start={{ x: 0, y: 0 }}
+              style={{
+                position: "absolute",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: GRADIENT_HEIGHT_PERCENT,
+              }}
+            />
+          )}
 
           <View
             style={{
