@@ -65,6 +65,10 @@ export default function SettingsScreen() {
             onPress={() => router.push("/mypage/settings/legal")}
             title="약관 및 개인정보"
           />
+          <SettingsRow
+            onPress={() => router.push("/mypage/settings/support")}
+            title="고객 지원"
+          />
         </View>
 
         <View style={styles.actionSection}>
