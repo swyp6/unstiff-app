@@ -47,6 +47,9 @@ import { ActualMeasureStepper } from "./actual-measure-stepper";
 // 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
 const MEMO_MAX_LENGTH = 50;
 
+// "사진 없이 기록하기"로 들어와 photo가 없을 때 그 자리에 대신 보여주는 스탬프.
+const STAMP_IMAGE = require("@/assets/home/stamp.png");
+
 function todayLabel() {
   const today = new Date();
   return `${today.getMonth() + 1}월 ${today.getDate()}일`;
@@ -296,19 +299,21 @@ export function RecordEditorScreen() {
               gap: 18,
             }}
           >
-            {photo && (
-              <Image
-                source={{
-                  uri: getOptimizedImageUrl(photo.secureUrl, {
-                    width: 670,
-                    height: 396,
-                    crop: "fill",
-                  }),
-                }}
-                style={{ width: "100%", height: 198, borderRadius: 12 }}
-                contentFit="cover"
-              />
-            )}
+            <Image
+              source={
+                photo
+                  ? {
+                      uri: getOptimizedImageUrl(photo.secureUrl, {
+                        width: 670,
+                        height: 396,
+                        crop: "fill",
+                      }),
+                    }
+                  : STAMP_IMAGE
+              }
+              style={{ width: "100%", height: 198, borderRadius: 12 }}
+              contentFit="cover"
+            />
 
             {/* 사진 아래 입력 영역만 아래에서 살짝 올라오며 나타난다 — 카메라
               탭에서 들어온 경우 직전 화면(target)과 사진의 위치·크기가 같고

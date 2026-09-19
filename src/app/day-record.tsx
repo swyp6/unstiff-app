@@ -35,6 +35,9 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 // 같은 효과).
 const PHOTO_HEIGHT = 445 * (SCREEN_WIDTH / 375);
 
+// "사진 없이 기록하기"로 사진이 없을 때 사진 자리에 대신 보여주는 스탬프.
+const STAMP_IMAGE = require("@/assets/home/stamp.png");
+
 const MEASURE_LABELS: Record<keyof ExerciseMeasuresDto, string> = {
   duration: "시간",
   distance: "거리",
@@ -246,10 +249,18 @@ function RecordPage({
             contentFit="cover"
           />
         ) : (
-          <View style={{ flex: 1 }} />
+          <View
+            style={{ flex: 1, backgroundColor: primitiveColors.charcoal["12"] }}
+          >
+            <Image
+              source={STAMP_IMAGE}
+              style={{ flex: 1 }}
+              contentFit="cover"
+            />
+          </View>
         )}
 
-        {(entry.intensity || measureRows.length > 0) && (
+        {entry.imageUrl && (entry.intensity || measureRows.length > 0) && (
           <LinearGradient
             colors={["rgba(13,15,20,0)", "rgba(13,15,20,0.92)"]}
             end={{ x: 0, y: 1 }}
