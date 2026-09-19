@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -218,7 +219,16 @@ export default function NotificationSettingsScreen() {
     : false;
 
   return (
-    <SafeAreaView edges={["top", "left", "right"]} style={styles.screen}>
+    // settings/index.tsx와 같은 이유로 bottom을 iOS에서만 유지한다 — 이
+    // 화면도 항상 탭바 위에 떠 있다.
+    <SafeAreaView
+      edges={
+        Platform.OS === "android"
+          ? ["top", "left", "right"]
+          : ["top", "left", "right", "bottom"]
+      }
+      style={styles.screen}
+    >
       <SettingsHeader
         onBack={() => goBackOrReplace("/mypage/settings")}
         title="알림 설정"
