@@ -79,20 +79,9 @@ export function formatAgreedDate(agreedAt: string | null): string | null {
   return `${match[1]}.${match[2]}.${match[3]}`;
 }
 
-// GET /terms에는 version 필드가 없고 contentUrl 파일명이 "service-1.0.html"처럼
-// versioned라 basename의 "-<version>.html"에서 뽑는다. 패턴이 다르면 null.
-export function extractTermsVersion(contentUrl: string | null): string | null {
-  if (!contentUrl) return null;
-  const path = contentUrl.split(/[?#]/)[0];
-  const basename = path.slice(path.lastIndexOf("/") + 1);
-  const match = /-(\d+(?:\.\d+)*)\.html$/i.exec(basename);
-  return match ? match[1] : null;
-}
-
-// 동의 내역 row description — Figma "동의일 YYYY.MM.DD · 버전 —". 값이 없으면
-// 날조하지 않고 "—".
+// 동의 내역 row description — "동의일 YYYY.MM.DD". 값이 없으면 날조하지 않고
+// "—".
 export function formatAgreementDescription(term: Term | null): string {
   const date = term ? formatAgreedDate(term.agreedAt) : null;
-  const version = term ? extractTermsVersion(term.contentUrl) : null;
-  return `동의일 ${date ?? "—"} · 버전 ${version ?? "—"}`;
+  return `동의일 ${date ?? "—"}`;
 }

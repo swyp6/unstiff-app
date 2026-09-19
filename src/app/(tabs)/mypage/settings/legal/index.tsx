@@ -180,8 +180,8 @@ export default function LegalScreen() {
             ))}
           </View>
 
-          {/* 동의 내역 — 표시 전용(누를 수 없음). 동의일·버전은 GET /terms의
-              agreedAt·contentUrl에서만 만든다. */}
+          {/* 동의 내역 — 표시 전용(누를 수 없음). 동의일은 GET /terms의
+              agreedAt에서만 만든다. */}
           <View style={[styles.section, styles.historySection]}>
             <SettingsSectionLabel label="동의 내역" variant="subheading" />
             {LEGAL_AGREEMENT_HISTORY_ROWS.map((row) => (
