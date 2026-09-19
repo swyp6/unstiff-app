@@ -6,7 +6,6 @@ import type {
   AiChatMessageResponse,
   AiChatSendRequest,
   AiConversationType,
-  AiContentComplaintRequest,
   CursorRequest,
   CursorResponse,
 } from "./types";
@@ -36,14 +35,6 @@ export async function fetchAiChatHistory(
   const { data } = await apiClient.get<CursorResponse<AiChatHistoryItem>>(
     "/api/v1/chat/ai/messages",
     { params: { conversationType, ...cursorRequest } },
-  );
-  return data;
-}
-
-export async function reportAiContent(request: AiContentComplaintRequest) {
-  const { data } = await apiClient.post<{ id: number }>(
-    "/api/v1/complaints/ai-content",
-    request,
   );
   return data;
 }

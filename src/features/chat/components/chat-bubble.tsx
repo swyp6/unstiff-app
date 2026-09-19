@@ -6,9 +6,9 @@ import { Pressable, StyleSheet, View } from "react-native";
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import type { ChatMessage } from "@/features/chat/types";
+import { AiContentReportMenu } from "@/features/reports/components/ai-content-report-menu";
+import { AiContentReportSheet } from "@/features/reports/components/ai-content-report-sheet";
 
-import { AiContentReportMenu } from "./ai-content-report-menu";
-import { AiContentReportSheet } from "./ai-content-report-sheet";
 import { ChatAvatar } from "./chat-avatar";
 
 const BOT_AVATAR_SIZE = 36;
@@ -90,12 +90,13 @@ export function ChatBubble({ message, onReported }: ChatBubbleProps) {
               visible={menuTop !== null}
             />
             <AiContentReportSheet
-              messageId={messageId}
               onClose={() => setIsReportSheetOpen(false)}
               onReported={() => {
                 setIsReportSheetOpen(false);
                 onReported?.();
               }}
+              refId={messageId}
+              refType="CHAT_MESSAGE"
               visible={isReportSheetOpen}
             />
           </>

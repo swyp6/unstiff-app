@@ -5,8 +5,9 @@ import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { semanticColors } from "@/constants/tokens";
-import { reportAiContent } from "@/features/chat/api";
-import type { AiContentReportReason } from "@/features/chat/types";
+
+import { reportAiContent } from "../api";
+import type { AiContentReportRefType, AiContentReportReason } from "../types";
 
 const REASON_TEXT_MAX_LENGTH = 100;
 
@@ -18,18 +19,20 @@ const REASON_OPTIONS: { value: AiContentReportReason; label: string }[] = [
   { value: "OTHER", label: "기타" },
 ];
 
-// Google Play AI 생성 콘텐츠 정책의 인앱 신고 요건 대응. 봇 말풍선의 `⋮` →
-// "AI 콘텐츠 신고" 메뉴에서 뜬다. POST /api/v1/complaints/ai-content,
-// refType은 CHAT_MESSAGE 고정. 접수 성공/실패와 무관하게 시트는 바로
-// 닫히고(스펙 6-1), 완료 토스트는 onReported를 받은 부모(chat.tsx)가 띄운다.
+// Google Play AI 생성 콘텐츠 정책의 인앱 신고 요건 대응. 오늘의 미션/AI 캐릭터
+// 답변의 `⋮` → "AI 콘텐츠 신고" 메뉴에서 뜬다. POST /api/v1/complaints/ai-content.
+// 접수 성공/실패와 무관하게 시트는 바로 닫히고(스펙 6-1), 완료 토스트는
+// onReported를 받은 화면(chat.tsx/home.tsx)이 띄운다.
 export function AiContentReportSheet({
   visible,
-  messageId,
+  refType,
+  refId,
   onClose,
   onReported,
 }: {
   visible: boolean;
-  messageId: number;
+  refType: AiContentReportRefType;
+  refId: number;
   onClose: () => void;
   onReported: () => void;
 }) {
@@ -58,8 +61,8 @@ export function AiContentReportSheet({
     setError(null);
     try {
       await reportAiContent({
-        refType: "CHAT_MESSAGE",
-        refId: messageId,
+        refType,
+        refId,
         detail: {
           reason,
           reasonText: reason === "OTHER" ? trimmedReasonText : null,

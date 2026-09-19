@@ -13,12 +13,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedView } from "@/components/themed-view";
 import { semanticColors } from "@/constants/tokens";
-import { AiContentReportToast } from "@/features/chat/components/ai-content-report-toast";
 import {
   BotBubbleText,
   BotMessageRow,
   ChatBubble,
 } from "@/features/chat/components/chat-bubble";
+import { AiContentReportToast } from "@/features/reports/components/ai-content-report-toast";
 import { ChatDateDivider } from "@/features/chat/components/chat-date-divider";
 import { ChatHeader } from "@/features/chat/components/chat-header";
 import { ChatInputBar } from "@/features/chat/components/chat-input-bar";

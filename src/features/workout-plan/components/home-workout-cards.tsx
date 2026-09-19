@@ -12,6 +12,8 @@ import {
   getWorkoutPlanSummary,
   type WorkoutPlanDraft,
 } from "@/features/workout-plan/model";
+import { AiContentReportMenu } from "@/features/reports/components/ai-content-report-menu";
+import { AiContentReportSheet } from "@/features/reports/components/ai-content-report-sheet";
 
 const MISSION_ILLUSTRATION = require("@/assets/home/mission-illustration.png");
 
@@ -53,6 +55,10 @@ type MissionCardProps = {
   // 눌러 그 운동 기록(day-record) 화면을 연다. TodayWorkoutRow의
   // onOpenRecord와 같은 패턴.
   onOpenRecord?: () => void;
+  // AI 콘텐츠 신고(refId)에 쓰는 실제 미션 식별자 — 아직 없으면(scheduled)
+  // 신고할 대상이 없어 `⋮` 자체를 안 보여준다.
+  missionId?: number | null;
+  onReported?: () => void;
 };
 
 export function MissionCard({
@@ -64,11 +70,34 @@ export function MissionCard({
   onAccept,
   onToggleComplete,
   onOpenRecord,
+  missionId,
+  onReported,
 }: MissionCardProps) {
+  const [menuTop, setMenuTop] = useState<number | null>(null);
+  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
+
   if (status === "dismissed") return null;
 
   const isAccepted = status === "accepted" || status === "completed";
   const isCompleted = status === "completed";
+  // scheduled는 아직 실제 미션 내용이 없어 신고할 대상이 없다.
+  const canReport = status !== "scheduled" && missionId != null;
+
+  const reportButton = canReport && (
+    <Pressable
+      accessibilityLabel="더보기"
+      accessibilityRole="button"
+      hitSlop={8}
+      onPress={(event) => setMenuTop(event.nativeEvent.pageY - 16)}
+      className="h-6 w-6 items-center justify-center"
+    >
+      <Ionicons
+        color={semanticColors["label-disabled"]}
+        name="ellipsis-vertical"
+        size={18}
+      />
+    </Pressable>
+  );
 
   return (
     <View className="rounded-[24px] bg-background-normal p-5 shadow-[0px_4px_6px_rgba(0,0,0,0.04)]">
@@ -76,7 +105,7 @@ export function MissionCard({
           3502:36610(scheduled)·4305:33908(revealed)에는 이 줄 자체가 없고,
           "오늘의 미션" 라벨은 아래 중앙 정렬된 콘텐츠 안에 오렌지색으로 들어간다. */}
       {isAccepted && (
-        <View className="min-h-8 flex-row items-center">
+        <View className="min-h-8 flex-row items-center justify-between">
           {/* TodayWorkoutCard의 "오늘의 운동" 헤딩과 같은 타이포/색상 —
               홈 화면에 나란히 쌓이는 두 카드 헤더가 같은 무게로 보여야 한다. */}
           <ThemedText
@@ -85,6 +114,7 @@ export function MissionCard({
           >
             오늘의 미션
           </ThemedText>
+          {reportButton}
         </View>
       )}
 
@@ -194,16 +224,41 @@ export function MissionCard({
       )}
 
       {/* Figma 4305:33908: NEW뱃지는 우상단에 절대 위치로 뜬다 —
-          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다. */}
+          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다.
+          신고 `⋮`도 그 옆에 같이 둔다. */}
       {status === "revealed" && (
-        <View className="absolute right-5 top-5 rounded-full bg-orange-50 px-[9px] py-1">
-          <ThemedText
-            typography="caption-1-bold"
-            style={{ color: primitiveColors.orange["500"] }}
-          >
-            NEW
-          </ThemedText>
+        <View className="absolute right-5 top-5 flex-row items-center gap-2">
+          <View className="rounded-full bg-orange-50 px-[9px] py-1">
+            <ThemedText
+              typography="caption-1-bold"
+              style={{ color: primitiveColors.orange["500"] }}
+            >
+              NEW
+            </ThemedText>
+          </View>
+          {reportButton}
         </View>
+      )}
+
+      {canReport && (
+        <>
+          <AiContentReportMenu
+            onClose={() => setMenuTop(null)}
+            onSelectReport={() => setIsReportSheetOpen(true)}
+            top={menuTop ?? 0}
+            visible={menuTop !== null}
+          />
+          <AiContentReportSheet
+            onClose={() => setIsReportSheetOpen(false)}
+            onReported={() => {
+              setIsReportSheetOpen(false);
+              onReported?.();
+            }}
+            refId={missionId as number}
+            refType="MISSION"
+            visible={isReportSheetOpen}
+          />
+        </>
       )}
     </View>
   );
