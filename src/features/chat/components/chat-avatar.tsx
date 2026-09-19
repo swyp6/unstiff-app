@@ -49,10 +49,14 @@ export function ChatAvatar({ size = 36, imageUri }: ChatAvatarProps) {
 }
 
 const styles = StyleSheet.create({
+  // boxShadow(CSS Box Shadow, RN 0.80+)는 iOS shadow*/Android elevation과
+  // 달리 두 플랫폼에서 대칭으로 그려지고, 같은 뷰의 overflow: hidden에도
+  // 잘리지 않는다 — 그림자 전용 wrapper 뷰가 더 필요 없다.
   container: {
     alignItems: "center",
     backgroundColor: primitiveColors.orange["400"],
     justifyContent: "center",
     overflow: "hidden",
+    boxShadow: "0px 4px 6px rgba(0, 0, 0, 0.04)",
   },
 });

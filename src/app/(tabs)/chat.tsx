@@ -284,7 +284,13 @@ export default function ChatScreen() {
 
   return (
     <ThemedView style={styles.screen}>
-      <SafeAreaView edges={["top", "bottom"]} style={styles.flex}>
+      {/* bottom을 빼는 이유: 이 화면은 항상 탭바 위에 떠 있고, 탭바가 하단
+          시스템 네비게이션 바 여백을 이미 처리한다. edges에 "bottom"까지
+          넣으면 안드로이드 edge-to-edge에서 insets.bottom이 탭바 유무와
+          무관하게 그대로 잡혀, ChatLockedBar/컴포저 아래에 눈에 잘 안 띄는
+          (거의 같은 색) 여백이 한 번 더 생긴다 — src/app/(tabs)/home.tsx와
+          같은 문제. */}
+      <SafeAreaView edges={["top"]} style={styles.flex}>
         <ChatHeader
           subtitle={
             lastMessage ? formatSubtitle(lastMessage.createdAt) : undefined

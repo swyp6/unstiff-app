@@ -1296,7 +1296,15 @@ export default function HomeScreen() {
   }
 
   return (
-    <Screen style={{ backgroundColor: HOME_SURFACE_BACKGROUND }}>
+    // bottom을 빼는 이유: 이 화면은 항상 탭바 위에 떠 있고, 탭바가 하단 시스템
+    // 네비게이션 바 여백을 이미 처리한다. Screen의 기본(all edges)을 그대로
+    // 쓰면 안드로이드 edge-to-edge에서 insets.bottom이 탭바 유무와 무관하게
+    // 그대로 잡혀 탭바 위에 빈 여백이 한 번 더 생긴다(iOS는 탭 화면에서 0으로
+    // 잡혀 눈에 띄지 않았다).
+    <Screen
+      edges={["top"]}
+      style={{ backgroundColor: HOME_SURFACE_BACKGROUND }}
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
