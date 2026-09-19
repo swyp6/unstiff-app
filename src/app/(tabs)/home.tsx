@@ -2,7 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { AddItemButton } from "@/components/ui/add-item-button";
@@ -1296,13 +1296,15 @@ export default function HomeScreen() {
   }
 
   return (
-    // bottom을 빼는 이유: 이 화면은 항상 탭바 위에 떠 있고, 탭바가 하단 시스템
-    // 네비게이션 바 여백을 이미 처리한다. Screen의 기본(all edges)을 그대로
-    // 쓰면 안드로이드 edge-to-edge에서 insets.bottom이 탭바 유무와 무관하게
-    // 그대로 잡혀 탭바 위에 빈 여백이 한 번 더 생긴다(iOS는 탭 화면에서 0으로
-    // 잡혀 눈에 띄지 않았다).
+    // bottom을 안드로이드에서만 빼는 이유: 이 화면은 항상 탭바 위에 떠 있고,
+    // 탭바가 하단 시스템 네비게이션 바 여백을 이미 처리한다. Screen의
+    // 기본(all edges)을 그대로 쓰면 안드로이드 edge-to-edge에서
+    // insets.bottom이 탭바 유무와 무관하게 그대로 잡혀 탭바 위에 빈 여백이
+    // 한 번 더 생긴다. iOS는 반대로 insets.bottom이 탭바 높이만큼 그대로
+    // 필요해서(NativeTabs가 그만큼을 안전영역으로 보고하는 그 값을 빼버리면
+    // 리스트 마지막 항목이 탭바 아이콘 밑에 깔린다) bottom을 유지한다.
     <Screen
-      edges={["top"]}
+      edges={Platform.OS === "android" ? ["top"] : ["top", "bottom"]}
       style={{ backgroundColor: HOME_SURFACE_BACKGROUND }}
     >
       <ScrollView
