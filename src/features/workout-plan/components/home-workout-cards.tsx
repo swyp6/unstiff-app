@@ -490,9 +490,13 @@ function StopwatchBar({
     return () => clearInterval(timer);
   }, [isRunning, disabled]);
 
+  // now는 interval tick에서만 갱신되므로 일시정지 동안엔 마지막 tick 시각에
+  // 멈춰 있고, 재개 직후 첫 tick 전까지는 새 startedAt보다 앞선다. 그때
+  // 음수 delta가 정산된 elapsedSeconds를 깎지 않도록 이번 실행 구간의
+  // 경과만 0 이상으로 자른다 — 아직 관측된 경과가 없다는 뜻이라 0이 맞다.
   const displaySeconds =
     isRunning && startedAt != null
-      ? elapsedSeconds + (now - startedAt) / 1000
+      ? elapsedSeconds + Math.max(0, now - startedAt) / 1000
       : elapsedSeconds;
   const [confirmDialog, setConfirmDialog] = useState<"finish" | "reset" | null>(
     null,
