@@ -708,13 +708,6 @@ export default function HomeScreen() {
   const todayWorkouts = getWorkoutsForDate(today);
   const selectedDateWorkouts = getWorkoutsForDate(selectedCalendarDate);
   const todayLabel = `${today.getMonth() + 1}월 ${today.getDate()}일`;
-  const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
-  // 로컬에서 아직 오늘 운동을 체크하지 않았어도, 서버 recordCount가 이미
-  // 0보다 크면(다른 기기에서 기록했거나 앱을 재실행한 경우) 오늘을 이미
-  // 기록된 날로 표시해야 한다 — recordCount는 그 날의 실제 기록 수이므로
-  // "오늘이 기록됐는지" 판정에 직접 연결한다.
-  const isTodayRecorded =
-    doneCount > 0 || (daysByDate.get(toDateKey(today))?.recordCount ?? 0) > 0;
   const isSelectedDateToday =
     selectedCalendarDate.toDateString() === today.toDateString();
   // 오늘 이후(미래) 날짜는 아직 안 지난 날이라 "운동 추가"는 계속 가능해야
@@ -1322,6 +1315,7 @@ export default function HomeScreen() {
           viewedMonth={viewedMonth}
           onViewedMonthChange={setViewedMonth}
           today={today}
+          selectedDate={selectedCalendarDate}
           onSelectDate={setSelectedCalendarDate}
           onDayWithRecordPress={(dateKey) =>
             router.push({
@@ -1330,7 +1324,6 @@ export default function HomeScreen() {
             })
           }
           daysByDate={daysByDate}
-          isTodayRecorded={isTodayRecorded}
           hasLocalScheduledWorkout={(date) =>
             getWorkoutsForDate(date).length > 0
           }

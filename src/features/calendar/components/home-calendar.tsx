@@ -16,6 +16,7 @@ import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { toDateKey } from "@/features/calendar/date";
 import type { CalendarDay } from "@/features/calendar/types";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
+import { cn } from "@/lib/utils";
 
 import { MonthPickerSheet } from "./month-picker-sheet";
 
@@ -81,10 +82,10 @@ export function HomeCalendar({
   viewedMonth,
   onViewedMonthChange,
   today,
+  selectedDate,
   onSelectDate,
   onDayWithRecordPress,
   daysByDate,
-  isTodayRecorded,
   hasLocalScheduledWorkout,
   streakDays,
   calendarError,
@@ -94,13 +95,15 @@ export function HomeCalendar({
   viewedMonth: Date;
   onViewedMonthChange: (month: Date) => void;
   today: Date;
+  // 하단 예정된 운동 패널이 기준으로 삼는 날짜와 같은 값 — 캘린더 셀의 선택
+  // 강조도 이 값으로 판단해야 둘이 항상 일치한다.
+  selectedDate: Date;
   onSelectDate: (date: Date) => void;
   // 그 날 기록이 있으면 day-record 화면으로 넘어간다(YYYY-MM-DD 키).
   onDayWithRecordPress: (dateKey: string) => void;
   // date(YYYY-MM-DD) 기준 lookup — days는 기록/예정 운동이 있는 날짜만 내려오는
   // sparse 맵이라 index로 캘린더 셀과 매칭하면 안 되고 반드시 date로 찾아야 한다.
   daysByDate: Map<string, CalendarDay>;
-  isTodayRecorded: boolean;
   // 아직 백엔드에 저장 API가 없는(로컬 상태만 갱신되는) 예정 운동 표시용.
   hasLocalScheduledWorkout: (date: Date) => boolean;
   streakDays: number;
@@ -233,6 +236,8 @@ export function HomeCalendar({
     transform: [{ translateX: -calendarWidth + dragX.value }],
   }));
 
+  const selectedDateKey = toDateKey(selectedDate);
+
   function renderMonthGrid(monthWeeks: (number | null)[][], monthDate: Date) {
     const isThisMonth =
       monthDate.getFullYear() === today.getFullYear() &&
@@ -254,7 +259,11 @@ export function HomeCalendar({
           // daysByDate는 현재 조회된 달(viewedMonth)의 응답만 담고 있으므로,
           // 스와이프 중인 옆 달 패널의 날짜는 자연히 매칭되지 않아 하이라이트가
           // 없는 상태로 보인다 — 그 달로 넘어가 API가 다시 조회되면 채워진다.
-          const dayEntry = daysByDate.get(toDateKey(cellDate));
+          const cellDateKey = toDateKey(cellDate);
+          // "오늘"과 "사용자가 선택한 날짜"는 별개다 — 처음엔 둘 다 오늘이지만
+          // 다른 날짜를 탭하면 선택 강조만 그 날짜로 옮겨가고 오늘 표시는 남는다.
+          const isSelected = cellDateKey === selectedDateKey;
+          const dayEntry = daysByDate.get(cellDateKey);
           const dayRecordCount = dayEntry?.recordCount ?? 0;
           // hasPhoto는 "사진이 있다"는 뜻이지 "기록이 있다"는 뜻이 아니다.
           // 오늘 포함 모든 날짜가 같은 서버 값(dayEntry.imageUrl)을 쓴다 —
@@ -281,16 +290,12 @@ export function HomeCalendar({
             isFutureDay &&
             (dayEntry?.hasPlan === true || hasLocalScheduledWorkout(cellDate));
 
-          const textColor =
-            isToday && hasPhoto
-              ? "#ffffff"
-              : isToday
-                ? semanticColors["label-normal"]
-                : hasPhoto
-                  ? semanticColors["label-normal"]
-                  : isFutureDay
-                    ? semanticColors["label-disabled"]
-                    : semanticColors["label-subtle"];
+          // 오늘 셀의 숫자 색은 아래 "오늘 표시" 원 안에서 따로 정한다.
+          const textColor = hasPhoto
+            ? semanticColors["label-normal"]
+            : isFutureDay
+              ? semanticColors["label-disabled"]
+              : semanticColors["label-subtle"];
 
           return (
             <Pressable
@@ -316,18 +321,18 @@ export function HomeCalendar({
               {hasMultiplePhotos && !isToday && (
                 <View className="absolute -top-1 left-2 h-[52px] w-[35px] rounded-lg border-[1.5px] border-background-normal bg-fill-subtle" />
               )}
+              {/* 오늘(isToday)과 선택(isSelected)은 서로 다른 시각 요소다 —
+                  오늘은 아래 날짜 숫자의 원형 배경(Figma 5689:17569)으로만,
+                  선택은 셀 전체 dashed 테두리(Figma 5685:57079)로만 표시하므로
+                  둘이 겹쳐도(오늘을 선택) 각각 그대로 보인다. */}
               <View
-                className={
-                  isToday
-                    ? `h-[60px] w-[43px] items-start overflow-hidden rounded-lg border-2 p-1.5 ${
-                        isTodayRecorded
-                          ? "border-solid border-orange-500 bg-fill-normal"
-                          : "border-dashed border-orange-500"
-                      }`
-                    : hasPhoto || hasRecordWithoutPhoto
-                      ? "h-[60px] w-[43px] items-start rounded-lg bg-fill-normal p-1.5"
-                      : "h-[60px] w-[43px] items-start p-1.5"
-                }
+                className={cn(
+                  "h-[60px] w-[43px] items-start p-1.5",
+                  isSelected &&
+                    "overflow-hidden rounded-lg border-2 border-dashed border-orange-500",
+                  (hasPhoto || hasRecordWithoutPhoto) &&
+                    "rounded-lg bg-fill-normal",
+                )}
               >
                 {hasPhoto && (
                   <>
@@ -339,7 +344,7 @@ export function HomeCalendar({
                         }),
                       }}
                       // Figma 4305:34251: 사진 자체에 6px 라운드가 들어간다 —
-                      // isToday가 아닌 셀은 부모에 overflow-hidden이 없어서,
+                      // 선택되지 않은 셀은 부모에 overflow-hidden이 없어서,
                       // 컨테이너 클리핑에 기대지 않고 이미지에 직접 라운드를 준다.
                       style={{
                         position: "absolute",
@@ -348,12 +353,6 @@ export function HomeCalendar({
                       }}
                       contentFit="cover"
                     />
-                    {isToday && (
-                      <View
-                        className="absolute inset-0"
-                        style={{ backgroundColor: "rgba(0,0,0,0.28)" }}
-                      />
-                    )}
                   </>
                 )}
                 {hasRecordWithoutPhoto && (
@@ -378,12 +377,26 @@ export function HomeCalendar({
                       </ThemedText>
                     </View>
                   )}
-                <ThemedText
-                  typography={isToday ? "caption-1-bold" : "caption-1-regular"}
-                  style={{ color: textColor }}
-                >
-                  {day}
-                </ThemedText>
+                {isToday ? (
+                  // Figma 5689:17569 "오늘 표시" — 셀 테두리 대신 숫자를 26x26
+                  // brand/weak 원으로 감싼다. Figma에서 원은 셀 (0.5, 1)에 고정이라
+                  // 일반 셀의 숫자 위치(p-1.5 → 6, 6)와 중심이 맞는다.
+                  <View className="absolute left-[0.5px] top-px h-[26px] w-[26px] items-center justify-center rounded-full bg-orange-50">
+                    <ThemedText
+                      typography="caption-1-bold"
+                      style={{ color: primitiveColors.orange[500] }}
+                    >
+                      {day}
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <ThemedText
+                    typography="caption-1-regular"
+                    style={{ color: textColor }}
+                  >
+                    {day}
+                  </ThemedText>
+                )}
                 {hasScheduledWorkout && (
                   <View className="absolute bottom-2.5 left-[18px] h-1.5 w-1.5 rounded-full bg-charcoal-5" />
                 )}
