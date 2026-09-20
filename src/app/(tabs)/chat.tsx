@@ -18,6 +18,7 @@ import {
   BotMessageRow,
   ChatBubble,
 } from "@/features/chat/components/chat-bubble";
+import { AiContentReportSheet } from "@/features/reports/components/ai-content-report-sheet";
 import { AiContentReportToast } from "@/features/reports/components/ai-content-report-toast";
 import { ChatDateDivider } from "@/features/chat/components/chat-date-divider";
 import { ChatHeader } from "@/features/chat/components/chat-header";
@@ -183,6 +184,13 @@ export default function ChatScreen() {
   const agreeToExternalAi = useChatStore((state) => state.agreeToExternalAi);
   const declineExternalAi = useChatStore((state) => state.declineExternalAi);
   const [showReportedToast, setShowReportedToast] = useState(false);
+  // 신고 중인 AI 메시지의 서버 id — 신고 시트는 행(ChatBubble)이 아니라 이
+  // 화면이 하나만 그린다(ChatBubble.onReport 주석 참고). 메뉴에서 신고를 고른
+  // 순간 고정되고 시트가 닫힐 때만 비워져, 그 사이 목록이 스크롤되거나 새
+  // 메시지가 붙거나 키보드로 뷰포트가 줄어도 대상이 바뀌지 않는다.
+  const [reportingMessageId, setReportingMessageId] = useState<number | null>(
+    null,
+  );
   const listRef = useRef<FlatList<ChatRow>>(null);
   const isNearBottomRef = useRef(true);
   const previousLastMessageIdRef = useRef<string | undefined>(undefined);
@@ -267,10 +275,7 @@ export default function ChatScreen() {
         return <ChatDateDivider label={row.label} />;
       case "message":
         return (
-          <ChatBubble
-            message={row.message}
-            onReported={() => setShowReportedToast(true)}
-          />
+          <ChatBubble message={row.message} onReport={setReportingMessageId} />
         );
       case "pending":
         return row.pending === "typing" ? (
@@ -388,6 +393,21 @@ export default function ChatScreen() {
         termError={externalAiTermError}
         visible={entryState === "consent-required" && !consentDeclined}
       />
+      {/* 대상이 바뀔 때마다 새로 mount돼 이전 신고 사유·기타 입력이 남지
+          않는다. FlatList 밖이라 행이 잘려도(removeClippedSubviews) 시트는
+          그대로다. */}
+      {reportingMessageId !== null && (
+        <AiContentReportSheet
+          onClose={() => setReportingMessageId(null)}
+          onReported={() => {
+            setReportingMessageId(null);
+            setShowReportedToast(true);
+          }}
+          refId={reportingMessageId}
+          refType="CHAT_MESSAGE"
+          visible
+        />
+      )}
       {showReportedToast && (
         <AiContentReportToast onHide={() => setShowReportedToast(false)} />
       )}
