@@ -24,9 +24,9 @@ type Screen = "overview" | "reason" | "other";
 
 type MissionFeedbackModalProps = {
   visible: boolean;
-  // pending 상태가 없을 때(visible=false)는 null일 수 있다 — DeletePlanModal/
-  // RecordMethodModal과 같은 프레임(dim/dialog 구조, `if (!visible) return
-  // null` 진입부)을 그대로 따른다.
+  // pending 상태가 없을 때(visible=false)는 null일 수 있다 — DeletePlanModal과
+  // 같은 프레임(dim/dialog 구조, `if (!visible) return null` 진입부)을 그대로
+  // 따른다.
   missionId: number | null;
   // overview 화면 subtitle에 표시할 실제 미션 제목. home.tsx의 mission 관련
   // local state(missionId/missionTitle 등)는 NativeTabs가 탭 화면을 항상
@@ -44,7 +44,7 @@ type MissionFeedbackModalProps = {
 
 // Figma 2414:21129(오늘 미션 어땠어요?)/2414:21157(피드백 사유 선택)/
 // 2414:21372(기타 의견 입력) — 홈 화면 위에 뜨는 dim + 중앙 모달.
-// RecordMethodModal(features/upload/components/record-method-modal.tsx)과
+// DeletePlanModal(features/workout-plan/components/delete-plan-modal.tsx)과
 // 같은 dialog 프레임을 따른다.
 export function MissionFeedbackModal({
   visible,

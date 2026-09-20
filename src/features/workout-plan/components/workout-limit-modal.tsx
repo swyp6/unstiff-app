@@ -12,7 +12,7 @@ import { openHomeAtDate } from "../home-date-request-store";
 // 막으면서 띄운다. 300x195 카드가 화면 정중앙, dim(surface/dim
 // rgba(23,23,25,0.45))은 status bar·탭바까지 전체를 덮는다.
 //
-// ConfirmModal(공통)은 radius 20·가로 버튼 2개, RecordMethodModal은 radius
+// ConfirmModal(공통)은 radius 20·가로 버튼 2개, DeletePlanModal은 radius
 // 24·padding 24·max-width 340이라 이 디자인(300 고정, 26/20/18 padding, pill
 // CTA + 보조 링크)과 맞지 않아 전용 컴포넌트로 둔다. Figma에 backdrop 탭
 // 동작이 없으므로 dim을 눌러도 아무 일도 하지 않는다 — RN Modal이 뒤 화면의
@@ -83,7 +83,7 @@ export function WorkoutLimitModal({
             </ThemedText>
           </View>
 
-          {/* RecordMethodModal/DeletePlanModal과 같은 패턴 — Pressable 자체에
+          {/* DeletePlanModal과 같은 패턴 — Pressable 자체에
               배경/radius를 주면 fade Modal 안에서 버튼 배경이 그려지지 않는
               경우가 있어(실기기·시뮬레이터에서 재현), Pressable은 터치 영역
               크기만 갖고 시각 스타일은 pointerEvents="none" View가 갖는다.
