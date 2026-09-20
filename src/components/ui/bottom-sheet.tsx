@@ -106,6 +106,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const snapPoint = useRef<"collapsed" | "expanded">(
       expanded ? "expanded" : "collapsed",
     );
+    // snapPoint ref는 제스처 콜백에서 동기적으로 읽는 용도라 그대로 두고,
+    // 스크롤 영역 높이를 현재 스냅 상태에 맞춰 다시 그리기 위해 state로도
+    // 들고 있는다(아래 contentMaxHeight 참고).
+    const [isExpandedSnap, setIsExpandedSnap] = useState(expanded);
     const wasVisible = useRef(false);
     const isClosing = useRef(false);
     const fullSheetHeight =
@@ -122,15 +126,19 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         ? Math.max(0, fullSheetHeight - windowHeight * expandedHeightRatio)
         : 0;
     // Animated.View 자체는 항상 fullSheetHeight로 고정돼 있고 translateY로
-    // 얼마나 보일지만 바꾸는 구조라, expandedHeightRatio로 화면 전체보다
-    // 작게 펼치는 시트는 시트 안쪽(스크롤 영역) 아래쪽 (fullSheetHeight -
-    // 보이는 높이)만큼이 화면 밖으로 밀려나 잘린다. 스크롤 영역 높이를 실제
-    // 보이는 높이로 제한해서, 넘치는 내용이 화면 밖에 숨는 대신 스크롤로
-    // 닿을 수 있게 한다.
-    const contentMaxHeight =
-      fullHeight && expandedHeightRatio != null
-        ? Math.max(0, windowHeight * expandedHeightRatio - headerHeight)
-        : undefined;
+    // 얼마나 보일지만 바꾸는 구조라, 화면 전체보다 작게 올라와 있는 동안은
+    // 시트 안쪽(스크롤 영역) 아래쪽 (fullSheetHeight - 보이는 높이)만큼이
+    // 화면 밖으로 밀려나 잘린다. 스크롤 영역 높이를 "현재 스냅 상태에서"
+    // 실제 보이는 높이로 제한해서, 넘치는 내용이 화면 밖에 숨는 대신
+    // 스크롤로 닿을 수 있게 한다 — 펼친 높이(expandedHeightRatio)만 기준으로
+    // 잡으면 처음 반만 올라온(initialHeightRatio) 상태에서는 뷰포트 아래쪽이
+    // 화면 밖이라 끝까지 스크롤해도 마지막 항목·버튼이 안 보인다.
+    const visibleSheetHeight =
+      fullSheetHeight -
+      (isExpandedSnap ? expandedTranslateY : collapsedTranslateY);
+    const contentMaxHeight = fullHeight
+      ? Math.max(0, visibleSheetHeight - headerHeight)
+      : undefined;
 
     const animateTo = useCallback(
       (
@@ -139,6 +147,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         afterAnimation?: () => void,
       ) => {
         snapPoint.current = nextSnapPoint;
+        // 펼칠 땐 애니메이션 전에 뷰포트를 키워 올라오는 영역이 내용으로
+        // 채워져 있게 하고, 접을 땐 시트가 다 내려간 뒤에 줄인다 — 미리
+        // 줄이면 아직 화면에 보이는 아래쪽이 슬라이드 중에 비어 보인다.
+        if (nextSnapPoint === "expanded") setIsExpandedSnap(true);
         Animated.spring(translateY, {
           damping: 30,
           mass: 1,
@@ -147,7 +159,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
           toValue,
           useNativeDriver: true,
         }).start(({ finished }) => {
-          if (finished) afterAnimation?.();
+          if (!finished) return;
+          if (nextSnapPoint === "collapsed") setIsExpandedSnap(false);
+          afterAnimation?.();
         });
       },
       [translateY],
