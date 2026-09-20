@@ -3,6 +3,7 @@ import "@/global.css";
 import { useFonts } from "expo-font";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
+import { StatusBar } from "expo-status-bar";
 import { useColorScheme } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -39,6 +40,15 @@ export default function RootLayout() {
         <ThemeProvider
           value={colorScheme === "dark" ? DarkTheme : DefaultTheme}
         >
+          {/* Android는 edge-to-edge(RN core, 모든 API 레벨)로 status bar가
+              투명이고, AppTheme에 windowLightStatusBar가 없어 아이콘이 기본
+              흰색이다 — 흰 배경 위에서 안 보인다. 이 앱은 Figma에 다크 모드가
+              없어 거의 모든 화면이 system color scheme과 무관하게 밝은 배경
+              (background-normal/#fafafa)을 깔므로, scheme을 따르는 "auto"가
+              아니라 실제 배경에 맞춘 "dark"(어두운 아이콘)로 iOS/Android를
+              맞춘다. camera.tsx의 style="light"는 나중에 mount되어 그 화면에서
+              만 우선하고 unmount되면 여기 값으로 돌아온다. */}
+          <StatusBar style="dark" />
           <AnimatedSplashOverlay />
           <Stack screenOptions={{ headerShown: false }}>
             <Stack.Screen name="index" />
