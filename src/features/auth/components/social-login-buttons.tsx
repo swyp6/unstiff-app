@@ -97,12 +97,12 @@ async function handleGoogleLogin() {
 
 async function handleAppleLogin() {
   try {
-    const credential = await AppleAuthentication.signInAsync({
-      requestedScopes: [
-        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-        AppleAuthentication.AppleAuthenticationScope.EMAIL,
-      ],
-    });
+    // No requestedScopes (SDK default `[]`) — the server identifies an Apple
+    // user solely by the identityToken's `sub` claim (unstiff-api
+    // AppleAuthenticator), and nothing client-side reads credential.email /
+    // fullName either, so asking for them would collect personal data that
+    // is never used.
+    const credential = await AppleAuthentication.signInAsync();
 
     if (!credential.identityToken) {
       throw new Error("Apple sign-in did not return an identityToken");
