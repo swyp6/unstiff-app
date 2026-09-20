@@ -47,6 +47,15 @@ const config: ExpoConfig = {
     blockedPermissions: [
       "android.permission.ACCESS_COARSE_LOCATION",
       "android.permission.ACCESS_FINE_LOCATION",
+      // 사진 선택은 expo-image-picker의 시스템 Photo Picker만 쓰고(Android 13+
+      // 에서 권한 불필요), 동영상/오디오는 쓰지 않는다. expo-media-library plugin과
+      // 라이브러리 manifest가 기본으로 넣는 READ_MEDIA_* 4개를 최종 manifest에서
+      // 제거한다 — 남기면 Play "사진 및 동영상 권한" 선언 대상이 된다.
+      // profile-photo.tsx의 커스텀 앨범은 이 권한이 없으면 picker로 fallback한다.
+      "android.permission.READ_MEDIA_AUDIO",
+      "android.permission.READ_MEDIA_IMAGES",
+      "android.permission.READ_MEDIA_VIDEO",
+      "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
     ],
   },
 
@@ -111,6 +120,8 @@ const config: ExpoConfig = {
         savePhotosPermission:
           "사진을 앨범에 저장하기 위해 접근 권한이 필요합니다.",
         isAccessMediaLocationEnabled: false,
+        // 저장(saveToLibraryAsync)만 쓰므로 granular 읽기 권한을 요청하지 않는다.
+        granularPermissions: [],
       },
     ],
 
