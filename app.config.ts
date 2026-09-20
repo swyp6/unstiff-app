@@ -11,7 +11,7 @@ const apsEnvironment =
 const config: ExpoConfig = {
   name: "찌뿌두둥",
   slug: "unstiff",
-  owner: "yerimi00",
+  owner: "unstiff",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
