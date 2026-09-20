@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { Pressable, StyleSheet, TextInput, View } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
@@ -79,11 +85,23 @@ export function AiContentReportSheet({
 
   return (
     <BottomSheet
+      // "기타" 사유 입력으로 키보드가 뜨면 시트를 최대 높이까지 펼쳐 제목·사유
+      // 목록은 시트 안에 남기고 입력창이 키보드 위에 오게 한다. 시트 위치는
+      // BottomSheet가, 그 안에서 넘치는 콘텐츠는 아래 ScrollView가 맡는다 —
+      // 손잡이·제목은 BottomSheet 헤더라 스크롤 밖에 고정된다.
+      expandOnKeyboardShow
       onClose={resetAndClose}
       title="이 답변을 신고할게요"
       visible={visible}
     >
-      <View style={styles.body}>
+      <ScrollView
+        contentContainerStyle={styles.body}
+        // 키보드가 떠 있는 동안 사유·버튼을 눌러도 탭이 키보드 닫기에
+        // 먹히지 않고 그대로 전달되게(ScrollView 기본값 "never"는 첫 탭을
+        // 키보드 닫기로만 쓴다).
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.options}>
           {REASON_OPTIONS.map((option) => {
             const isSelected = option.value === reason;
@@ -162,7 +180,7 @@ export function AiContentReportSheet({
             </View>
           )}
         </Pressable>
-      </View>
+      </ScrollView>
     </BottomSheet>
   );
 }
