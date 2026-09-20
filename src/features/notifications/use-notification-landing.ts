@@ -13,11 +13,23 @@ import {
   type NotificationLandingRoute,
 } from "@/features/notifications/notification-landing";
 
-// 마지막으로 랜딩한 메시지 id. 훅 ref가 아니라 모듈 변수인 이유: iOS/Android
+// 이미 랜딩한 메시지 id들. 훅 ref가 아니라 모듈 변수인 이유: iOS/Android
 // 네이티브 모두 백그라운드 탭에서 opened 이벤트를 쏘면서 같은 메시지를
 // initialNotification에도 남겨두므로, 훅이 다시 mount돼 getInitialNotification을
 // 한 번 더 부르면(StrictMode, RootLayout remount) 같은 메시지가 다시 온다.
-let lastHandledMessageId: string | undefined;
+// 마지막 id 하나만 기억하면 A → B → A처럼 사이에 다른 메시지가 끼었을 때 A를
+// 다시 랜딩하므로 최근 것들을 Set으로 들고 있는다. Set은 삽입 순서를 유지하므로
+// 상한을 넘으면 가장 오래된 id부터 지운다(FIFO).
+const MAX_HANDLED_MESSAGE_IDS = 20;
+const handledMessageIds = new Set<string>();
+
+function markMessageHandled(messageId: string) {
+  handledMessageIds.add(messageId);
+  if (handledMessageIds.size > MAX_HANDLED_MESSAGE_IDS) {
+    const oldest = handledMessageIds.values().next().value;
+    if (oldest !== undefined) handledMessageIds.delete(oldest);
+  }
+}
 
 // 메시지 → 이동할 route. 랜딩 대상이 아니거나(알 수 없는 type 등) 이미 처리한
 // 메시지면 null. dedupe 표시는 route가 정해지는 이 시점에 하므로, 같은 메시지가
@@ -27,10 +39,10 @@ function resolveLandingRoute(
 ): NotificationLandingRoute | null {
   const route = getNotificationLandingRoute(message.data?.type);
   if (!route) return null;
-  if (message.messageId && message.messageId === lastHandledMessageId) {
-    return null;
+  if (message.messageId) {
+    if (handledMessageIds.has(message.messageId)) return null;
+    markMessageHandled(message.messageId);
   }
-  lastHandledMessageId = message.messageId;
   return route;
 }
 
@@ -69,7 +81,7 @@ export function useNotificationLanding(enabled: boolean) {
 
     // cancelled guard를 두지 않는다 — 네이티브는 initialNotification을 한 번
     // 돌려주면 비우므로, 첫 호출의 결과를 버리면 cold-start 랜딩이 유실된다.
-    // 중복은 lastHandledMessageId로 막는다.
+    // 중복은 handledMessageIds로 막는다.
     getInitialNotification(messaging)
       .then((message) => {
         if (message) handleNotificationMessage(message);
