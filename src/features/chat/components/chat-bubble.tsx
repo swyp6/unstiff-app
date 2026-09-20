@@ -7,7 +7,6 @@ import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import type { ChatMessage } from "@/features/chat/types";
 import { AiContentReportMenu } from "@/features/reports/components/ai-content-report-menu";
-import { AiContentReportSheet } from "@/features/reports/components/ai-content-report-sheet";
 
 import { ChatAvatar } from "./chat-avatar";
 
@@ -45,15 +44,19 @@ export function BotBubbleText({ children }: { children: string }) {
 
 type ChatBubbleProps = {
   message: ChatMessage;
-  // 신고 접수 성공 시 화면 레벨(chat.tsx)에 토스트를 띄우라고 알린다 — 이
-  // 행은 FlatList 안에서 스크롤에 따라 사라질 수 있어 토스트 자체를 여기서
-  // 그리지 않는다.
-  onReported?: () => void;
+  // 더보기 → "AI 콘텐츠 신고"를 고르면 신고 대상 메시지 id(서버 id)만 화면
+  // 레벨(chat.tsx)로 올린다. 신고 시트와 완료 토스트는 화면이 그린다 — 이
+  // 행은 FlatList 안이라 스크롤·키보드로 뷰포트가 줄면 화면 밖으로 나갈 수
+  // 있고, Android FlatList는 removeClippedSubviews가 기본 true여서 그때 행의
+  // 네이티브 뷰가 통째로 떼어진다(ReactViewGroup.removeViewInLayout). 그 안에
+  // Modal이 있으면 ReactModalHostView.onDetachedFromWindow → dismiss로 다이얼
+  // 로그까지 사라진다. 상단 메시지의 "기타" 입력에서 키보드가 뜨면 뒤 화면의
+  // KeyboardAvoidingView가 목록을 줄여 그 행이 잘리고 신고 시트가 꺼지던 이유.
+  onReport?: (messageId: number) => void;
 };
 
-export function ChatBubble({ message, onReported }: ChatBubbleProps) {
+export function ChatBubble({ message, onReport }: ChatBubbleProps) {
   const [menuTop, setMenuTop] = useState<number | null>(null);
-  const [isReportSheetOpen, setIsReportSheetOpen] = useState(false);
 
   if (message.role === "assistant") {
     const messageId = Number(message.id);
@@ -82,24 +85,12 @@ export function ChatBubble({ message, onReported }: ChatBubbleProps) {
           <BotBubbleText>{message.text}</BotBubbleText>
         </BotMessageRow>
         {canReport && (
-          <>
-            <AiContentReportMenu
-              onClose={() => setMenuTop(null)}
-              onSelectReport={() => setIsReportSheetOpen(true)}
-              top={menuTop ?? 0}
-              visible={menuTop !== null}
-            />
-            <AiContentReportSheet
-              onClose={() => setIsReportSheetOpen(false)}
-              onReported={() => {
-                setIsReportSheetOpen(false);
-                onReported?.();
-              }}
-              refId={messageId}
-              refType="CHAT_MESSAGE"
-              visible={isReportSheetOpen}
-            />
-          </>
+          <AiContentReportMenu
+            onClose={() => setMenuTop(null)}
+            onSelectReport={() => onReport?.(messageId)}
+            top={menuTop ?? 0}
+            visible={menuTop !== null}
+          />
         )}
       </>
     );

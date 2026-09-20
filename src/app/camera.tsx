@@ -340,7 +340,11 @@ export default function CameraScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: CAMERA_BG }}>
-      <StatusBar style="light" />
+      {/* RN StatusBar는 마운트된 <StatusBar> 중 마지막 것이 이기는 스택이라,
+          하단 카메라 탭(capture/index)으로 한 번 들어오면 이 화면이 탭 콘텐츠로
+          계속 마운트돼 있어 다른 탭(홈/채팅/마이)의 밝은 배경에서도 흰 아이콘이
+          남았다. 포커스 동안만 올려서 벗어나면 _layout.tsx의 "dark"로 돌아간다. */}
+      {isFocused && <StatusBar style="light" />}
       <View
         style={{
           flex: 1,
