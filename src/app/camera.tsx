@@ -9,11 +9,12 @@ import {
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { Image, Pressable, View } from "react-native";
+import { AppState, Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { openOsSettings } from "@/features/permissions/api";
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { uploadPickedImage } from "@/features/upload/upload-image";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
@@ -114,7 +115,7 @@ export default function CameraScreen() {
   // 있다 — isFocused로 CameraView를 직접 게이팅해 그 순간에도 두 세션이
   // 겹치지 않게 한다.
   const isFocused = useIsFocused();
-  const [permission, requestPermission] = useCameraPermissions();
+  const [permission, requestPermission, getPermission] = useCameraPermissions();
   const [facing, setFacing] = useState<"front" | "back">("back");
   const [photo, setPhoto] = useState<CapturedPhoto | null>(() =>
     pickedUri && pickedWidth && pickedHeight
@@ -158,6 +159,58 @@ export default function CameraScreen() {
     if (!isFocused) return;
     return () => setIsCameraReady(false);
   }, [isFocused]);
+
+  // 권한을 한 번 거부하면(iOS 항상, Android는 "다시 묻지 않음") OS가 더는
+  // 팝업을 띄우지 않아 사용자는 설정 앱에서 직접 허용해야 한다. 그렇게
+  // 허용하고 앱으로 돌아와도 hook의 permission state는 마운트 시점 값
+  // (denied)에 머물러 있으므로, 앱이 다시 active가 될 때마다 상태를 한 번
+  // 재조회해 CameraView 렌더링 조건이 다시 평가되게 한다. 훅의
+  // getPermission은 unmount 후 setState를 스스로 막으므로(isMounted ref)
+  // 별도 cancelled 플래그는 필요 없다.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") return;
+      getPermission().catch((permissionError) => {
+        logImageUploadError(
+          "camera permission refresh failed",
+          permissionError,
+        );
+      });
+    });
+    return () => subscription.remove();
+  }, [getPermission]);
+
+  // "권한 허용" 버튼 — 설정 화면 기기 권한 행(handlePermissionRowPress)과
+  // 같은 정책: 아직 물어볼 수 있으면 OS 팝업(requestPermission), 더는 물어볼
+  // 수 없으면(canAskAgain=false — iOS는 한 번 거부하면 항상, Android는
+  // "다시 묻지 않음") requestPermission이 팝업 없이 즉시 denied로 끝나므로
+  // 설정 앱으로 보낸다. 다만 그 헬퍼는 granted여도 설정으로 보내는 반면
+  // 여기서는 granted면 기존 카메라 흐름에 맡겨야 해서 직접 분기한다.
+  // hook state가 아직 null이거나(초기 조회 전) stale할 수 있어 탭 시점에
+  // getPermission으로 한 번 다시 읽는다 — 이 호출과 requestPermission 모두
+  // hook state를 갱신하므로 결과가 렌더링 조건에 바로 반영된다.
+  async function handleRequestPermission() {
+    try {
+      const status = await getPermission();
+      if (status.granted) return;
+
+      if (!status.canAskAgain) {
+        await openOsSettings();
+        return;
+      }
+
+      // Android는 getPermission이 canAskAgain=true라고 해도 실제 요청이
+      // 팝업 없이 blocked로 끝날 수 있다 — 그 경우 두 번 탭하게 두지 않고
+      // 바로 설정으로 보낸다(설정 화면과 동일).
+      const result = await requestPermission();
+      if (!result.granted && !result.canAskAgain) {
+        await openOsSettings();
+      }
+    } catch (permissionError) {
+      logImageUploadError("camera permission request failed", permissionError);
+      setError("권한 요청에 실패했어요. 다시 시도해 주세요.");
+    }
+  }
 
   async function handleCapture() {
     try {
@@ -341,7 +394,7 @@ export default function CameraScreen() {
             <Pressable
               className="flex-1 items-center justify-center gap-4 px-8"
               accessibilityRole="button"
-              onPress={requestPermission}
+              onPress={handleRequestPermission}
             >
               <ThemedText
                 typography="body-2-bold"
