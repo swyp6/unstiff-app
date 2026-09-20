@@ -11,6 +11,7 @@ import {
 import {
   Animated,
   type GestureResponderEvent,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   PanResponder,
@@ -56,6 +57,14 @@ type BottomSheetProps = PropsWithChildren<{
   // 가능 범위를 예측 못 하게 줄여버림), 직접 키보드 높이를 추적해 처리하는
   // 호출부는 이 값을 false로 줘서 끌 수 있게 한다.
   keyboardAvoiding?: boolean;
+  // fullHeight 시트가 반(collapsed)만 올라온 상태에서 안쪽 TextInput에 포커스돼
+  // 키보드가 뜨면, 위로 스와이프한 것과 똑같이 expanded 스냅(=정의된 가장
+  // 높은 지점)까지 바로 펼친다. 반만 열린 채로 키보드까지 겹치면 입력 필드가
+  // 거의 다 가려지기 때문이다. 키보드가 닫혀도 다시 접지는 않는다 — 입력을
+  // 마치면 바로 아래 버튼을 누르는 흐름이라 접으면 버튼이 사라진다. 자식
+  // 오버레이 시트의 입력으로 뜬 키보드에는 반응하면 안 되는 호출부는 그동안
+  // 이 값을 false로 내려 끈다.
+  expandOnKeyboardShow?: boolean;
   // "inline"으로 임베드해 화면의 콘텐츠 영역(=탭바 위)에서만 겹쳐 그릴 때는
   // 시트 아래가 기기 바닥이 아니라 이미 safe-area를 지키는 Native TabBar라,
   // bottom 여백을 또 더하면 빈 공간이 생긴다 — 그런 호출부는 []를 넘긴다.
@@ -87,6 +96,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       expandedHeightRatio,
       overlay,
       keyboardAvoiding = true,
+      expandOnKeyboardShow = false,
       safeAreaEdges = ["bottom"],
       onClose,
       onExpanded,
@@ -241,6 +251,29 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       expandedTranslateY,
       fullHeight,
       onExpanded,
+      visible,
+    ]);
+
+    useEffect(() => {
+      if (!visible || !expandOnKeyboardShow || !fullHeight) return;
+      // Android에는 keyboardWillShow가 없다 — use-keyboard-height.ts와 같은 분기.
+      const showEvent =
+        Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+      const subscription = Keyboard.addListener(showEvent, () => {
+        if (isClosing.current || snapPoint.current === "expanded") return;
+        // releaseDrag의 "위로 스와이프" 분기와 동일한 경로로 펼쳐서, 부모가
+        // expanded를 제어하는 경우에도 onExpandedChange로 동기화된다.
+        animateTo(expandedTranslateY, "expanded", onExpanded);
+        onExpandedChange?.(true);
+      });
+      return () => subscription.remove();
+    }, [
+      animateTo,
+      expandOnKeyboardShow,
+      expandedTranslateY,
+      fullHeight,
+      onExpanded,
+      onExpandedChange,
       visible,
     ]);
 

@@ -99,6 +99,11 @@ export function WorkoutPlanEditSheet({
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
   const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
+  // 자식 시트(운동 종류의 "직접 입력")에서 뜬 키보드로 이 시트까지 펼쳐지면
+  // 자식을 닫은 뒤 부모 높이가 바뀌어 있게 된다 — 자식이 열려 있는 동안은
+  // 키보드에 반응하지 않는다.
+  const isChildSheetVisible =
+    isWorkoutTypeSheetVisible || isTimeSheetVisible || isIntensitySheetVisible;
   const scrollRef = useRef<ScrollView>(null);
   const sheetRef = useRef<BottomSheetHandle>(null);
 
@@ -161,8 +166,11 @@ export function WorkoutPlanEditSheet({
       // 비율(713/814)까지만 펼쳐진다(화면 맨 위까지 올라가지 않는다). 펼친
       // 상태에서 아래로 스와이프하면 반으로, 반 상태에서 한 번 더 아래로
       // 스와이프하면 완전히 닫힌다 — BottomSheet의 releaseDrag가 이 3단
-      // 스와이프를 그대로 처리한다.
+      // 스와이프를 그대로 처리한다. 운동명·한 줄 메모 등 안쪽 입력에 포커스돼
+      // 키보드가 뜨면(expandOnKeyboardShow) 입력마다 onFocus를 달지 않아도
+      // 위로 스와이프한 것과 같이 펼친 높이까지 바로 올라간다.
       expandedHeightRatio={713 / 814}
+      expandOnKeyboardShow={!isChildSheetVisible}
       initialHeightRatio={0.5}
       onClose={onClose}
       overlay={childOverlay}
