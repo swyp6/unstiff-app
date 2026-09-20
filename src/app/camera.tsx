@@ -396,9 +396,18 @@ export default function CameraScreen() {
               accessibilityRole="button"
               onPress={handleRequestPermission}
             >
+              {/* alignSelf: stretch — 부모가 items-center라 Text가 콘텐츠
+                  폭으로 측정되면 반올림 오차로 마지막 어절("필요합니다")이
+                  세 번째 줄로 밀린 채 2줄 높이에 잘린다(confirm-modal의
+                  w-full과 같은 이유). 가용 폭을 전부 주고 textAlign으로
+                  가운데 맞춘다. */}
               <ThemedText
                 typography="body-2-bold"
-                style={{ color: "#ffffff", textAlign: "center" }}
+                style={{
+                  color: "#ffffff",
+                  textAlign: "center",
+                  alignSelf: "stretch",
+                }}
               >
                 카메라로 촬영하려면{"\n"}접근 권한이 필요합니다
               </ThemedText>
