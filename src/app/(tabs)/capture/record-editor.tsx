@@ -16,7 +16,7 @@ export default function CaptureRecordEditorRoute() {
   return (
     <>
       <Stack.Screen options={{ animation: "none" }} />
-      <RecordEditorScreen />
+      <RecordEditorScreen insideTabs />
     </>
   );
 }

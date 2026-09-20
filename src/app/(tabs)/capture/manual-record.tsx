@@ -185,8 +185,16 @@ export default function ManualRecordScreen() {
           capture/_layout.tsx에 선언하지 않는 이유는 그쪽 주석 참고. */}
       <Stack.Screen options={{ animation: "none" }} />
       {/* iOS 26 NativeTabs의 탭바는 콘텐츠 위에 떠 있어 하단 인셋에 그 높이가
-          포함된다 — 하단 고정 CTA가 탭바 뒤로 숨지 않도록 bottom edge까지 준다. */}
-      <SafeAreaView style={{ flex: 1 }} edges={["top", "bottom"]}>
+          포함된다 — 하단 고정 CTA가 탭바 뒤로 숨지 않도록 bottom edge까지 준다.
+          안드로이드는 반대로 bottom을 뺀다(home.tsx·chat.tsx·settings와 같은
+          처리): expo-router가 탭 콘텐츠 높이에서 탭바를 이미 제외하고 탭바가
+          시스템 네비게이션 바 여백까지 흡수하는데, insets.bottom은 그 네비게이션
+          바 높이가 탭바 유무와 무관하게 그대로 내려와서 bottom edge까지 주면
+          CTA가 그만큼 탭바 위로 떠 버린다. */}
+      <SafeAreaView
+        style={{ flex: 1 }}
+        edges={Platform.OS === "android" ? ["top"] : ["top", "bottom"]}
+      >
         <View
           style={{
             height: 52,
