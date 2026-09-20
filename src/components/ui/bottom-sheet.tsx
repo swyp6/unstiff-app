@@ -64,6 +64,15 @@ type BottomSheetProps = PropsWithChildren<{
   // 마치면 바로 아래 버튼을 누르는 흐름이라 접으면 버튼이 사라진다. 자식
   // 오버레이 시트의 입력으로 뜬 키보드에는 반응하면 안 되는 호출부는 그동안
   // 이 값을 false로 내려 끈다.
+  //
+  // fullHeight가 아닌(콘텐츠 높이에 맞춰 열리는) 시트에서는 키보드가 보이는
+  // 동안만 시트 높이를 fullSheetHeight로 고정해 fullHeight 시트와 같은 구조
+  // (KeyboardAvoidingView flex:1 + 콘텐츠 영역 flex:1)로 그린다. 높이가 고정
+  // 안 된 KeyboardAvoidingView는 자기 onLayout 높이(부모 기준)로 패딩을 다시
+  // 계산해 "패딩 → 높이 증가 → 패딩 증가"로 시트 전체가 위로 계속 밀려
+  // 올라가기 때문이다. 이쪽은 키보드가 닫히면 원래 콘텐츠 높이로 돌아온다 —
+  // 콘텐츠가 그대로 다 보이는 높이라 접어도 버튼이 사라지지 않는다. 안쪽
+  // 콘텐츠는 ScrollView로 감싸야 넘치는 부분이 잘리지 않고 스크롤된다.
   expandOnKeyboardShow?: boolean;
   // "inline"으로 임베드해 화면의 콘텐츠 영역(=탭바 위)에서만 겹쳐 그릴 때는
   // 시트 아래가 기기 바닥이 아니라 이미 safe-area를 지키는 Native TabBar라,
@@ -120,6 +129,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     // 스크롤 영역 높이를 현재 스냅 상태에 맞춰 다시 그리기 위해 state로도
     // 들고 있는다(아래 contentMaxHeight 참고).
     const [isExpandedSnap, setIsExpandedSnap] = useState(expanded);
+    // fullHeight가 아닌 시트가 expandOnKeyboardShow로 키보드가 보이는 동안만
+    // fullSheetHeight로 고정돼 있는지(prop 주석 참고).
+    const [isKeyboardExpanded, setIsKeyboardExpanded] = useState(false);
     const wasVisible = useRef(false);
     const isClosing = useRef(false);
     const fullSheetHeight =
@@ -127,7 +139,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
     const fixedSheetHeight = fixedHeightRatio
       ? Math.min(windowHeight * fixedHeightRatio, fullSheetHeight)
       : undefined;
-    const hasConstrainedHeight = fullHeight || fixedSheetHeight !== undefined;
+    const sheetHeight = isKeyboardExpanded
+      ? fullSheetHeight
+      : (fixedSheetHeight ?? (fullHeight ? fullSheetHeight : undefined));
+    const hasConstrainedHeight = sheetHeight !== undefined;
     const collapsedTranslateY = fullHeight
       ? Math.max(0, fullSheetHeight - windowHeight * initialHeightRatio)
       : 0;
@@ -253,6 +268,32 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       onExpanded,
       visible,
     ]);
+
+    useEffect(() => {
+      if (!visible || !expandOnKeyboardShow || fullHeight) {
+        setIsKeyboardExpanded(false);
+        return;
+      }
+      // Android에는 keyboardWillShow가 없다 — use-keyboard-height.ts와 같은 분기.
+      const showEvent =
+        Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+      const hideEvent =
+        Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+      const showSubscription = Keyboard.addListener(showEvent, () => {
+        if (isClosing.current) return;
+        setIsKeyboardExpanded(true);
+      });
+      // 닫히는 슬라이드 중에 키보드가 내려가며 시트 높이까지 줄어들면 내려가는
+      // 시트가 한 번 튄다 — 닫힌 뒤 visible=false에서 위 분기가 어차피 되돌린다.
+      const hideSubscription = Keyboard.addListener(hideEvent, () => {
+        if (isClosing.current) return;
+        setIsKeyboardExpanded(false);
+      });
+      return () => {
+        showSubscription.remove();
+        hideSubscription.remove();
+      };
+    }, [expandOnKeyboardShow, fullHeight, visible]);
 
     useEffect(() => {
       if (!visible || !expandOnKeyboardShow || !fullHeight) return;
@@ -387,8 +428,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
         <Animated.View
           style={[
             styles.sheet,
-            fullHeight && { height: fullSheetHeight },
-            fixedSheetHeight !== undefined && { height: fixedSheetHeight },
+            sheetHeight !== undefined && { height: sheetHeight },
             { transform: [{ translateY }] },
           ]}
         >
@@ -398,6 +438,16 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             // 닫혀 있어도 컨테이너 높이를 실측보다 작게 잡는 부작용이 있어
             // padding으로 통일한다.
             behavior={keyboardAvoiding ? "padding" : undefined}
+            // RN KeyboardAvoidingView는 자기 onLayout(부모 기준 y=0)이 화면 맨
+            // 위에서 시작한다고 보고 패딩을 계산해, 하단에 붙은 이 시트에서는
+            // 화면 위 여백만큼 덜 채운다. 키보드로 fullSheetHeight까지 펼친
+            // 상태(translateY=0)에서는 시트 위 여백이 정확히 windowHeight -
+            // fullSheetHeight라 그만큼 보정하면 패딩이 실제 키보드 높이가 된다.
+            // fullHeight 시트는 expandedHeightRatio로 translateY가 남을 수 있어
+            // 기존 계산을 그대로 둔다.
+            keyboardVerticalOffset={
+              isKeyboardExpanded ? windowHeight - fullSheetHeight : 0
+            }
             style={hasConstrainedHeight ? styles.flex : undefined}
           >
             <View style={hasConstrainedHeight ? styles.flex : undefined}>
