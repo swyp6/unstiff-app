@@ -2,6 +2,7 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useEffect, useState } from "react";
 import { Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -145,6 +146,11 @@ export default function RecordCompleteScreen() {
 
   return (
     <View style={{ flex: 1, backgroundColor: primitiveColors.charcoal["12"] }}>
+      {/* 어두운 배경이라 _layout.tsx 기본값("dark")을 덮는다. 카메라를 거쳐
+          왔을 때 camera.tsx의 "light"가 남아 우연히 맞던 것을 이 화면이 직접
+          책임진다 — 홈에서 시작한 기록 흐름은 카메라 없이도 여기로 온다.
+          root fullScreenModal이라 dismiss되면 unmount되어 기본값으로 돌아간다. */}
+      <StatusBar style="light" />
       <View style={{ paddingTop: insets.top, flex: 1 }}>
         <RecordScreenHeader
           dateLabel={formatHeaderDate(confirmed.date)}

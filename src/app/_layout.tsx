@@ -46,8 +46,9 @@ export default function RootLayout() {
               없어 거의 모든 화면이 system color scheme과 무관하게 밝은 배경
               (background-normal/#fafafa)을 깔므로, scheme을 따르는 "auto"가
               아니라 실제 배경에 맞춘 "dark"(어두운 아이콘)로 iOS/Android를
-              맞춘다. camera.tsx의 style="light"는 나중에 mount되어 그 화면에서
-              만 우선하고 unmount되면 여기 값으로 돌아온다. */}
+              맞춘다. 어두운 화면(camera.tsx, record-complete.tsx)만 자기
+              <StatusBar style="light" />를 올려 그 화면이 보이는 동안 우선하고,
+              내려가면 여기 값으로 돌아온다. */}
           <StatusBar style="dark" />
           <AnimatedSplashOverlay />
           <Stack screenOptions={{ headerShown: false }}>
