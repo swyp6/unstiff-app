@@ -118,9 +118,13 @@ export function RecordEditorScreen({
     ...(target?.mode === "LINKED" ? target.initialGoalValues : null),
   }));
   const [intensity, setIntensity] = useState<Intensity>(null);
+  // 시트에도 CTA와 같은 bottomInset을 넘긴다 — embedded 시트는 이 값만큼
+  // 콘텐츠 영역 바닥에서 떠서 끝나므로, CTA만 0으로 내리고 시트는
+  // insets.bottom을 그대로 쓰면 안드로이드 탭 안에서 그 차이(네비게이션 바
+  // 높이)만큼의 띠가 시트 아래에 남아 거기 걸친 CTA가 노출된다.
   const { intensitySheet, measureSheet, openIntensitySheet, openMeasureSheet } =
     useMeasureSheets({
-      embeddedBottomInset: insets.bottom,
+      embeddedBottomInset: bottomInset,
       intensity,
       onChangeIntensity: setIntensity,
       onChangeValues: setValues,
@@ -492,9 +496,10 @@ export function RecordEditorScreen({
             덮어버리므로 inline(embedded)으로 띄운다(capture/target.tsx의
             시트 처리와 같은 이유). embedded의 absoluteFill은 RN에서 부모의
             padding을 무시하고 부모 테두리 기준 bottom:0을 잡아서, 이 View의
-            insets.bottom padding 안에 두는 것만으론 탭바 높이를 못 피한다 —
-            useMeasureSheets에 넘긴 embeddedBottomInset이 그 높이를 직접
-            반영한다. manual-record.tsx와 이 시트들(강도·실제값)을 공유한다. */}
+            bottomInset padding 안에 두는 것만으론 탭바 높이를 못 피한다 —
+            useMeasureSheets에 넘긴 embeddedBottomInset(=같은 bottomInset)이
+            그 높이를 직접 반영한다. manual-record.tsx와 이 시트들(강도·실제값)을
+            공유한다. */}
         {intensitySheet}
         {measureSheet}
       </View>

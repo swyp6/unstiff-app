@@ -61,6 +61,12 @@ export default function ManualRecordScreen() {
   const navigation = useNavigation();
   const photo = useRecordFlowStore((state) => state.photo);
   const insets = useSafeAreaInsets();
+  // 이 화면의 embedded 시트들이 콘텐츠 영역 바닥에서 얼마나 떠서 끝나야 하는지
+  // — 아래 SafeAreaView의 edges 분기와 같은 근거다(record-editor-screen.tsx의
+  // bottomInset 주석 참고). iOS는 탭바가 콘텐츠 위에 떠 있어 insets.bottom
+  // (탭바 높이 포함)만큼 올려야 탭바를 안 덮고, 안드로이드는 콘텐츠 영역이
+  // 이미 탭바 위에서 끝나므로 0이어야 시트가 CTA까지 온전히 덮는다.
+  const bottomInset = Platform.OS === "android" ? 0 : insets.bottom;
 
   const [title, setTitle] = useState("");
   const [exerciseType, setExerciseType] = useState("");
@@ -75,7 +81,7 @@ export default function ManualRecordScreen() {
   const [intensity, setIntensity] = useState<Intensity>(null);
   const { intensitySheet, measureSheet, openIntensitySheet, openMeasureSheet } =
     useMeasureSheets({
-      embeddedBottomInset: insets.bottom,
+      embeddedBottomInset: bottomInset,
       intensity,
       onChangeIntensity: setIntensity,
       onChangeValues: setValues,
@@ -489,7 +495,7 @@ export default function ManualRecordScreen() {
           // 넘겨야 시트가 탭바 위에서 멈춘다.
           <WorkoutTypeBottomSheet
             embedded
-            embeddedBottomInset={insets.bottom}
+            embeddedBottomInset={bottomInset}
             onClose={() => setIsTypeSheetVisible(false)}
             onConfirm={(value) => {
               setExerciseType(value);
