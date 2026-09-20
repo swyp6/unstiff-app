@@ -3,7 +3,7 @@
 import * as MediaLibrary from "expo-media-library/legacy";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { Alert, Pressable, StyleSheet, View } from "react-native";
+import { Alert, Platform, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -38,9 +38,16 @@ const HERO_TITLE_DESCRIPTION_GAP = 8;
 
 type PhotoLibraryAccess = "full" | "limited" | "denied";
 
+// Android 13+에서는 manifest에 READ_MEDIA_IMAGES를 선언하지 않는다(app.config.ts
+// blockedPermissions — Play "사진 및 동영상 권한" 정책상 일회성 선택은 시스템
+// Photo Picker를 써야 한다). 커스텀 앨범은 expo-media-library의 읽기 권한이
+// 있어야 목록을 가져올 수 있으므로, 그 버전에서는 권한 요청/커스텀 앨범 진입을
+// 시도하지 않고 바로 시스템 picker(expo-image-picker)로 간다.
+const shouldSkipCustomLibrary =
+  Platform.OS === "android" && Platform.Version >= 33;
+
 // 커스텀 앨범(/profile-photo-library)은 expo-media-library의 읽기 권한이
-// 있어야 목록을 가져올 수 있다. 권한이 없거나(예: Android 13+에서 manifest에
-// READ_MEDIA_IMAGES가 없어 요청 자체가 거부되는 경우) 요청이 실패하면 기존
+// 있어야 목록을 가져올 수 있다. 권한이 없거나 요청이 실패하면 기존
 // native picker(expo-image-picker) 흐름으로 그대로 돌아간다.
 //
 // "limited"(iOS "선택한 사진만" / Android 14 부분 접근)는 granted=true로
@@ -112,10 +119,14 @@ export default function ProfilePhotoScreen() {
     if (isPicking) return;
     setIsPicking(true);
     try {
-      if ((await getPhotoLibraryAccess()) === "full") {
+      if (
+        !shouldSkipCustomLibrary &&
+        (await getPhotoLibraryAccess()) === "full"
+      ) {
         router.push("/profile-photo-library");
         return;
       }
+      // Android 13+ → 권한 없이 시스템 Photo Picker를 바로 연다.
       // limited → 시스템 picker가 전체 라이브러리를 보여준다.
       // denied → pickImage가 기존대로 권한 요청 후 거부 시 안내 alert를 띄운다.
       const asset = await pickImage("library");
