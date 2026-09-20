@@ -64,12 +64,31 @@ function todayLabel() {
 // (src/app/record-editor.tsx, fullScreenModal), 하단 카메라 탭에서 시작한
 // 흐름은 그 탭의 nested route(src/app/(tabs)/capture/record-editor.tsx)라
 // Native TabBar가 계속 보인다. 화면 자체는 이 컴포넌트 하나를 공유한다.
-export function RecordEditorScreen() {
+//
+// insideTabs: 카메라 탭의 nested route로 떠서 Native TabBar가 함께 보이는지.
+// 아래 하단 인셋 계산에만 쓰인다.
+export function RecordEditorScreen({
+  insideTabs = false,
+}: {
+  insideTabs?: boolean;
+}) {
   // root 라우트로 뜰 때는 fullScreenModal이라 <SafeAreaView>가 상단 인셋을
   // 0으로 잡는 경우가 있어(camera.tsx에 같은 주석) 훅에서 직접 읽어 padding
   // 으로 적용한다. 하단은 카메라 탭의 nested route로 뜰 때 iOS 26 NativeTabs의
   // 떠 있는 탭바 높이가 인셋에 포함돼, 고정 CTA가 그 뒤로 숨는 것을 막아준다.
   const insets = useSafeAreaInsets();
+  // 탭 안에서 안드로이드만 하단 인셋을 빼는 이유(home.tsx·chat.tsx·settings와
+  // 같은 처리): iOS는 expo-router가 탭마다 SafeAreaProvider를 새로 깔아
+  // insets.bottom이 "탭바 높이 + 홈 인디케이터"라 이 값이 곧 탭바를 피하는
+  // 여백이다. 안드로이드는 expo-router가 탭 콘텐츠를 react-native-screens
+  // SafeAreaView(bottom)로 감싸 화면 높이에서 탭바를 이미 제외하고, 탭바
+  // (BottomNavigationView)가 시스템 네비게이션 바 여백까지 흡수한다 — 그런데
+  // insets.bottom은 root SafeAreaProvider의 네비게이션 바 높이가 탭바 유무와
+  // 무관하게 그대로 내려와서, 여기서 한 번 더 더하면 CTA가 그만큼 탭바 위로
+  // 떠 버린다. root 라우트(fullScreenModal, 탭바 없음)는 edge-to-edge라 이
+  // 인셋이 실제 네비게이션 바 여백이므로 그대로 둔다.
+  const bottomInset =
+    Platform.OS === "android" && insideTabs ? 0 : insets.bottom;
   // 뒤로가기는 전역 히스토리(router.back())가 아니라 이 화면이 속한 가장
   // 가까운 navigator에서만 pop한다 — 카메라 탭에서 들어왔으면 그 탭의 nested
   // Stack(→ target), 홈에서 들어왔으면 root Stack(→ 탭 화면)이다. 전역
@@ -242,7 +261,7 @@ export function RecordEditorScreen() {
         style={{
           flex: 1,
           paddingTop: insets.top,
-          paddingBottom: insets.bottom,
+          paddingBottom: bottomInset,
         }}
       >
         <View
