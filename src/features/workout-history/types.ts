@@ -10,6 +10,11 @@ export type WorkoutHistoryRefType = "PLAN" | "MISSION";
 export type WorkoutHistoryResponse = {
   id: number;
   refType: WorkoutHistoryRefType;
+  // 기록을 남긴 대상의 id — PLAN이면 오늘의 운동(daily-plan) id, MISSION이면
+  // 미션 id. 즉흥(MANUAL) 기록도 서버가 오늘의 운동을 만들어 연결하므로 항상
+  // 채워진다. 같은 제목의 오늘의 운동이 여러 개일 수 있으니 화면에서 기록을
+  // 찾을 때는 name이 아니라 이 값으로 맞춘다.
+  refId: number;
   targetDate: string; // "YYYY-MM-DD"
   name: string;
   exerciseType: string | null;

@@ -930,30 +930,30 @@ export default function HomeScreen() {
 
   // 완료된 "오늘의 운동" 항목을 탭하면 점세개(수정 시트) 대신 실제 운동
   // 기록으로 이동한다. 기록은 POST /api/v1/workouts에 refId(오늘의 운동 id
-  // = TodayWorkoutInstance.id)로 연결해 만들지만 GET /api/v1/workouts 응답
-  // (WorkoutHistoryResponse)은 그 refId를 돌려주지 않아 id로 직접 맞출 수
-  // 없다. 그래서 같은 제목의 PLAN 기록이 정확히 하나일 때만 연다 — 같은
-  // 제목이 둘 이상이면 어느 것이 이 항목의 기록인지 프론트에서 구분할 수
-  // 없으므로 열지 않는다. 정확히 맞추려면 서버가 refId를 내려줘야 한다.
+  // = TodayWorkoutInstance.id)로 연결해 만들고, GET /api/v1/workouts 응답도
+  // 그 refId를 돌려주므로 refType + refId로 맞춘다 — 제목(name)은 같은
+  // 제목의 오늘의 운동이 여러 개일 수 있어 identity로 쓰지 않는다.
+  // instanceId는 String(dailyPlan.id)이므로 refId 쪽을 문자열로 맞춰 비교한다.
   function openTodayWorkoutRecord(instanceId: string) {
-    const workout = todayWorkouts.find((item) => item.id === instanceId);
-    if (!workout) return;
     return openTodayRecord((workouts) =>
       findUniqueRecordIndex(
         workouts,
         (entry) =>
-          entry.refType === "PLAN" && entry.name === workout.plan.title,
+          entry.refType === "PLAN" && String(entry.refId) === instanceId,
       ),
     );
   }
 
   // 서버에서 완료된 "오늘의 미션"을 탭하면 그 미션으로 남긴 실제 운동
-  // 기록으로 이동한다. GET /api/v1/missions/daily가 하루에 미션 하나만
-  // 내려주므로 오늘 기록 중 refType === "MISSION"인 것이 그 미션의 기록이다
-  // — 단 위와 같이 refId가 없어 MISSION 기록이 정확히 하나일 때만 연다.
+  // 기록으로 이동한다. 위와 같이 refType + refId(= 미션 id)로 맞춘다 —
+  // 하루에 MISSION 기록이 여러 개 생기더라도 이 미션의 기록만 연다.
   function openMissionRecord() {
+    if (missionId == null) return;
     return openTodayRecord((workouts) =>
-      findUniqueRecordIndex(workouts, (entry) => entry.refType === "MISSION"),
+      findUniqueRecordIndex(
+        workouts,
+        (entry) => entry.refType === "MISSION" && entry.refId === missionId,
+      ),
     );
   }
 
