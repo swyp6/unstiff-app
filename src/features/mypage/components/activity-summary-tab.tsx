@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, View } from "react-native";
 import Animated, {
   Easing,
@@ -18,7 +18,6 @@ import {
   comparePeriod,
   effectivePeriodRange,
   nextPeriod,
-  parseCalendarDate,
   periodLabel,
   periodOf,
   previousPeriod,
@@ -696,11 +695,14 @@ function MetricTabs({
   );
 }
 
-// 막대 그래프 영역 높이. 월간(최대 31칸)만 칸이 좁아 터치하기 어려워지므로
-// 가로 스크롤 + 고정 칸 너비를 쓰고, 주간/연간(최대 12칸)은 카드 폭에 맞춰
-// 균등하게 나눈다 — svg 없이 View만으로 그린다.
+// 그래프 영역 높이. 스크롤 없이 한 화면에 다 보이도록 주간·월간·연간 모두
+// 칸 수와 무관하게 카드 폭에 맞춰 균등하게 나눈다 — svg 없이 View만으로
+// 그린다.
 const CHART_HEIGHT = 140;
-const MONTH_SLOT_WIDTH = 28;
+// 꺾은선 x축 라벨 한 칸의 고정 크기 — "22" 같은 두 자리 숫자가 줄바꿈되지
+// 않을 만큼의 폭.
+const LABEL_WIDTH = 24;
+const LABEL_HEIGHT = 16;
 
 function ReportChart({
   mode,
@@ -721,61 +723,296 @@ function ReportChart({
   selectedKey: string | null;
   onSelect: (key: string) => void;
 }) {
-  const columns = keys.map((key, index) => {
-    const bucket = bucketMap.get(key);
-    const bars = selectedTypes
-      .map((type) => {
-        const raw = bucket?.exercises[type]?.[metricKey];
-        if (raw == null) return null;
-        return { type, value: toDisplayUnitValue(metricKey, raw) };
-      })
-      .filter((bar): bar is { type: string; value: number } => bar !== null);
-    const selected = key === selectedKey;
+  // 주간은 막대, 월간·연간은 꺾은선. mode가 매번 완전히 바뀌는 값이라 props로
+  // 나눈 두 컴포넌트로 분리하는 편이 각각의 좌표 계산 로직을 섞지 않는다.
+  if (mode === "week") {
     return (
-      <Pressable
-        className="items-center justify-end"
-        key={key}
-        onPress={() => onSelect(key)}
-        style={mode === "month" ? { width: MONTH_SLOT_WIDTH } : { flex: 1 }}
-      >
-        <View
-          className="w-full flex-row items-end justify-center gap-[2px]"
-          style={{ height: CHART_HEIGHT }}
-        >
-          {bars.map((bar) => (
+      <ReportBarChart
+        bucketMap={bucketMap}
+        keys={keys}
+        maxValue={maxValue}
+        metricKey={metricKey}
+        onSelect={onSelect}
+        selectedKey={selectedKey}
+        selectedTypes={selectedTypes}
+      />
+    );
+  }
+  return (
+    <ReportLineChart
+      bucketMap={bucketMap}
+      keys={keys}
+      maxValue={maxValue}
+      metricKey={metricKey}
+      mode={mode}
+      onSelect={onSelect}
+      selectedKey={selectedKey}
+      selectedTypes={selectedTypes}
+    />
+  );
+}
+
+function ReportBarChart({
+  keys,
+  bucketMap,
+  metricKey,
+  selectedTypes,
+  maxValue,
+  selectedKey,
+  onSelect,
+}: {
+  keys: string[];
+  bucketMap: Map<string, WorkoutReportBucket>;
+  metricKey: keyof ExerciseMeasuresDto;
+  selectedTypes: string[];
+  maxValue: number;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+}) {
+  return (
+    <View className="flex-row items-end">
+      {keys.map((key, index) => {
+        const bucket = bucketMap.get(key);
+        const bars = selectedTypes
+          .map((type) => {
+            const raw = bucket?.exercises[type]?.[metricKey];
+            if (raw == null) return null;
+            return { type, value: toDisplayUnitValue(metricKey, raw) };
+          })
+          .filter(
+            (bar): bar is { type: string; value: number } => bar !== null,
+          );
+        const selected = key === selectedKey;
+        return (
+          <Pressable
+            className="items-center justify-end"
+            key={key}
+            onPress={() => onSelect(key)}
+            style={{ flex: 1 }}
+          >
             <View
-              className="w-[6px] rounded-t-[2px]"
-              key={bar.type}
+              className="w-full flex-row items-end justify-center gap-[2px]"
+              style={{ height: CHART_HEIGHT }}
+            >
+              {bars.map((bar) => (
+                <View
+                  className="w-[6px] rounded-t-[2px]"
+                  key={bar.type}
+                  style={{
+                    backgroundColor: colorForExerciseType(bar.type),
+                    height: `${Math.max(3, (bar.value / maxValue) * 100)}%`,
+                    opacity: selectedKey === null || selected ? 1 : 0.45,
+                  }}
+                />
+              ))}
+            </View>
+            <ThemedText
               style={{
-                backgroundColor: colorForExerciseType(bar.type),
-                height: `${Math.max(3, (bar.value / maxValue) * 100)}%`,
-                opacity: selectedKey === null || selected ? 1 : 0.45,
+                color: selected
+                  ? primitiveColors.charcoal["11"]
+                  : primitiveColors.charcoal["4"],
               }}
+              typography="caption-2-medium"
+            >
+              {tickLabelFor("week", key, index, keys.length)}
+            </ThemedText>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
+// 꺾은선 하나 — svg 없이 두 점 사이 거리/각도를 구해 얇은 View를 회전시켜
+// 선분처럼 보이게 그린다(중심 기준 회전이라 중점에 두면 좌표 계산이 쉽다).
+const LINE_STROKE_WIDTH = 2;
+const LINE_DOT_SIZE = 6;
+const LINE_DOT_SIZE_SELECTED = 9;
+
+type ChartPoint = { x: number; y: number };
+
+function LineSegment({
+  from,
+  to,
+  color,
+}: {
+  from: ChartPoint;
+  to: ChartPoint;
+  color: string;
+}) {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const distance = Math.sqrt(dx * dx + dy * dy);
+  const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  return (
+    <View
+      className="absolute"
+      style={{
+        backgroundColor: color,
+        borderRadius: LINE_STROKE_WIDTH / 2,
+        height: LINE_STROKE_WIDTH,
+        left: (from.x + to.x) / 2 - distance / 2,
+        top: (from.y + to.y) / 2 - LINE_STROKE_WIDTH / 2,
+        transform: [{ rotate: `${angle}deg` }],
+        width: distance,
+      }}
+    />
+  );
+}
+
+function LineDot({
+  point,
+  color,
+  selected,
+}: {
+  point: ChartPoint;
+  color: string;
+  selected: boolean;
+}) {
+  const size = selected ? LINE_DOT_SIZE_SELECTED : LINE_DOT_SIZE;
+  return (
+    <View
+      className="absolute rounded-full"
+      style={{
+        backgroundColor: color,
+        borderColor: semanticColors["background-normal"],
+        borderWidth: selected ? 2 : 0,
+        height: size,
+        left: point.x - size / 2,
+        top: point.y - size / 2,
+        width: size,
+      }}
+    />
+  );
+}
+
+// 스크롤 없이 칸 수(월간 최대 31칸까지)와 무관하게 카드 폭 안에서
+// x = (index + 0.5) / 칸수 * 전체폭 공식으로 좌표를 낸다 — onLayout으로
+// 실제 렌더 폭을 재야 이 계산이 가능하다.
+function ReportLineChart({
+  mode,
+  keys,
+  bucketMap,
+  metricKey,
+  selectedTypes,
+  maxValue,
+  selectedKey,
+  onSelect,
+}: {
+  mode: ActivityPeriodMode;
+  keys: string[];
+  bucketMap: Map<string, WorkoutReportBucket>;
+  metricKey: keyof ExerciseMeasuresDto;
+  selectedTypes: string[];
+  maxValue: number;
+  selectedKey: string | null;
+  onSelect: (key: string) => void;
+}) {
+  const [plotWidth, setPlotWidth] = useState(0);
+
+  const xAt = (index: number) => ((index + 0.5) / keys.length) * plotWidth;
+  const yAt = (value: number) =>
+    CHART_HEIGHT - (Math.max(0, value) / maxValue) * CHART_HEIGHT;
+
+  const series = selectedTypes.map((type) => ({
+    color: colorForExerciseType(type),
+    points: keys.map((key, index) => {
+      const raw = bucketMap.get(key)?.exercises[type]?.[metricKey];
+      if (raw == null) return null;
+      return {
+        index,
+        point: { x: xAt(index), y: yAt(toDisplayUnitValue(metricKey, raw)) },
+      };
+    }),
+    type,
+  }));
+
+  return (
+    <View className="gap-[8px]">
+      <View
+        className="w-full"
+        onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)}
+        style={{ height: CHART_HEIGHT }}
+      >
+        {plotWidth > 0 &&
+          series.map(({ type, color, points }) => {
+            // 기록이 없는 칸은 건너뛰고 마지막으로 있던 점과 바로 잇는다 —
+            // 운동 종류 대부분은 매일이 아니라 며칠에 한 번 기록되므로, 빈
+            // 칸마다 선을 끊으면 사실상 점만 찍히고 "선 그래프"가 안 보인다.
+            const segments: { from: ChartPoint; to: ChartPoint }[] = [];
+            let previous: ChartPoint | null = null;
+            points.forEach((entry) => {
+              if (!entry) return;
+              if (previous) segments.push({ from: previous, to: entry.point });
+              previous = entry.point;
+            });
+            return (
+              <View key={type}>
+                {segments.map((segment, index) => (
+                  <LineSegment
+                    color={color}
+                    from={segment.from}
+                    key={index}
+                    to={segment.to}
+                  />
+                ))}
+                {points.map(
+                  (entry) =>
+                    entry && (
+                      <LineDot
+                        color={color}
+                        key={entry.index}
+                        point={entry.point}
+                        selected={keys[entry.index] === selectedKey}
+                      />
+                    ),
+                )}
+              </View>
+            );
+          })}
+        {/* 선 위에 겹치는 투명 터치 영역 — 칸별로 탭해서 상세를 고른다. */}
+        <View className="absolute inset-0 flex-row">
+          {keys.map((key) => (
+            <Pressable
+              key={key}
+              onPress={() => onSelect(key)}
+              style={{ flex: 1 }}
             />
           ))}
         </View>
-        <ThemedText
-          style={{
-            color: selected
-              ? primitiveColors.charcoal["11"]
-              : primitiveColors.charcoal["4"],
-          }}
-          typography="caption-2-medium"
-        >
-          {tickLabelFor(mode, key, index, keys.length)}
-        </ThemedText>
-      </Pressable>
-    );
-  });
+      </View>
 
-  if (mode === "month") {
-    return (
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        <View className="flex-row items-end gap-[2px]">{columns}</View>
-      </ScrollView>
-    );
-  }
-  return <View className="flex-row items-end">{columns}</View>;
+      <View style={{ height: LABEL_HEIGHT }}>
+        {keys.map((key, index) => {
+          const label = tickLabelFor(mode, key, index, keys.length);
+          if (!label) return null;
+          const selected = key === selectedKey;
+          // 칸 폭(특히 월간, 최대 31칸)이 "10"/"22" 같은 두 자리 숫자보다
+          // 좁을 수 있어 flex 칸에 그대로 넣으면 줄바꿈된다 — 칸 중앙
+          // 좌표(xAt) 기준으로 고정 폭 라벨을 절대 위치시켜 폭과 무관하게
+          // 한 줄로 고정한다.
+          return (
+            <ThemedText
+              className="text-center"
+              key={key}
+              numberOfLines={1}
+              style={{
+                color: selected
+                  ? primitiveColors.charcoal["11"]
+                  : primitiveColors.charcoal["4"],
+                left: xAt(index) - LABEL_WIDTH / 2,
+                position: "absolute",
+                width: LABEL_WIDTH,
+              }}
+              typography="caption-2-medium"
+            >
+              {label}
+            </ThemedText>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 // Figma "Metric / 활동 구성" (4273:22242 계열) — 한 줄 안에 왼쪽
@@ -896,23 +1133,13 @@ function ReportDetailCard({
   );
 }
 
-// signupDate를 아직 못 받았을 때의 대체값 — effectivePeriodRange가 항상
-// "period 시작"보다 이르게 잡히도록 아주 오래전 날짜를 쓴다. 이 경우
-// canGoPrevious가 false라 화면은 어차피 현재 기간에 머문다.
+// 캘린더(기록) 탭처럼 가입일 제한 없이 과거 기간을 전부 넘나들 수 있게
+// effectivePeriodRange의 하한을 항상 이 값으로 둔다 — 실질적으로
+// "period 시작"이 그대로 from이 된다.
 const EARLIEST_SIGNUP_FALLBACK = { year: 2000, month: 1, day: 1 };
 
-type ActivitySummaryTabProps = {
-  // GET /users/me의 createdAt(서버 LocalDateTime 문자열). 아직 못 받았거나
-  // 실패했으면 null — 그동안은 현재 기간만 보여주고 양쪽 화살표를 잠근다.
-  createdAt: string | null;
-};
-
-export function ActivitySummaryTab({ createdAt }: ActivitySummaryTabProps) {
+export function ActivitySummaryTab() {
   const today = todayCalendarDate();
-  const signupDate = useMemo(
-    () => (createdAt ? parseCalendarDate(createdAt) : null),
-    [createdAt],
-  );
   // 보고 있는 기간 하나와, 거기로 온 방향(제목 transition용)만 상태로 둔다.
   // mode를 바꾸면 그 mode의 "오늘이 속한 기간"으로 항상 리셋한다.
   const [navigation, setNavigation] = useState<{
@@ -922,11 +1149,9 @@ export function ActivitySummaryTab({ createdAt }: ActivitySummaryTabProps) {
   const { period, direction } = navigation;
   const mode = period.mode;
 
-  // 이동 범위: 가입일이 속한 기간 ~ 오늘이 속한 기간. 미래 기간은 없다.
+  // 이동 범위: 과거는 제한 없음(캘린더 탭과 동일), 미래 기간만 없다.
   const currentPeriod = periodOf(mode, today);
-  const earliestPeriod = signupDate ? periodOf(mode, signupDate) : null;
-  const canGoPrevious =
-    earliestPeriod !== null && comparePeriod(period, earliestPeriod) > 0;
+  const canGoPrevious = true;
   const canGoNext = comparePeriod(period, currentPeriod) < 0;
 
   function selectMode(nextMode: ActivityPeriodMode) {
@@ -936,7 +1161,7 @@ export function ActivitySummaryTab({ createdAt }: ActivitySummaryTabProps) {
 
   const { from, to } = effectivePeriodRange(
     period,
-    signupDate ?? EARLIEST_SIGNUP_FALLBACK,
+    EARLIEST_SIGNUP_FALLBACK,
     today,
   );
 
@@ -1011,7 +1236,14 @@ export function ActivitySummaryTab({ createdAt }: ActivitySummaryTabProps) {
   const bucketMap = new Map(
     displayBuckets.map((bucket) => [bucket.period, bucket] as const),
   );
-  const bucketKeys = bucketKeysFor(mode, from, to);
+  // 연간의 x축은 조회에 쓴 from/to(가입일까지로, 그리고 오늘까지로 좁혀질
+  // 수 있다)와 무관하게 그 해 1~12월을 항상 다 보여준다 — "올해"라는 한
+  // 화면 안에서 아직 안 지난 달만 쏙 빠지면 어색하다. 아직 안 지난 달은
+  // 그냥 빈 칸(기록 없음)으로 그려진다.
+  const bucketKeys =
+    mode === "year"
+      ? monthKeysInRange(`${period.year}-01`, `${period.year}-12`)
+      : bucketKeysFor(mode, from, to);
   const maxValue = niceMax(
     Math.max(
       0,
