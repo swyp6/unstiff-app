@@ -1,3 +1,4 @@
+import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 
 // DTOs mirroring the 마이페이지 활동 기록 API (see swagger:
@@ -21,4 +22,29 @@ export type WorkoutActivityResponse = {
   // 그대로 렌더링한다 — 프론트에서 다시 정렬하거나 slice하지 않는다. 항목
   // 구조는 GET /api/v1/workouts?date=의 WorkoutHistoryResponse와 같다.
   recentActivities: WorkoutHistoryResponse[];
+};
+
+// GET /api/v1/workouts/report의 구간 하나. period는 주간/월간은 "YYYY-MM-DD",
+// 연간은 "YYYY-MM". exercises는 그 구간에 실제 기록된 운동 종류만 키로 갖고
+// 값 없는 측정 항목은 키 자체가 없다.
+export type WorkoutReportBucket = {
+  period: string;
+  exercises: Record<string, ExerciseMeasuresDto>;
+};
+
+export type WorkoutReportSummary = {
+  activeDays: number;
+  recordCount: number;
+  measureCount: number;
+};
+
+// GET /api/v1/workouts/report
+export type WorkoutReportResponse = {
+  // 그 기간에 기록된 운동 종류. 고른 것과 무관하게 항상 전체가 오고
+  // 가나다순이다 — 칩 목록을 그릴 때 이 값을 쓴다.
+  exerciseTypes: string[];
+  summary: WorkoutReportSummary;
+  // 기록이 없는 구간은 담기지 않는다 — 빈 날짜를 채워 그리려면 호출부에서
+  // 조회 범위를 직접 순회해야 한다.
+  buckets: WorkoutReportBucket[];
 };
