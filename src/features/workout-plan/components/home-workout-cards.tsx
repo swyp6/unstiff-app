@@ -1,6 +1,6 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import { Image } from "expo-image";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
@@ -27,6 +27,19 @@ export type StopwatchState = {
   isRunning: boolean;
   startedAt: number | null;
 };
+
+// 실행 중이면 startedAt(벽시계 기준) 이후 흐른 시간을 더하고, 아니면 저장된
+// elapsedSeconds를 그대로 돌려준다 — 화면 표시(StopwatchBar)와 완료 체크
+// 가능 여부 판단(TodayWorkoutCard)이 같은 계산을 공유해서 어긋나지 않게 한다.
+function getStopwatchElapsedSeconds(stopwatch: StopwatchState, now: number) {
+  return stopwatch.isRunning && stopwatch.startedAt != null
+    ? stopwatch.elapsedSeconds + Math.max(0, now - stopwatch.startedAt) / 1000
+    : stopwatch.elapsedSeconds;
+}
+
+// 누적 기록이 이 값 미만이면 아직 "운동했다"고 보기 어려워 완료 체크를
+// 막는다. UI 표시 문자열이 아니라 실제 stopwatch state(초 단위)로 판단한다.
+const STOPWATCH_CHECKABLE_MIN_SECONDS = 1;
 
 export type TodayWorkoutInstance = {
   id: string;
@@ -306,6 +319,19 @@ type TodayWorkoutCardProps = {
   onStopwatchToggleRun: (instanceId: string) => void;
   onStopwatchReset: (instanceId: string) => void;
   onStopwatchFinish: (instanceId: string) => void;
+  // 완료 체크 버튼 전용 — 체크 시점에 정산한 elapsedSeconds를 확정해 멈추고
+  // (settle), 종료 확인 팝업을 취소하면 그 값 그대로 재개(resume)한다.
+  // onStopwatchToggleRun과 달리 "현재 isRunning"을 보고 방향을 정하지 않고
+  // 항상 한 방향으로만 동작해서, 팝업이 떠 있는 동안 elapsedSeconds가
+  // 늘어나지 않는다.
+  onStopwatchSettleForCheck: (
+    instanceId: string,
+    elapsedSeconds: number,
+  ) => void;
+  onStopwatchResumeAfterCancel: (
+    instanceId: string,
+    elapsedSeconds: number,
+  ) => void;
   onAddSavedPlan: (plan: WorkoutPlanDraft) => void;
   onOpenSavedPlan: (planId: string) => void;
   // 오늘의 운동 항목은 저장된 계획과 독립된 자기 사본(workout.plan)을 갖고
@@ -333,6 +359,8 @@ export function TodayWorkoutCard({
   onStopwatchToggleRun,
   onStopwatchReset,
   onStopwatchFinish,
+  onStopwatchSettleForCheck,
+  onStopwatchResumeAfterCancel,
   onAddSavedPlan,
   onOpenSavedPlan,
   onOpenWorkoutDetail,
@@ -342,6 +370,62 @@ export function TodayWorkoutCard({
   readOnly = false,
 }: TodayWorkoutCardProps) {
   const doneCount = todayWorkouts.filter((workout) => workout.isDone).length;
+
+  // 스톱워치가 실행 중인 항목이 하나라도 있을 때만 매초 리렌더해서, 체크
+  // 버튼의 "1초 이상" 조건이 화면 문자열이 아니라 실시간 elapsed 값 기준으로
+  // 갱신되게 한다(StopwatchBar가 자기 표시값을 갱신하는 것과 같은 방식).
+  const hasRunningStopwatch = todayWorkouts.some(
+    (workout) => workout.stopwatch?.isRunning,
+  );
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!hasRunningStopwatch) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, [hasRunningStopwatch]);
+
+  // 체크 버튼은 완료 상태를 바로 바꾸지 않고, 먼저 "스톱워치를 종료할까요?"
+  // 확인 팝업을 여는 역할만 한다 — 실제 완료 처리(onStopwatchFinish)는
+  // 팝업에서 확인을 눌러야 실행된다. wasRunning/elapsedSeconds는 체크를
+  // 누르기 직전(정산 직후) 상태를 기억해뒀다가, 취소 시에만 그 상태(러닝
+  // 중이었으면 그 값 그대로 재개)로 되돌리는 데 쓴다 — 모달이 떠 있던
+  // 시간이 elapsedSeconds에 섞여 들어가지 않게 하기 위함이다.
+  const [finishConfirmTarget, setFinishConfirmTarget] = useState<{
+    id: string;
+    wasRunning: boolean;
+    elapsedSeconds: number;
+  } | null>(null);
+  // setFinishConfirmTarget(null)은 setState라 같은 프레임의 연타에는 아직
+  // 모달이 열린 것으로 보일 수 있다(record-editor-screen의 submissionLockRef와
+  // 같은 이유) — "확인" 버튼이 onStopwatchFinish(완료 상태 변경 + 기록 방식
+  // 모달 오픈)를 두 번 실행하지 않도록 동기적으로 막는 락.
+  const finishConfirmLockRef = useRef(false);
+  // 이 모달은 카드 안의 모든 항목이 공유하므로, finishConfirmTarget이 바뀔
+  // 때(새로 열리거나 닫힐 때)마다 이전 확인의 락 상태가 남아있지 않도록
+  // 초기화한다. 렌더 경로(map 콜백)가 아니라 effect에서만 ref를 건드린다.
+  useEffect(() => {
+    finishConfirmLockRef.current = false;
+  }, [finishConfirmTarget]);
+
+  // 체크 버튼 press — 지금 이 순간의 elapsed를 직접 계산해 확정하고
+  // 일시정지한다(onStopwatchToggleRun을 재사용해 "현재 isRunning을 보고
+  // 방향을 정하는" 방식은 쓰지 않는다 — 취소 시 재개도 같은 이유로 별도
+  // 함수를 쓴다. 재사용 시 모달이 떠 있는 동안 다른 경로로 state가 바뀌면
+  // 취소 때 잘못된 방향으로 toggle될 수 있고, 실기기에서 실제로 모달이
+  // 열려 있던 시간만큼 그대로 더해지는 문제가 있었다). 정산된 값을
+  // finishConfirmTarget에 그대로 들고 있다가 취소 시 그 값으로 재개한다.
+  function handleStopwatchCheckPress(workout: TodayWorkoutInstance) {
+    const stopwatch = workout.stopwatch;
+    if (!stopwatch) return;
+    const wasRunning = stopwatch.isRunning;
+    // Date.now()는 이 함수가 onPress로만 호출될 때(렌더 중이 아니라 실제
+    // 체크 press 시점)의 정확한 경과시간을 구하기 위해 필요하다 — toggleStopwatchRun과
+    // 같은 이유로 렌더 중에는 절대 호출되지 않는다.
+    // eslint-disable-next-line react-hooks/purity
+    const elapsedSeconds = getStopwatchElapsedSeconds(stopwatch, Date.now());
+    onStopwatchSettleForCheck(workout.id, elapsedSeconds);
+    setFinishConfirmTarget({ id: workout.id, wasRunning, elapsedSeconds });
+  }
 
   return (
     <View className="rounded-[24px] bg-background-normal shadow-[0px_4px_12px_0px_rgba(92,23,5,0.04)]">
@@ -383,6 +467,26 @@ export function TodayWorkoutCard({
           ) : (
             todayWorkouts.map((workout, index) => {
               const hasStopwatch = workout.stopwatch != null;
+              // 스톱워치 항목은 아직 1초도 기록되지 않았으면 체크할 수 없다
+              // (elapsed=0 상태 포함) — 문자열이 아니라 실제 elapsedSeconds로 판단.
+              const canCheckStopwatch =
+                hasStopwatch &&
+                getStopwatchElapsedSeconds(workout.stopwatch!, now) >=
+                  STOPWATCH_CHECKABLE_MIN_SECONDS;
+              // 이 항목의 종료 확인 팝업이 이미 떠 있는 동안엔 체크/재생·
+              // 일시정지·리셋 어느 것도 다시 건드릴 수 없게 막는다 — 팝업이
+              // 열려 있는 동안 다른 입력으로 elapsedSeconds가 바뀌는 경로를
+              // 원천 차단한다.
+              const isFinishConfirmPending =
+                finishConfirmTarget?.id === workout.id;
+              const canToggle =
+                !readOnly && !workout.isDone && !isFinishConfirmPending;
+              let onToggle: (() => void) | undefined;
+              if (canToggle && hasStopwatch && canCheckStopwatch) {
+                onToggle = () => handleStopwatchCheckPress(workout);
+              } else if (canToggle && !hasStopwatch) {
+                onToggle = () => onToggleTodayWorkout(workout.id);
+              }
               return (
                 <View key={workout.id}>
                   <TodayWorkoutRow
@@ -398,19 +502,14 @@ export function TodayWorkoutCard({
                         ? () => onOpenWorkoutRecord(workout.id)
                         : undefined
                     }
-                    onToggle={
-                      readOnly ||
-                      workout.isDone ||
-                      (hasStopwatch && !workout.isDone)
-                        ? undefined
-                        : () => onToggleTodayWorkout(workout.id)
-                    }
+                    onToggle={onToggle}
                     workout={workout}
                   />
                   {workout.stopwatch && (
                     <StopwatchBar
-                      disabled={readOnly || workout.isDone}
-                      onFinish={() => onStopwatchFinish(workout.id)}
+                      disabled={
+                        readOnly || workout.isDone || isFinishConfirmPending
+                      }
                       onReset={() => onStopwatchReset(workout.id)}
                       onToggleRun={() => onStopwatchToggleRun(workout.id)}
                       stopwatch={workout.stopwatch}
@@ -459,6 +558,40 @@ export function TodayWorkoutCard({
           </>
         )}
       </View>
+
+      {/* 종료 확인 팝업의 유일한 진입점은 체크 버튼이다 — 재생/일시정지
+          버튼은 순수하게 시작/멈춤만 담당하고 이 모달을 열지 않는다. */}
+      <ConfirmModal
+        cancelLabel="취소하기"
+        confirmColor={primitiveColors.orange["500"]}
+        confirmLabel="저장하기"
+        description="현재까지 기록된 시간을 저장합니다"
+        onCancel={() => {
+          // 체크를 누르기 전 러닝 중이었다면, 체크 시점에 정산해둔
+          // elapsedSeconds 그대로 재개시킨다(startedAt만 지금 시각으로 새로
+          // 세팅) — 모달이 떠 있던 시간은 여기 반영되지 않는다. 이미
+          // paused 상태에서 체크했다면 아무것도 하지 않아 paused를 유지한다.
+          if (finishConfirmTarget?.wasRunning) {
+            onStopwatchResumeAfterCancel(
+              finishConfirmTarget.id,
+              finishConfirmTarget.elapsedSeconds,
+            );
+          }
+          finishConfirmLockRef.current = false;
+          setFinishConfirmTarget(null);
+        }}
+        onConfirm={() => {
+          // 연타로 onConfirm이 같은 프레임에 두 번 들어와도 완료 처리
+          // (onStopwatchFinish)가 두 번 실행되지 않도록 동기적으로 막는다.
+          if (finishConfirmLockRef.current) return;
+          finishConfirmLockRef.current = true;
+          const instanceId = finishConfirmTarget?.id;
+          setFinishConfirmTarget(null);
+          if (instanceId) onStopwatchFinish(instanceId);
+        }}
+        title="스톱워치를 종료할까요?"
+        visible={finishConfirmTarget != null}
+      />
     </View>
   );
 }
@@ -471,15 +604,15 @@ function StopwatchBar({
   disabled,
   onToggleRun,
   onReset,
-  onFinish,
 }: {
   stopwatch: StopwatchState;
   disabled: boolean;
+  // 재생/일시정지 버튼 전용 — 시작·재개·일시정지만 담당하고 종료 확인
+  // 팝업은 열지 않는다(그 팝업의 유일한 진입점은 체크 버튼).
   onToggleRun: () => void;
   onReset: () => void;
-  onFinish: () => void;
 }) {
-  const { elapsedSeconds, isRunning, startedAt } = stopwatch;
+  const { isRunning } = stopwatch;
   // Date.now()는 렌더 중에 직접 부르면 impure라 여기 effect 안에서만 읽고,
   // 렌더는 이 state 값만 순수하게 소비한다.
   const [now, setNow] = useState(() => Date.now());
@@ -494,19 +627,8 @@ function StopwatchBar({
   // 멈춰 있고, 재개 직후 첫 tick 전까지는 새 startedAt보다 앞선다. 그때
   // 음수 delta가 정산된 elapsedSeconds를 깎지 않도록 이번 실행 구간의
   // 경과만 0 이상으로 자른다 — 아직 관측된 경과가 없다는 뜻이라 0이 맞다.
-  const displaySeconds =
-    isRunning && startedAt != null
-      ? elapsedSeconds + Math.max(0, now - startedAt) / 1000
-      : elapsedSeconds;
-  const [confirmDialog, setConfirmDialog] = useState<"finish" | "reset" | null>(
-    null,
-  );
-
-  function handleMainPress() {
-    const wasRunning = isRunning;
-    onToggleRun();
-    if (wasRunning) setConfirmDialog("finish");
-  }
+  const displaySeconds = getStopwatchElapsedSeconds(stopwatch, now);
+  const [confirmDialog, setConfirmDialog] = useState<"reset" | null>(null);
 
   return (
     <View
@@ -529,7 +651,7 @@ function StopwatchBar({
           accessibilityRole="button"
           className="size-12 items-center justify-center rounded-full bg-white"
           disabled={disabled}
-          onPress={handleMainPress}
+          onPress={onToggleRun}
         >
           <Ionicons
             color={primitiveColors.charcoal[11]}
@@ -552,19 +674,6 @@ function StopwatchBar({
         </Pressable>
       </View>
 
-      <ConfirmModal
-        cancelLabel="취소하기"
-        confirmColor={primitiveColors.orange["500"]}
-        confirmLabel="저장하기"
-        description="현재까지 기록된 시간을 저장합니다"
-        onCancel={() => setConfirmDialog(null)}
-        onConfirm={() => {
-          setConfirmDialog(null);
-          onFinish();
-        }}
-        title="스톱워치를 종료할까요?"
-        visible={confirmDialog === "finish"}
-      />
       <ConfirmModal
         cancelLabel="취소하기"
         confirmColor={semanticColors["status-negative-normal"]}
