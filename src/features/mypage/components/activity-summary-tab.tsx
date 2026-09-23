@@ -1218,23 +1218,30 @@ export function ActivitySummaryTab() {
     );
   }, [report, mode]);
 
+  // "전체" 칩으로 아예 다 꺼버릴 수 있게 된 이상, 개별 칩만 "마지막 하나는
+  // 못 끔"으로 막아두면 오히려 일관성이 없다 — 개별 칩도 끝까지 끌 수
+  // 있게 둔다.
   function toggleExerciseType(type: string) {
     setExcludedTypes((prev) => {
-      if (prev.has(type)) {
-        const next = new Set(prev);
+      const next = new Set(prev);
+      if (next.has(type)) {
         next.delete(type);
-        return next;
+      } else {
+        next.add(type);
       }
-      // prev(excludedTypes)는 기간을 넘나들며 유지되므로 지금 기간엔 없는
-      // 종류가 껴 있을 수 있다 — availableCount - prev.size로 빼면 그만큼
-      // 실제 선택 개수보다 적게 나온다. 지금 report.exerciseTypes 기준으로
-      // 직접 세야 "마지막 하나는 끌 수 없다"가 정확히 맞는다.
-      const selectedCount = (report?.exerciseTypes ?? []).filter(
-        (t) => !prev.has(t),
-      ).length;
-      if (selectedCount <= 1) return prev;
-      return new Set(prev).add(type);
+      return next;
     });
+  }
+
+  // "전체" 칩은 토글이다 — 지금 전체가 켜져 있으면(칩이 active로 보이는
+  // 기준과 같은 excludedTypes.size === 0) 눌렀을 때 전부 끄고, 아니면
+  // (일부만 꺼져 있거나 지금 기간엔 없는 종류가 껴 있어도) 전부 켠다.
+  // 개별 칩과 달리 "마지막 하나는 못 끔" 제약이 없다 — 전체를 다 꺼서
+  // 아무것도 안 보이는 상태도 여기서는 허용한다.
+  function toggleAllExerciseTypes() {
+    setExcludedTypes((prev) =>
+      prev.size === 0 ? new Set(report?.exerciseTypes ?? []) : new Set(),
+    );
   }
 
   const availableTypes = report?.exerciseTypes ?? [];
@@ -1343,7 +1350,7 @@ export function ActivitySummaryTab() {
               <ExerciseTypeChips
                 excluded={excludedTypes}
                 onToggle={toggleExerciseType}
-                onToggleAll={() => setExcludedTypes(new Set())}
+                onToggleAll={toggleAllExerciseTypes}
                 types={availableTypes}
               />
 
