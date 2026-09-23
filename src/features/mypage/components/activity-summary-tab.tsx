@@ -1343,7 +1343,13 @@ export function ActivitySummaryTab() {
                   style={{ color: primitiveColors.charcoal["5"] }}
                   typography="caption-1-medium"
                 >
-                  {`활동한 ${report.summary.activeDays}일 · 기록한 운동 ${report.summary.recordCount}건 · 기록 항목 ${report.summary.measureCount}개`}
+                  {selectedTypes.length === 0
+                    ? // report.summary는 종류 필터와 무관하게 항상 전체
+                      // 기준이라, 전체를 다 꺼서 아무 종류도 선택 안 됐을
+                      // 땐 그 숫자를 그대로 보여주면 텅 빈 차트·상세와
+                      // 안 맞는다.
+                      "선택한 운동 종류가 없어요"
+                    : `활동한 ${report.summary.activeDays}일 · 기록한 운동 ${report.summary.recordCount}건 · 기록 항목 ${report.summary.measureCount}개`}
                 </ThemedText>
               </View>
 
