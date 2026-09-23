@@ -1149,9 +1149,12 @@ export function ActivitySummaryTab() {
   const { period, direction } = navigation;
   const mode = period.mode;
 
-  // 이동 범위: 과거는 제한 없음(캘린더 탭과 동일), 미래 기간만 없다.
+  // 이동 범위: 캘린더 탭처럼 가입일 제한은 없지만, EARLIEST_SIGNUP_FALLBACK
+  // 아래로는 못 내려간다 — 그 밑으로 가면 effectivePeriodRange의 from(그
+  // fallback)이 to(그 기간의 끝)보다 늦어져 조회 범위가 역전된다.
   const currentPeriod = periodOf(mode, today);
-  const canGoPrevious = true;
+  const earliestPeriod = periodOf(mode, EARLIEST_SIGNUP_FALLBACK);
+  const canGoPrevious = comparePeriod(period, earliestPeriod) > 0;
   const canGoNext = comparePeriod(period, currentPeriod) < 0;
 
   function selectMode(nextMode: ActivityPeriodMode) {
@@ -1217,14 +1220,19 @@ export function ActivitySummaryTab() {
 
   function toggleExerciseType(type: string) {
     setExcludedTypes((prev) => {
-      const availableCount = report?.exerciseTypes.length ?? 0;
       if (prev.has(type)) {
         const next = new Set(prev);
         next.delete(type);
         return next;
       }
-      // 마지막 하나는 끌 수 없다.
-      if (availableCount - prev.size <= 1) return prev;
+      // prev(excludedTypes)는 기간을 넘나들며 유지되므로 지금 기간엔 없는
+      // 종류가 껴 있을 수 있다 — availableCount - prev.size로 빼면 그만큼
+      // 실제 선택 개수보다 적게 나온다. 지금 report.exerciseTypes 기준으로
+      // 직접 세야 "마지막 하나는 끌 수 없다"가 정확히 맞는다.
+      const selectedCount = (report?.exerciseTypes ?? []).filter(
+        (t) => !prev.has(t),
+      ).length;
+      if (selectedCount <= 1) return prev;
       return new Set(prev).add(type);
     });
   }
@@ -1282,25 +1290,26 @@ export function ActivitySummaryTab() {
           period={period}
         />
 
-        {!report &&
-          (loadError ? (
-            <View className="h-[320px] w-full items-center justify-center">
-              <ThemedText
-                style={{ color: primitiveColors.charcoal["5"] }}
-                typography="caption-1-medium"
-              >
-                활동 리포트를 불러오지 못했어요
-              </ThemedText>
-            </View>
-          ) : (
-            <View className="h-[320px] w-full items-center justify-center">
-              <ActivityIndicator color={semanticColors["label-normal"]} />
-            </View>
-          ))}
+        {loadError && (
+          <View className="h-[320px] w-full items-center justify-center">
+            <ThemedText
+              style={{ color: primitiveColors.charcoal["5"] }}
+              typography="caption-1-medium"
+            >
+              활동 리포트를 불러오지 못했어요
+            </ThemedText>
+          </View>
+        )}
 
-        {report && !hasData && <ActivityReportEmptyCard />}
+        {!loadError && !report && (
+          <View className="h-[320px] w-full items-center justify-center">
+            <ActivityIndicator color={semanticColors["label-normal"]} />
+          </View>
+        )}
 
-        {report && hasData && (
+        {!loadError && report && !hasData && <ActivityReportEmptyCard />}
+
+        {!loadError && report && hasData && (
           <View className="w-full gap-[16px]">
             {/* Figma "Activity Type Composition Card" (4391:23402) — 흰 카드
                 rounded-20 + shadow(0/4/12 rgba(0,0,0,0.04)) + border-line-subtle,
