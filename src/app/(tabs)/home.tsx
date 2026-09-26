@@ -957,9 +957,9 @@ export default function HomeScreen() {
     );
   }
 
-  // 스톱워치 시작/일시정지 — 확인창은 StopwatchBar가 띄우고, 여기선 상태만
-  // 바꾼다. startedAt(벽시계 기준 시각)로 경과시간을 계산하므로 이 함수는
-  // 그 기준점만 세팅/정산한다.
+  // 스톱워치 시작/일시정지 — 종료 확인창은 TodayWorkoutCard가 띄우고, 여기선
+  // 상태만 바꾼다. startedAt(벽시계 기준 시각)로 경과시간을 계산하므로 이
+  // 함수는 그 기준점만 세팅/정산한다.
   function toggleStopwatchRun(instanceId: string) {
     updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) => {
@@ -984,6 +984,48 @@ export default function HomeScreen() {
           },
         };
       }),
+    );
+  }
+
+  // 완료 체크 버튼 전용 — TodayWorkoutCard가 체크 시점에 정산해둔
+  // elapsedSeconds를 그대로 확정해 멈춘다. toggleStopwatchRun처럼 "현재
+  // isRunning을 보고 방향을 정하는" 방식이 아니라 항상 멈춤으로만 동작해서,
+  // 확인 팝업이 떠 있는 동안 다른 경로로 state가 바뀌어도 이 호출이 최종
+  // 진실이 된다(실기기에서 관찰된, 팝업이 열려 있던 시간만큼 그대로
+  // 더해지던 문제를 막기 위함).
+  function settleStopwatchForCheck(instanceId: string, elapsedSeconds: number) {
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId && item.stopwatch
+          ? {
+              ...item,
+              stopwatch: { elapsedSeconds, isRunning: false, startedAt: null },
+            }
+          : item,
+      ),
+    );
+  }
+
+  // 종료 확인 팝업 "취소" 전용 — elapsedSeconds는 체크 시점에 정산해둔 값을
+  // 그대로 쓰고 startedAt만 지금 시각으로 새로 세팅한다. 팝업이 떠 있던
+  // 시간은 elapsedSeconds에 전혀 반영되지 않는다.
+  function resumeStopwatchAfterCancel(
+    instanceId: string,
+    elapsedSeconds: number,
+  ) {
+    updateWorkoutsForDate(today, (workouts) =>
+      workouts.map((item) =>
+        item.id === instanceId && item.stopwatch
+          ? {
+              ...item,
+              stopwatch: {
+                elapsedSeconds,
+                isRunning: true,
+                startedAt: Date.now(),
+              },
+            }
+          : item,
+      ),
     );
   }
 
@@ -1376,6 +1418,8 @@ export default function HomeScreen() {
             }
             onStopwatchFinish={finishStopwatch}
             onStopwatchReset={resetStopwatch}
+            onStopwatchResumeAfterCancel={resumeStopwatchAfterCancel}
+            onStopwatchSettleForCheck={settleStopwatchForCheck}
             onStopwatchToggleRun={toggleStopwatchRun}
             onToggleTodayWorkout={toggleTodayWorkoutDone}
             readOnly={!isSelectedDateToday}
