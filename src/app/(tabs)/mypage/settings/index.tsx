@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
 import {
@@ -14,9 +15,21 @@ import {
 import { goBackOrReplace } from "@/features/settings/navigation";
 
 const ACCOUNT_ITEMS = [
-  { title: "계정 설정", href: "/mypage/settings/account" },
-  { title: "알림 설정", href: "/mypage/settings/notification" },
-  { title: "앱 권한 및 연동", href: "/mypage/settings/permissions" },
+  {
+    title: "계정 설정",
+    href: "/mypage/settings/account",
+    action: "open_account",
+  },
+  {
+    title: "알림 설정",
+    href: "/mypage/settings/notification",
+    action: "open_notification",
+  },
+  {
+    title: "앱 권한 및 연동",
+    href: "/mypage/settings/permissions",
+    action: "open_permissions",
+  },
 ] as const;
 
 export default function SettingsScreen() {
@@ -26,7 +39,10 @@ export default function SettingsScreen() {
       {
         text: "로그아웃",
         style: "destructive",
-        onPress: logout,
+        onPress: () => {
+          trackClick("mypage_settings", "logout");
+          logout();
+        },
       },
     ]);
   }
@@ -61,7 +77,10 @@ export default function SettingsScreen() {
             {ACCOUNT_ITEMS.map((item) => (
               <SettingsRow
                 key={item.href}
-                onPress={() => router.push(item.href)}
+                onPress={() => {
+                  trackClick("mypage_settings", item.action);
+                  router.push(item.href);
+                }}
                 title={item.title}
               />
             ))}
@@ -74,11 +93,17 @@ export default function SettingsScreen() {
               AI 선택 동의를 관리하는 단일 진입점. */}
           <SettingsRow
             description="약관 조회 · 동의 내역 · AI 선택 동의 관리"
-            onPress={() => router.push("/mypage/settings/legal")}
+            onPress={() => {
+              trackClick("mypage_settings", "open_legal");
+              router.push("/mypage/settings/legal");
+            }}
             title="약관 및 개인정보"
           />
           <SettingsRow
-            onPress={() => router.push("/mypage/settings/support")}
+            onPress={() => {
+              trackClick("mypage_settings", "open_support");
+              router.push("/mypage/settings/support");
+            }}
             title="고객 지원"
           />
         </View>
@@ -87,7 +112,10 @@ export default function SettingsScreen() {
           <SettingsRow destructive onPress={handleLogout} title="로그아웃" />
           <SettingsRow
             destructive
-            onPress={() => router.push("/mypage/settings/withdrawal")}
+            onPress={() => {
+              trackClick("mypage_settings", "open_withdrawal");
+              router.push("/mypage/settings/withdrawal");
+            }}
             title="회원 탈퇴"
           />
         </View>

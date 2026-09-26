@@ -21,6 +21,7 @@ import ReanimatedAnimated, {
 import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { completeMission } from "@/features/missions/api";
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
@@ -152,6 +153,7 @@ export function RecordEditorScreen({
   const canSubmit = selectedTypes.length > 0 && !isMemoTooLong && !isSubmitting;
 
   function toggleType(type: GoalType) {
+    trackClick("record_editor", "goal_type_toggle");
     setSelectedTypes((current) =>
       current.includes(type)
         ? current.filter((item) => item !== type)
@@ -162,6 +164,7 @@ export function RecordEditorScreen({
   }
 
   async function handleSubmit() {
+    trackClick("record_editor", "submit");
     if (submissionLockRef.current) return;
     if (!target || target.mode !== "LINKED" || !canSubmit) return;
     submissionLockRef.current = true;
@@ -370,7 +373,10 @@ export function RecordEditorScreen({
                       layout={LinearTransition}
                     >
                       <ActualMeasureStepper
-                        onPressValue={() => openMeasureSheet(type)}
+                        onPressValue={() => {
+                          trackClick("record_editor", "measure_value_press");
+                          openMeasureSheet(type);
+                        }}
                         type={type}
                         value={values[type]}
                         onChange={(value) =>
@@ -389,7 +395,10 @@ export function RecordEditorScreen({
                 <SectionLabel optional>강도</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="강도 선택"
-                  onPress={openIntensitySheet}
+                  onPress={() => {
+                    trackClick("record_editor", "intensity_select");
+                    openIntensitySheet();
+                  }}
                   placeholder="선택해주세요"
                   value={getIntensityLabel(intensity)}
                 />

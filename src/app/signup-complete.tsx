@@ -5,6 +5,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { typography } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   isNicknameAlreadyUsedError,
   updateMyProfile,
@@ -132,6 +133,7 @@ export default function SignupCompleteScreen() {
   }, []);
 
   async function handleStart() {
+    trackClick("signup_complete", "start");
     if (isSubmitting) return;
     setIsSubmitting(true);
     try {

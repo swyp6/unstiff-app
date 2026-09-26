@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { trackClick } from "@/features/analytics/analytics";
 import { agreeToTerms, getTerms } from "@/features/auth/api";
 import { CheckCircle } from "@/features/auth/components/check-circle";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
@@ -34,6 +35,7 @@ import { useSignupStore } from "@/store/signup-store";
 // 상세가 GET /terms에서 다시 찾는다(source of truth를 서버에 둔다). push라 이
 // 화면은 스택에 남고, back으로 돌아오면 체크 상태(agreements)가 그대로다.
 function openTermDocument(type: OnboardingTermType) {
+  trackClick("terms_agreement", "view_detail");
   router.push(`/terms-document/${type}` as const);
 }
 
@@ -151,6 +153,7 @@ export default function TermsAgreementScreen() {
   }, [reloadKey]);
 
   function retry() {
+    trackClick("terms_agreement", "load_retry");
     setLoadError(false);
     setReloadKey((key) => key + 1);
   }
@@ -188,6 +191,7 @@ export default function TermsAgreementScreen() {
   }, [terms, agreements]);
 
   function toggleAll(value: boolean) {
+    trackClick("terms_agreement", "agree_all_toggle");
     if (!orderedTerms) return;
     setAgreements((current) => ({
       ...current,
@@ -196,6 +200,7 @@ export default function TermsAgreementScreen() {
   }
 
   async function handleSubmit() {
+    trackClick("terms_agreement", "submit");
     if (!terms) return;
     setIsSubmitting(true);
     try {
@@ -324,12 +329,13 @@ export default function TermsAgreementScreen() {
               onPressDetail={
                 detailType ? () => openTermDocument(detailType) : undefined
               }
-              onToggle={() =>
+              onToggle={() => {
+                trackClick("terms_agreement", "agree_single_toggle");
                 setAgreements((current) => ({
                   ...current,
                   [term.id]: !current[term.id],
-                }))
-              }
+                }));
+              }}
               required={term.required}
               title={title}
             />

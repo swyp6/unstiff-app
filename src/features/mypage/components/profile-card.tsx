@@ -3,6 +3,7 @@ import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { AvatarCircle } from "@/features/mypage/components/avatar-circle";
 import type { AvatarSelection } from "@/features/mypage/avatar-presets";
 
@@ -74,7 +75,10 @@ export function ProfileCard({
           accessibilityLabel="프로필 사진 수정"
           accessibilityRole="button"
           className="absolute items-center justify-center"
-          onPress={onEditPress}
+          onPress={() => {
+            trackClick("mypage", "edit_profile_open");
+            onEditPress?.();
+          }}
           style={{
             height: EDIT_TOUCH_SIZE,
             left: EDIT_TOUCH_LEFT,

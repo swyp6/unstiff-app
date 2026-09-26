@@ -6,6 +6,7 @@ import Animated, { Easing, Keyframe } from "react-native-reanimated";
 
 import { BrandMark } from "@/components/brand-mark";
 import { ThemedView } from "@/components/themed-view";
+import { trackClick } from "@/features/analytics/analytics";
 import { useOnboardingStore } from "@/store/onboarding-store";
 
 const GROW_DURATION_MS = 700;
@@ -49,7 +50,10 @@ export default function SplashScreen() {
     <Pressable
       accessibilityLabel="계속하기"
       accessibilityRole="button"
-      onPress={goNext}
+      onPress={() => {
+        trackClick("splash", "skip_tap");
+        goNext();
+      }}
       style={{ flex: 1 }}
     >
       <ThemedView style={{ flex: 1 }}>

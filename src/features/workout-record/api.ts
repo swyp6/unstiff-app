@@ -12,7 +12,7 @@ export async function saveWorkoutRecord(request: WorkoutRecordCreateRequest) {
     "/api/v1/workouts",
     request,
   );
-  logEvent("record_complete", {
+  logEvent("app_record_complete", {
     ref_type: request.refType,
     intensity: request.intensity ?? "unknown",
   });

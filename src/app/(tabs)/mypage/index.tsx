@@ -6,6 +6,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getMyProfile } from "@/features/auth/api";
 import { ActivitySummaryTab } from "@/features/mypage/components/activity-summary-tab";
 import { BadgesTab } from "@/features/mypage/components/badges-tab";
@@ -96,7 +97,10 @@ export default function MyPageScreen() {
             accessibilityRole="button"
             className="absolute"
             hitSlop={12}
-            onPress={() => router.push("/mypage/settings")}
+            onPress={() => {
+              trackClick("mypage", "open_settings");
+              router.push("/mypage/settings");
+            }}
             style={{
               right: SETTINGS_ICON_RIGHT,
               top: (HEADER_HEIGHT - SETTINGS_ICON_SIZE) / 2,

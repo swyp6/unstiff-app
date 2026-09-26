@@ -18,6 +18,7 @@ import Animated, {
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { DeletePlanModal } from "@/features/workout-plan/components/delete-plan-modal";
 import { GoalStepper } from "@/features/workout-plan/components/goal-stepper";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
@@ -67,21 +68,25 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
   const [isEditSheetVisible, setIsEditSheetVisible] = useState(false);
 
   const openEdit = () => {
+    trackClick("workout_plan_detail", "edit_open");
     setIsEditSheetVisible(true);
   };
 
   const deletePlan = () => {
+    trackClick("workout_plan_detail", "delete_confirm");
     setIsDeleteModalVisible(false);
     console.log("[workout-plan] locally deleted", id);
     router.dismissTo({ pathname: "/home", params: { deletedPlanId: id } });
   };
 
   const finishEditing = () => {
+    trackClick("workout_plan_detail", "save");
     console.log("[workout-plan] locally updated", plan);
     router.back();
   };
 
   const toggleGoalType = (goalType: GoalType) => {
+    trackClick("workout_plan_detail", "goal_type_toggle");
     setPlan((current) => ({
       ...current,
       selectedGoalTypes: toggleGoalTypeSelection(
@@ -172,7 +177,10 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
           <View>
             <SectionLabel>예상 시작 시간</SectionLabel>
             <SelectionRow
-              onPress={() => setIsTimeSheetVisible(true)}
+              onPress={() => {
+                trackClick("workout_plan_detail", "start_time_select");
+                setIsTimeSheetVisible(true);
+              }}
               placeholder="선택해주세요"
               value={formatStartTime(plan.startTime)}
             />
@@ -181,7 +189,10 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
           <View>
             <SectionLabel>강도</SectionLabel>
             <SelectionRow
-              onPress={() => setIsIntensitySheetVisible(true)}
+              onPress={() => {
+                trackClick("workout_plan_detail", "intensity_select");
+                setIsIntensitySheetVisible(true);
+              }}
               placeholder="선택해주세요"
               value={getIntensityLabel(plan.intensity)}
             />
@@ -210,7 +221,10 @@ function WorkoutPlanDetailContent({ id, data }: WorkoutPlanDetailContentProps) {
             />
             <Pressable
               accessibilityRole="button"
-              onPress={() => setIsDeleteModalVisible(true)}
+              onPress={() => {
+                trackClick("workout_plan_detail", "delete_open");
+                setIsDeleteModalVisible(true);
+              }}
               style={({ pressed }) => [
                 styles.deleteLink,
                 pressed && styles.pressed,

@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { openOsSettings } from "@/features/permissions/api";
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { uploadPickedImage } from "@/features/upload/upload-image";
@@ -190,6 +191,7 @@ export default function CameraScreen() {
   // getPermission으로 한 번 다시 읽는다 — 이 호출과 requestPermission 모두
   // hook state를 갱신하므로 결과가 렌더링 조건에 바로 반영된다.
   async function handleRequestPermission() {
+    trackClick("camera", "permission_request");
     try {
       const status = await getPermission();
       if (status.granted) return;
@@ -213,6 +215,7 @@ export default function CameraScreen() {
   }
 
   async function handleCapture() {
+    trackClick("camera", "shutter");
     try {
       if (!permission?.granted) {
         const result = await requestPermission();
@@ -251,6 +254,7 @@ export default function CameraScreen() {
   // 에서 선택"으로 처음 들어올 때 쓰는 picker는 home.tsx의
   // startRecordLibraryPick이 화면 전환 전에 따로 연다).
   async function handlePickFromLibrary() {
+    trackClick("camera", "pick_from_library");
     try {
       const libraryPermission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -274,6 +278,7 @@ export default function CameraScreen() {
   }
 
   async function handleUsePhoto() {
+    trackClick("camera", "use_photo");
     if (!photo || isUploading) return;
 
     setIsUploading(true);
@@ -357,7 +362,10 @@ export default function CameraScreen() {
             className="absolute left-5 size-11 items-center justify-center"
             accessibilityRole="button"
             accessibilityLabel="닫기"
-            onPress={() => router.back()}
+            onPress={() => {
+              trackClick("camera", "close");
+              router.back();
+            }}
           >
             <Ionicons name="close" size={24} color="#ffffff" />
           </Pressable>
@@ -458,7 +466,10 @@ export default function CameraScreen() {
                 // CameraView는 photo가 있는 동안에도 계속 mount돼 있으므로
                 // (위 뷰파인더 참고) isCameraReady를 여기서 다시 false로
                 // 내릴 필요가 없다 — 이미 준비된 같은 세션을 그대로 쓴다.
-                onPress={() => setPhoto(null)}
+                onPress={() => {
+                  trackClick("camera", "retake");
+                  setPhoto(null);
+                }}
               >
                 <ThemedText
                   typography="body-3-bold"
@@ -510,6 +521,7 @@ export default function CameraScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="카메라 전환"
                 onPress={() => {
+                  trackClick("camera", "flip");
                   setIsCameraReady(false);
                   setFacing((current) =>
                     current === "back" ? "front" : "back",

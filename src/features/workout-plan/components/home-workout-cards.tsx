@@ -7,6 +7,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   formatStopwatchTime,
   getWorkoutPlanSummary,
@@ -101,7 +102,10 @@ export function MissionCard({
       accessibilityLabel="더보기"
       accessibilityRole="button"
       hitSlop={8}
-      onPress={(event) => setMenuTop(event.nativeEvent.pageY - 16)}
+      onPress={(event) => {
+        trackClick("home", "mission_report_menu_open");
+        setMenuTop(event.nativeEvent.pageY - 16);
+      }}
       className="h-6 w-6 items-center justify-center"
     >
       <Ionicons
@@ -257,7 +261,10 @@ export function MissionCard({
         <>
           <AiContentReportMenu
             onClose={() => setMenuTop(null)}
-            onSelectReport={() => setIsReportSheetOpen(true)}
+            onSelectReport={() => {
+              trackClick("home", "mission_report_submit");
+              setIsReportSheetOpen(true);
+            }}
             top={menuTop ?? 0}
             visible={menuTop !== null}
           />

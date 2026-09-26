@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
+import { trackClick } from "@/features/analytics/analytics";
 import { CheckCircle } from "@/features/auth/components/check-circle";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
@@ -125,6 +126,7 @@ export default function ProfilePhotoLibraryScreen() {
   const selectedAsset = assets.find((asset) => asset.id === selectedId);
 
   async function handleConfirm() {
+    trackClick("profile_photo_library", "confirm");
     if (!selectedAsset || isConfirming) return;
     setIsConfirming(true);
     try {
@@ -186,9 +188,12 @@ export default function ProfilePhotoLibraryScreen() {
         renderItem={({ item }) => (
           <PhotoCell
             asset={item}
-            onPress={() =>
-              setSelectedId((current) => (current === item.id ? null : item.id))
-            }
+            onPress={() => {
+              trackClick("profile_photo_library", "select_cell");
+              setSelectedId((current) =>
+                current === item.id ? null : item.id,
+              );
+            }}
             selected={item.id === selectedId}
             size={cellSize}
           />

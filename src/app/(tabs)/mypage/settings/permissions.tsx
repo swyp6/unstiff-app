@@ -21,6 +21,7 @@ import {
 } from "@/features/settings/components/settings-list";
 import { goBackOrReplace } from "@/features/settings/navigation";
 import { semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 
 type PermissionRowKey = "camera" | "photoLibrary" | "push";
 
@@ -55,6 +56,7 @@ export default function PermissionsScreen() {
     key: PermissionRowKey,
     action: () => Promise<void>,
   ) {
+    trackClick("mypage_settings_permissions", "row_press");
     if (pendingKeys.has(key)) return;
     setPendingKeys((prev) => new Set(prev).add(key));
     try {

@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, radius, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   getPushMessages,
   markAllPushMessagesRead,
@@ -211,6 +212,7 @@ export default function NotificationsScreen() {
 
   const handlePressMessage = useCallback(
     (message: PushMessageResponse) => {
+      trackClick("notifications", "row_open");
       // 이미 읽은 알림은 매번 호출하지 않는다(엔드포인트 자체는 idempotent다).
       // 유형별 이동 화면은 서버 `data` 계약이 확정되지 않아 아직 붙이지 않는다.
       if (message.read) return;
@@ -244,6 +246,7 @@ export default function NotificationsScreen() {
   );
 
   function retry() {
+    trackClick("notifications", "load_retry");
     setStatus("loading");
     setMessages([]);
     setIsLoadingMore(false);
@@ -322,7 +325,10 @@ export default function NotificationsScreen() {
           // 마이페이지 탭의 nested Stack을 건드리지 않는 root Stack 사본으로
           // 보낸다(app/notification-settings). replace라서 이 화면을 대신
           // 차지하고, 거기서 뒤로가기를 누르면 지금처럼 홈으로 돌아간다.
-          onOpenSettings={() => router.replace("/notification-settings")}
+          onOpenSettings={() => {
+            trackClick("notifications", "open_settings_from_empty");
+            router.replace("/notification-settings");
+          }}
         />
       ) : (
         <FlatList

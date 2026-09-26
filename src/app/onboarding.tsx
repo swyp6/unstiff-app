@@ -14,6 +14,7 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import { trackClick } from "@/features/analytics/analytics";
 import { useOnboardingStore } from "@/store/onboarding-store";
 
 const SWIPE_THRESHOLD = 60;
@@ -88,7 +89,10 @@ export default function OnboardingScreen() {
             className="px-3 py-2"
             accessibilityRole="button"
             accessibilityLabel="건너뛰기"
-            onPress={finishOnboarding}
+            onPress={() => {
+              trackClick("onboarding", "skip");
+              finishOnboarding();
+            }}
           >
             <ThemedText typography="body-3-bold" className="text-charcoal-5">
               건너뛰기
@@ -150,7 +154,14 @@ export default function OnboardingScreen() {
           <Pressable
             className="h-14 w-full items-center justify-center rounded-2xl bg-label-normal"
             accessibilityRole="button"
-            onPress={() => (isLastStep ? finishOnboarding() : goToNextStep())}
+            onPress={() => {
+              trackClick("onboarding", "next_or_start");
+              if (isLastStep) {
+                finishOnboarding();
+              } else {
+                goToNextStep();
+              }
+            }}
           >
             <ThemedText typography="body-2-bold" style={{ color: "#ffffff" }}>
               {isLastStep ? "시작하기" : "다음"}

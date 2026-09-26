@@ -1,17 +1,17 @@
-import { useSegments } from "expo-router";
+import { usePathname } from "expo-router";
 import { useEffect } from "react";
 
-import { logScreenView } from "@/features/analytics/analytics";
+import { logEvent } from "@/features/analytics/analytics";
+import { getPageId } from "@/features/analytics/page-ids";
 
-// useSegments()는 실제 경로가 아니라 파일 세그먼트를 그대로 준다(동적 라우트는
-// 값이 아니라 "[id]" 같은 패턴 그대로) — screen_name을 pathname으로 잡으면
-// workout-plans/42, workout-plans/43 ...이 GA4에서 전부 다른 화면으로 잡혀서
-// 리포트가 무의미해진다.
+// pathname은 그룹((tabs) 등) 제거된 실제 URL이라 동적 라우트도 안전하게 매칭
+// 가능 — getPageId가 접두사 매칭(workout-plans/[id] 등)으로 처리한다.
 export function useScreenTracking() {
-  const segments = useSegments();
-  const screenName = segments.length ? `/${segments.join("/")}` : "/";
+  const pathname = usePathname();
 
   useEffect(() => {
-    logScreenView(screenName);
-  }, [screenName]);
+    const pageId = getPageId(pathname);
+    if (!pageId) return;
+    logEvent(`app_${pageId}_view`, { page_id: pageId });
+  }, [pathname]);
 }

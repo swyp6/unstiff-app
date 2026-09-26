@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { typography } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import {
@@ -99,6 +100,7 @@ export default function NicknameScreen() {
   }
 
   function handleNext() {
+    trackClick("nickname", "next");
     if (!canSubmit) return;
     setStoredNickname(nickname);
     router.push("/profile-photo");

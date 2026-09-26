@@ -17,6 +17,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RecordActionsMenu } from "@/components/ui/record-actions-menu";
 import { RecordScreenHeader } from "@/components/ui/record-screen-header";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { getWorkoutHistory } from "@/features/workout-history/api";
 import { WorkoutHistoryEditSheet } from "@/features/workout-history/components/workout-history-edit-sheet";
@@ -132,19 +133,37 @@ export default function DayRecordScreen() {
     >
       <RecordScreenHeader
         dateLabel={formatDateLabel(parseDateParam(params.date))}
-        onClose={() => router.back()}
-        onMenuPress={() => setIsMenuVisible(true)}
+        onClose={() => {
+          trackClick("day_record", "close");
+          router.back();
+        }}
+        onMenuPress={() => {
+          trackClick("day_record", "menu_open");
+          setIsMenuVisible(true);
+        }}
       />
 
       {workouts !== null && workouts.length > 0 && (
         <RecordActionsMenu
           hasPhoto={Boolean(workouts[currentIndex].imageUrl)}
           isPhotoActionPending={isPhotoActionPending}
-          onChangePhoto={handleChangePhoto}
+          onChangePhoto={() => {
+            trackClick("day_record", "change_photo");
+            handleChangePhoto();
+          }}
           onClose={() => setIsMenuVisible(false)}
-          onDeletePhoto={() => setIsDeleteConfirmVisible(true)}
-          onEditRecord={() => setIsEditSheetVisible(true)}
-          onSavePhoto={handleSavePhoto}
+          onDeletePhoto={() => {
+            trackClick("day_record", "delete_photo_open");
+            setIsDeleteConfirmVisible(true);
+          }}
+          onEditRecord={() => {
+            trackClick("day_record", "edit_record");
+            setIsEditSheetVisible(true);
+          }}
+          onSavePhoto={() => {
+            trackClick("day_record", "save_photo");
+            handleSavePhoto();
+          }}
           topOffset={insets.top + 52}
           visible={isMenuVisible}
         />
@@ -158,6 +177,7 @@ export default function DayRecordScreen() {
         description="기록은 남고 스티커로 바뀌어요"
         onCancel={() => setIsDeleteConfirmVisible(false)}
         onConfirm={() => {
+          trackClick("day_record", "delete_photo_confirm");
           setIsDeleteConfirmVisible(false);
           handleDeletePhoto();
         }}

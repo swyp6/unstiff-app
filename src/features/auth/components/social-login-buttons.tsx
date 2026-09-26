@@ -10,7 +10,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { Alert, Platform, View } from "react-native";
 
-import { logEvent } from "@/features/analytics/analytics";
+import { logEvent, trackClick } from "@/features/analytics/analytics";
 import { hasUnagreedRequiredTerms, signIn } from "@/features/auth/api";
 import type { OAuth2SignInResponse } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
@@ -74,6 +74,7 @@ function logSignInError(provider: string, error: unknown) {
 
 async function handleGoogleLogin() {
   try {
+    trackClick("login", "login_google");
     await GoogleSignin.hasPlayServices();
     const response = await GoogleSignin.signIn();
 
@@ -100,6 +101,7 @@ async function handleGoogleLogin() {
 
 async function handleAppleLogin() {
   try {
+    trackClick("login", "login_apple");
     // No requestedScopes (SDK default `[]`) — the server identifies an Apple
     // user solely by the identityToken's `sub` claim (unstiff-api
     // AppleAuthenticator), and nothing client-side reads credential.email /
@@ -130,6 +132,7 @@ async function handleAppleLogin() {
 
 async function handleKakaoLogin() {
   try {
+    trackClick("login", "login_kakao");
     // Backend verifies Kakao sign-in via the OIDC ID token, not the OAuth
     // access token (unlike Apple, this isn't obvious from the SDK alone —
     // confirmed with the backend team, requires OpenID Connect enabled on

@@ -2,6 +2,7 @@ import { Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 
 export type MyPageTab = "streak" | "badges" | "summary";
 
@@ -35,7 +36,10 @@ export function MyPageTabs({ value, onChange }: MyPageTabsProps) {
             accessibilityState={{ selected }}
             className="flex-1 items-center justify-center py-[8px]"
             key={tab.key}
-            onPress={() => onChange(tab.key)}
+            onPress={() => {
+              trackClick("mypage", "tab_select");
+              onChange(tab.key);
+            }}
             style={
               selected && {
                 borderBottomColor: primitiveColors.charcoal["12"],

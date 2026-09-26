@@ -13,6 +13,7 @@ import { scheduleOnRN } from "react-native-worklets";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { toDateKey } from "@/features/calendar/date";
 import type { CalendarDay } from "@/features/calendar/types";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
@@ -163,6 +164,7 @@ export function HomeCalendar({
   }, [viewedMonth, dragX]);
 
   function goToPreviousMonth() {
+    trackClick("home", "calendar_month_prev");
     if (!calendarWidth) {
       commitMonthChange(-1);
       return;
@@ -177,6 +179,7 @@ export function HomeCalendar({
   }
 
   function goToNextMonth() {
+    trackClick("home", "calendar_month_next");
     if (!calendarWidth) {
       commitMonthChange(1);
       return;
@@ -303,6 +306,7 @@ export function HomeCalendar({
               accessibilityRole="button"
               accessibilityLabel={`${monthDate.getMonth() + 1}월 ${day}일`}
               onPress={() => {
+                trackClick("home", "calendar_day_select");
                 onSelectDate(cellDate);
                 // 그 날 기록이 있으면 day-record 화면으로 바로 넘어간다.
                 // 오늘도 포함 — 체크 가능한 TodayWorkoutCard는 계속 기본으로
@@ -428,7 +432,10 @@ export function HomeCalendar({
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="연월 직접 선택"
-            onPress={() => setIsMonthPickerVisible(true)}
+            onPress={() => {
+              trackClick("home", "calendar_month_picker_open");
+              setIsMonthPickerVisible(true);
+            }}
           >
             <ThemedText
               typography="title-3-bold"

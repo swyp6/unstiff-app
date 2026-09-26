@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedView } from "@/components/themed-view";
 import { semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   BotBubbleText,
   BotMessageRow,
@@ -254,6 +255,7 @@ export default function ChatScreen() {
   // 서버 동의가 끝나야만 store가 모달을 닫고 채팅을 시작한다. 실패하면 모달은
   // 그대로 남고(재시도 가능) 약관 화면과 같은 문구로 알린다.
   async function handleAgree() {
+    trackClick("chat", "ai_consent_agree");
     const agreed = await agreeToExternalAi();
     if (!agreed) {
       Alert.alert("오류", "약관 동의 처리 중 문제가 발생했습니다.");
@@ -265,6 +267,7 @@ export default function ChatScreen() {
   // 되돌아오지 않고, 다음에 채팅 탭에 들어오면 loadConversation이 서버
   // 상태를 다시 확인해 여전히 미동의면 모달을 다시 띄운다.
   function handleDecline() {
+    trackClick("chat", "ai_consent_decline");
     declineExternalAi();
     router.replace("/home");
   }
@@ -275,7 +278,13 @@ export default function ChatScreen() {
         return <ChatDateDivider label={row.label} />;
       case "message":
         return (
-          <ChatBubble message={row.message} onReport={setReportingMessageId} />
+          <ChatBubble
+            message={row.message}
+            onReport={(id) => {
+              trackClick("chat", "message_report_open");
+              setReportingMessageId(id);
+            }}
+          />
         );
       case "pending":
         return row.pending === "typing" ? (
@@ -289,7 +298,10 @@ export default function ChatScreen() {
         return (
           <ChatRetryAction
             disabled={isLoading || isTyping}
-            onPress={retryFailure}
+            onPress={() => {
+              trackClick("chat", "load_retry");
+              retryFailure();
+            }}
           />
         );
     }
@@ -372,12 +384,18 @@ export default function ChatScreen() {
                     <ChatOptionsBar
                       disabled={!canSend}
                       options={lastMessage.options}
-                      onSelect={sendMessage}
+                      onSelect={(option) => {
+                        trackClick("chat", "option_select");
+                        sendMessage(option);
+                      }}
                     />
                   )}
                 <ChatInputBar
                   disabled={isTyping || !canSend}
-                  onSend={sendMessage}
+                  onSend={(text) => {
+                    trackClick("chat", "input_send");
+                    sendMessage(text);
+                  }}
                 />
               </View>
             )
@@ -400,6 +418,7 @@ export default function ChatScreen() {
         <AiContentReportSheet
           onClose={() => setReportingMessageId(null)}
           onReported={() => {
+            trackClick("chat", "message_report_submit");
             setReportingMessageId(null);
             setShowReportedToast(true);
           }}

@@ -11,6 +11,7 @@ import ReanimatedAnimated, { FadeIn } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 import { getDailyMission } from "@/features/missions/api";
@@ -135,6 +136,7 @@ export default function RecordTargetScreen() {
   // 서버가 INSTANT_PLAN_LIMIT_EXCEEDED로 거절하고 같은 모달을 띄운다. 모달을
   // 닫아도 사진/이 화면은 그대로다.
   function startManualRecord() {
+    trackClick("capture_target", "manual_record");
     if (isWorkoutLimitReached(todayWorkouts.length)) {
       setIsWorkoutLimitModalVisible(true);
       return;
@@ -143,6 +145,7 @@ export default function RecordTargetScreen() {
   }
 
   function selectMission() {
+    trackClick("capture_target", "select_mission");
     if (!mission || !isMissionRecordable) return;
     goToRecordEditor("mission", {
       refType: "MISSION",
@@ -152,6 +155,7 @@ export default function RecordTargetScreen() {
   }
 
   function selectTodayWorkout(workout: DailyPlanResponse) {
+    trackClick("capture_target", "select_today_workout");
     // Pressable의 disabled만 믿지 않는다 — 이미 완료된 오늘의 운동은 다시
     // 기록 대상으로 삼을 수 없으므로 핸들러에서도 한 번 더 막는다.
     if (workout.status === "COMPLETED") return;
