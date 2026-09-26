@@ -48,9 +48,6 @@ export default function MyPageScreen() {
   // (which unmounts StreakTab) doesn't drop the data and refetch — the
   // hook itself refreshes on every focus of this screen.
   const workoutActivity = useWorkoutActivity();
-  // 활동 리포트의 이동 범위 하한(가입일). 아래 /me 응답에서 같이 꺼내 두고
-  // 별도 요청은 하지 않는다 — 받기 전/실패 시 null이면 탭이 화살표를 잠근다.
-  const [createdAt, setCreatedAt] = useState<string | null>(null);
 
   // GET is the source of truth for nickname/profileImageUrl — this runs
   // once per mount (the tab bar keeps this screen mounted across tab
@@ -71,7 +68,6 @@ export default function MyPageScreen() {
     getMyProfile()
       .then((profile) => {
         if (cancelled) return;
-        setCreatedAt(profile.createdAt);
         useMyProfileStore
           .getState()
           .hydrate(profile.nickname, profile.profileImageUrl, requestRevision);
@@ -126,7 +122,7 @@ export default function MyPageScreen() {
           <View className={TAB_REGION_CLASS[tab]}>
             {tab === "streak" && <StreakTab {...workoutActivity} />}
             {tab === "badges" && <BadgesTab />}
-            {tab === "summary" && <ActivitySummaryTab createdAt={createdAt} />}
+            {tab === "summary" && <ActivitySummaryTab />}
           </View>
         </ScrollView>
       </SafeAreaView>
