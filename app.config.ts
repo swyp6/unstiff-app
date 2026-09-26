@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   name: "찌뿌두둥",
   slug: "unstiff",
   owner: "unstiff",
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   scheme: "unstiff",
