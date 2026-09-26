@@ -1,3 +1,4 @@
+import { logEvent } from "@/features/analytics/analytics";
 import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 import { apiClient } from "@/lib/api-client";
 
@@ -11,5 +12,9 @@ export async function saveWorkoutRecord(request: WorkoutRecordCreateRequest) {
     "/api/v1/workouts",
     request,
   );
+  logEvent("record_complete", {
+    ref_type: request.refType,
+    intensity: request.intensity ?? "unknown",
+  });
   return data;
 }

@@ -1,3 +1,4 @@
+import { logEvent } from "@/features/analytics/analytics";
 import { apiClient } from "@/lib/api-client";
 
 import type {
@@ -52,6 +53,7 @@ export async function completeMission(missionId: number) {
   const { data } = await apiClient.post<DailyMissionResponse>(
     `/api/v1/missions/${missionId}/complete`,
   );
+  logEvent("mission_complete", { mission_id: missionId });
   return data;
 }
 

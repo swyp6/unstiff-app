@@ -10,6 +10,7 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { Alert, Platform, View } from "react-native";
 
+import { logEvent } from "@/features/analytics/analytics";
 import { hasUnagreedRequiredTerms, signIn } from "@/features/auth/api";
 import type { OAuth2SignInResponse } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
@@ -30,10 +31,12 @@ GoogleSignin.configure({
 // terms-agreement without the extra hasUnagreedRequiredTerms() round trip
 // is safe. An existing user may still have newly-added required terms to
 // accept, so that check is kept for them.
-async function routeAfterSignIn({
-  accessToken,
-  newUser,
-}: OAuth2SignInResponse) {
+async function routeAfterSignIn(
+  { accessToken, newUser }: OAuth2SignInResponse,
+  method: "google" | "apple" | "kakao",
+) {
+  logEvent(newUser ? "sign_up" : "login", { method });
+
   useAuthStore.getState().setAccessToken(accessToken);
   useSignupStore.getState().reset();
   useSignupStore.getState().setIsNewUser(newUser);
@@ -84,7 +87,7 @@ async function handleGoogleLogin() {
     }
 
     const signInResponse = await signIn("google", googleIdToken);
-    await routeAfterSignIn(signInResponse);
+    await routeAfterSignIn(signInResponse, "google");
   } catch (error) {
     if (isErrorWithCode(error) && error.code === statusCodes.IN_PROGRESS) {
       return;
@@ -109,7 +112,7 @@ async function handleAppleLogin() {
     }
 
     const signInResponse = await signIn("apple", credential.identityToken);
-    await routeAfterSignIn(signInResponse);
+    await routeAfterSignIn(signInResponse, "apple");
   } catch (error) {
     if (
       error &&
@@ -137,7 +140,7 @@ async function handleKakaoLogin() {
     }
 
     const signInResponse = await signIn("kakao", kakaoIdToken);
-    await routeAfterSignIn(signInResponse);
+    await routeAfterSignIn(signInResponse, "kakao");
   } catch (error) {
     logSignInError("kakao", error);
     Alert.alert("로그인 실패", "카카오 로그인 중 문제가 발생했습니다.");
