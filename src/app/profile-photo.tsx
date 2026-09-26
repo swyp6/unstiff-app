@@ -8,6 +8,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { typography } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import {
@@ -116,6 +117,7 @@ export default function ProfilePhotoScreen() {
   }, []);
 
   async function handlePickImage() {
+    trackClick("profile_photo", "select");
     if (isPicking) return;
     setIsPicking(true);
     try {
@@ -222,7 +224,10 @@ export default function ProfilePhotoScreen() {
             accessibilityLabel="지금은 건너뛸래요"
             accessibilityRole="button"
             hitSlop={12}
-            onPress={goToSignupComplete}
+            onPress={() => {
+              trackClick("profile_photo", "skip");
+              goToSignupComplete();
+            }}
           >
             <ThemedText style={styles.skipText} typography="body-2-medium">
               지금은 건너뛸래요
@@ -231,7 +236,10 @@ export default function ProfilePhotoScreen() {
         )}
         <OnboardingCtaButton
           disabled={!confirmedPhotoUri}
-          onPress={goToSignupComplete}
+          onPress={() => {
+            trackClick("profile_photo", "next");
+            goToSignupComplete();
+          }}
         />
       </OnboardingFooter>
     </SafeAreaView>

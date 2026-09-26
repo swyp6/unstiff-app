@@ -1,3 +1,4 @@
+import { logEvent } from "@/features/analytics/analytics";
 import { apiClient } from "@/lib/api-client";
 
 import type {
@@ -25,6 +26,13 @@ export async function sendAiChatMessage(request: AiChatSendRequest) {
     "/api/v1/chat/ai/send",
     request,
   );
+  // stop: true는 오늘 대화가 이 응답으로 끝났다는 서버 신호 — 오늘의
+  // 디스커버리(DAILY_DISCOVERY 대화)를 완료한 시점이다.
+  if (data.stop) {
+    logEvent("app_daily_discovery_complete", {
+      conversation_type: request.conversationType,
+    });
+  }
   return data;
 }
 

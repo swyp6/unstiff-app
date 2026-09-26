@@ -11,6 +11,7 @@ import Animated, {
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { OnboardingCtaButton } from "@/features/auth/components/onboarding-cta-button";
 import { OnboardingHeader } from "@/features/auth/components/onboarding-header";
 import { OnboardingFooter } from "@/features/auth/components/onboarding-layout";
@@ -170,6 +171,7 @@ export default function ProfilePhotoAdjustScreen() {
   }));
 
   async function handleConfirm() {
+    trackClick("profile_photo_adjust", "confirm");
     if (isSaving || !uri) return;
     setIsSaving(true);
     try {

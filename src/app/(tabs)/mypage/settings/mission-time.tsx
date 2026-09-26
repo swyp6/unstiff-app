@@ -10,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, radius, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   getMissionSetting,
   updateMissionSetting,
@@ -47,11 +48,13 @@ export default function MissionTimeScreen() {
   }, [reloadKey]);
 
   function retry() {
+    trackClick("mypage_settings_mission_time", "load_retry");
     setLoadError(false);
     setReloadKey((key) => key + 1);
   }
 
   async function handleSubmit() {
+    trackClick("mypage_settings_mission_time", "submit");
     if (!draft || isSubmitting) return;
 
     setIsSubmitting(true);

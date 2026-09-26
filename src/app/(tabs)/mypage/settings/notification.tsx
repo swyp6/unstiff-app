@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getMissionSetting } from "@/features/missions/api";
 import { formatOfferTimeLabel } from "@/features/missions/offer-time";
 import {
@@ -124,6 +125,7 @@ export default function NotificationSettingsScreen() {
   }, [reloadKey]);
 
   function retry() {
+    trackClick("mypage_settings_notification", "load_retry");
     setLoadError(false);
     setReloadKey((key) => key + 1);
   }
@@ -168,6 +170,7 @@ export default function NotificationSettingsScreen() {
   }
 
   async function handleToggleAll(nextValue: boolean) {
+    trackClick("mypage_settings_notification", "toggle_all");
     if (!configs || isAllToggling) return;
 
     const targets = SERVICE_PUSH_CONFIG_TYPES.filter(
@@ -285,16 +288,26 @@ export default function NotificationSettingsScreen() {
               <NotificationSettingRow
                 {...DIVIDER_TOP_AND_BOTTOM}
                 disabled={pendingTypes.has("DAILY_DISCOVERY")}
-                onValueChange={(value) =>
-                  handleToggle("DAILY_DISCOVERY", value)
-                }
+                onValueChange={(value) => {
+                  trackClick(
+                    "mypage_settings_notification",
+                    "toggle_daily_discovery",
+                  );
+                  handleToggle("DAILY_DISCOVERY", value);
+                }}
                 title={SERVICE_PUSH_CONFIG_LABELS.DAILY_DISCOVERY}
                 value={configs.DAILY_DISCOVERY}
               />
               <NotificationSettingRow
                 {...DIVIDER_TOP_AND_BOTTOM}
                 disabled={pendingTypes.has("DAILY_PLAN")}
-                onValueChange={(value) => handleToggle("DAILY_PLAN", value)}
+                onValueChange={(value) => {
+                  trackClick(
+                    "mypage_settings_notification",
+                    "toggle_daily_plan",
+                  );
+                  handleToggle("DAILY_PLAN", value);
+                }}
                 title={SERVICE_PUSH_CONFIG_LABELS.DAILY_PLAN}
                 value={configs.DAILY_PLAN}
               />
@@ -305,8 +318,20 @@ export default function NotificationSettingsScreen() {
                   꺼도 그대로 두고, 켜면 저장돼 있던 시간을 다시 보여준다. */}
               <MissionReceiveTimeRow
                 enabled={configs.DAILY_MISSION}
-                onTimePress={() => router.push(missionTimeHref)}
-                onToggle={(value) => handleToggle("DAILY_MISSION", value)}
+                onTimePress={() => {
+                  trackClick(
+                    "mypage_settings_notification",
+                    "mission_time_open",
+                  );
+                  router.push(missionTimeHref);
+                }}
+                onToggle={(value) => {
+                  trackClick(
+                    "mypage_settings_notification",
+                    "toggle_daily_mission",
+                  );
+                  handleToggle("DAILY_MISSION", value);
+                }}
                 timeLabel={
                   missionOfferTime
                     ? formatOfferTimeLabel(missionOfferTime)
@@ -317,7 +342,13 @@ export default function NotificationSettingsScreen() {
               <NotificationSettingRow
                 {...DIVIDER_BOTTOM}
                 disabled={pendingTypes.has("REMIND_PLAN")}
-                onValueChange={(value) => handleToggle("REMIND_PLAN", value)}
+                onValueChange={(value) => {
+                  trackClick(
+                    "mypage_settings_notification",
+                    "toggle_remind_plan",
+                  );
+                  handleToggle("REMIND_PLAN", value);
+                }}
                 title={SERVICE_PUSH_CONFIG_LABELS.REMIND_PLAN}
                 value={configs.REMIND_PLAN}
               />

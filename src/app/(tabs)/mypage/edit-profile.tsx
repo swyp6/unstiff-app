@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   isNicknameAlreadyUsedError,
   updateMyProfile,
@@ -108,6 +109,7 @@ export default function EditProfileScreen() {
       (!nicknameFormatError && availability === "available"));
 
   async function handleSave() {
+    trackClick("mypage_edit_profile", "save");
     if (!canSave) return;
 
     if (!nicknameChanged && !avatarChanged) {
@@ -192,7 +194,10 @@ export default function EditProfileScreen() {
               accessibilityLabel="프로필 이미지 변경"
               accessibilityRole="button"
               className="absolute items-center justify-center rounded-full border-[3px] border-background-normal bg-orange-500"
-              onPress={() => setIsPickerOpen(true)}
+              onPress={() => {
+                trackClick("mypage_edit_profile", "avatar_change");
+                setIsPickerOpen(true);
+              }}
               style={{
                 bottom: 0,
                 height: CAMERA_BADGE_SIZE,

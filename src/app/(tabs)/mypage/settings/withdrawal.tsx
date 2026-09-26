@@ -11,6 +11,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { unregister } from "@/features/auth/api";
 import { logout } from "@/features/auth/logout";
 import { SettingsHeader } from "@/features/settings/components/settings-header";
@@ -45,7 +46,10 @@ function WithdrawalCheckbox({ value, onValueChange }: WithdrawalCheckboxProps) {
       accessibilityRole="checkbox"
       accessibilityState={{ checked: value }}
       hitSlop={12}
-      onPress={() => onValueChange(!value)}
+      onPress={() => {
+        trackClick("mypage_settings_withdrawal", "checkbox_toggle");
+        onValueChange(!value);
+      }}
       style={styles.checkboxRow}
     >
       <View
@@ -78,6 +82,7 @@ export default function WithdrawalScreen() {
 
     setIsSubmitting(true);
     try {
+      trackClick("mypage_settings_withdrawal", "confirm");
       await unregister();
       logout();
     } catch {

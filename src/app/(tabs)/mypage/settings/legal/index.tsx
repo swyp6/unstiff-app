@@ -15,6 +15,7 @@ import {
 
 import { ThemedText } from "@/components/themed-text";
 import { radius, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import {
   agreeToTerms,
   getTerms,
@@ -70,6 +71,7 @@ export default function LegalScreen() {
   }, [reloadKey]);
 
   function retry() {
+    trackClick("mypage_settings_legal", "load_retry");
     setLoadError(false);
     setReloadKey((key) => key + 1);
   }
@@ -88,6 +90,7 @@ export default function LegalScreen() {
   // rollback 구조이고, 성공하면 GET /terms를 다시 받아 agreedAt 같은 서버 값을
   // 실제 값으로 채운다(기기 시간을 동의일처럼 쓰지 않는다).
   async function handleExternalAiToggle(nextAgreed: boolean) {
+    trackClick("mypage_settings_legal", "ai_toggle");
     if (!terms || isUpdatingAi) return;
     const externalAiTerm = findTerm(terms, "EXTERNAL_AI");
     if (!externalAiTerm || externalAiTerm.agreed === nextAgreed) return;
@@ -174,7 +177,10 @@ export default function LegalScreen() {
             {LEGAL_BROWSE_ROWS.map((row) => (
               <SettingsRow
                 key={row.type}
-                onPress={() => router.push(documentHref(row.type))}
+                onPress={() => {
+                  trackClick("mypage_settings_legal", "open_document");
+                  router.push(documentHref(row.type));
+                }}
                 title={row.title}
               />
             ))}
@@ -215,7 +221,10 @@ export default function LegalScreen() {
               />
               <SettingsRow
                 compact
-                onPress={() => router.push(documentHref("EXTERNAL_AI"))}
+                onPress={() => {
+                  trackClick("mypage_settings_legal", "ai_view_consent");
+                  router.push(documentHref("EXTERNAL_AI"));
+                }}
                 title="동의서 보기"
               />
             </View>

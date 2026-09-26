@@ -13,6 +13,7 @@ import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RecordActionsMenu } from "@/components/ui/record-actions-menu";
 import { RecordScreenHeader } from "@/components/ui/record-screen-header";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { getWorkoutHistoryById } from "@/features/workout-history/api";
 import { WorkoutHistoryEditSheet } from "@/features/workout-history/components/workout-history-edit-sheet";
@@ -140,6 +141,7 @@ export default function RecordCompleteScreen() {
   // 처리한다. 헤더의 X도 같은 동작이다 — 이미 저장이 끝난 화면이라
   // "닫기"와 "선택 완료"가 다른 곳으로 갈 이유가 없다.
   function handleConfirm() {
+    trackClick("record_complete", "confirm");
     reset();
     router.dismissTo("/home");
   }
@@ -155,18 +157,33 @@ export default function RecordCompleteScreen() {
         <RecordScreenHeader
           dateLabel={formatHeaderDate(confirmed.date)}
           onClose={handleConfirm}
-          onMenuPress={() => setIsMenuVisible(true)}
+          onMenuPress={() => {
+            trackClick("record_complete", "menu_open");
+            setIsMenuVisible(true);
+          }}
           variant="dark"
         />
 
         <RecordActionsMenu
           hasPhoto={Boolean(displayImageUrl)}
           isPhotoActionPending={isPhotoActionPending || !entry}
-          onChangePhoto={handleChangePhoto}
+          onChangePhoto={() => {
+            trackClick("record_complete", "change_photo");
+            handleChangePhoto();
+          }}
           onClose={() => setIsMenuVisible(false)}
-          onDeletePhoto={() => setIsDeleteConfirmVisible(true)}
-          onEditRecord={() => setIsEditSheetVisible(true)}
-          onSavePhoto={handleSavePhoto}
+          onDeletePhoto={() => {
+            trackClick("record_complete", "delete_photo_open");
+            setIsDeleteConfirmVisible(true);
+          }}
+          onEditRecord={() => {
+            trackClick("record_complete", "edit_record");
+            setIsEditSheetVisible(true);
+          }}
+          onSavePhoto={() => {
+            trackClick("record_complete", "save_photo");
+            handleSavePhoto();
+          }}
           topOffset={insets.top + 52}
           visible={isMenuVisible}
         />
@@ -178,6 +195,7 @@ export default function RecordCompleteScreen() {
           description="기록은 남고 스티커로 바뀌어요"
           onCancel={() => setIsDeleteConfirmVisible(false)}
           onConfirm={() => {
+            trackClick("record_complete", "delete_photo_confirm");
             setIsDeleteConfirmVisible(false);
             handleDeletePhoto();
           }}

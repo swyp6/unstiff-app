@@ -9,6 +9,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { useScreenTracking } from "@/features/analytics/use-screen-tracking";
 import { useNotificationLanding } from "@/features/notifications/use-notification-landing";
 import { useRegisterPushToken } from "@/features/notifications/use-register-push-token";
 
@@ -18,6 +19,7 @@ export default function RootLayout() {
   const colorScheme = useColorScheme();
 
   useRegisterPushToken();
+  useScreenTracking();
 
   // Font names match tokens.ts's `typography` fontFamily values — see
   // scripts/sync-figma-tokens.js's WEIGHT_SUFFIX/FONT_FAMILY_PREFIX constants.

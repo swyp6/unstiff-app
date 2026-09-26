@@ -69,6 +69,7 @@ const config: ExpoConfig = {
 
     ["@react-native-firebase/app", { ios: { disableSPM: true } }],
     "@react-native-firebase/messaging",
+    "@react-native-firebase/analytics",
 
     "expo-apple-authentication",
 

@@ -24,6 +24,7 @@ import ReanimatedAnimated, {
 import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
 import { WorkoutLimitModal } from "@/features/workout-plan/components/workout-limit-modal";
@@ -111,6 +112,7 @@ export default function ManualRecordScreen() {
     !isSubmitting;
 
   function toggleType(type: GoalType) {
+    trackClick("capture_manual_record", "goal_type_toggle");
     setSelectedTypes((current) =>
       current.includes(type)
         ? current.filter((item) => item !== type)
@@ -130,6 +132,7 @@ export default function ManualRecordScreen() {
   // 즉시 기록 흐름이라 목표/실제를 따로 받는 입력이 없다(Figma 4173:30739).
   // measures에는 화면에 입력한 실제 수행값 하나만 들어간다.
   async function handleSubmit() {
+    trackClick("capture_manual_record", "submit");
     if (submissionLockRef.current || !canSubmit) return;
     submissionLockRef.current = true;
 
@@ -345,7 +348,10 @@ export default function ManualRecordScreen() {
                 <SectionLabel>운동 종류</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="운동 종류 선택"
-                  onPress={() => setIsTypeSheetVisible(true)}
+                  onPress={() => {
+                    trackClick("capture_manual_record", "exercise_type_select");
+                    setIsTypeSheetVisible(true);
+                  }}
                   placeholder="선택해주세요"
                   value={exerciseType}
                 />
@@ -363,7 +369,13 @@ export default function ManualRecordScreen() {
                       layout={LinearTransition}
                     >
                       <ActualMeasureStepper
-                        onPressValue={() => openMeasureSheet(type)}
+                        onPressValue={() => {
+                          trackClick(
+                            "capture_manual_record",
+                            "measure_value_press",
+                          );
+                          openMeasureSheet(type);
+                        }}
                         type={type}
                         value={values[type]}
                         onChange={(value) =>
@@ -385,7 +397,10 @@ export default function ManualRecordScreen() {
                 <SectionLabel optional>강도</SectionLabel>
                 <SelectionRow
                   accessibilityLabel="강도 선택"
-                  onPress={openIntensitySheet}
+                  onPress={() => {
+                    trackClick("capture_manual_record", "intensity_select");
+                    openIntensitySheet();
+                  }}
                   placeholder="선택해주세요"
                   value={getIntensityLabel(intensity)}
                 />

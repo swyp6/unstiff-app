@@ -9,6 +9,7 @@ import { AddItemButton } from "@/components/ui/add-item-button";
 import { Screen } from "@/components/ui/screen";
 import { Spacing } from "@/constants/theme";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { trackClick } from "@/features/analytics/analytics";
 import { getCalendarMonth } from "@/features/calendar/api";
 import { HomeCalendar } from "@/features/calendar/components/home-calendar";
 import { addDays, toDateKey } from "@/features/calendar/date";
@@ -277,11 +278,13 @@ export default function HomeScreen() {
     useState(false);
 
   function handleMissionFeedbackComplete() {
+    trackClick("home", "mission_feedback_complete");
     useMissionFeedbackStore.getState().clearFeedback();
     setIsMissionFeedbackToastVisible(true);
   }
 
   function handleMissionFeedbackSkip() {
+    trackClick("home", "mission_feedback_skip");
     useMissionFeedbackStore.getState().clearFeedback();
   }
 
@@ -301,6 +304,7 @@ export default function HomeScreen() {
   }, []);
 
   async function handleMissionReveal() {
+    trackClick("home", "mission_reveal");
     try {
       applyMissionResponse(await prefetchDailyMission());
     } catch {
@@ -309,6 +313,7 @@ export default function HomeScreen() {
   }
 
   async function handleMissionAccept() {
+    trackClick("home", "mission_accept");
     if (missionId == null) return;
     try {
       applyMissionResponse(await acceptMission(missionId));
@@ -813,11 +818,13 @@ export default function HomeScreen() {
   }
 
   function handleAddWorkoutPress() {
+    trackClick("home", "add_workout_press");
     if (guardTodayWorkoutLimit()) return;
     openNewPlanSheet();
   }
 
   function handleAddSavedPlan(plan: WorkoutPlanDraft) {
+    trackClick("home", "today_workout_add_saved_plan");
     if (guardTodayWorkoutLimit()) return;
     return addSavedPlanToDate(plan, selectedCalendarDate);
   }
@@ -860,6 +867,7 @@ export default function HomeScreen() {
   );
 
   async function saveNewPlan(plan: WorkoutPlanDraft, saveAsRoutine: boolean) {
+    trackClick("home", "new_plan_save");
     // "루틴으로 할래요"(saveAsRoutine)가 꺼져 있으면(기본값) 1회성 운동이므로
     // 저장된 운동 계획에는 넣지 않고, 캘린더에서 지금 보고 있는 날짜(반드시
     // 실제 오늘은 아니다 — 다른 날짜를 보면서 추가할 수도 있다)에만 추가한다.
@@ -886,6 +894,7 @@ export default function HomeScreen() {
   // onToggle 자체를 안 넘겨서 이 함수는 항상 미완료 → 완료 방향으로만
   // 호출된다.
   function toggleTodayWorkoutDone(instanceId: string) {
+    trackClick("home", "today_workout_toggle_done");
     const workout = todayWorkouts.find((item) => item.id === instanceId);
     if (!workout || workout.isDone) return;
 
@@ -935,6 +944,7 @@ export default function HomeScreen() {
   // 제목의 오늘의 운동이 여러 개일 수 있어 identity로 쓰지 않는다.
   // instanceId는 String(dailyPlan.id)이므로 refId 쪽을 문자열로 맞춰 비교한다.
   function openTodayWorkoutRecord(instanceId: string) {
+    trackClick("home", "today_workout_open_record");
     return openTodayRecord((workouts) =>
       findUniqueRecordIndex(
         workouts,
@@ -948,6 +958,7 @@ export default function HomeScreen() {
   // 기록으로 이동한다. 위와 같이 refType + refId(= 미션 id)로 맞춘다 —
   // 하루에 MISSION 기록이 여러 개 생기더라도 이 미션의 기록만 연다.
   function openMissionRecord() {
+    trackClick("home", "mission_open_record");
     if (missionId == null) return;
     return openTodayRecord((workouts) =>
       findUniqueRecordIndex(
@@ -961,6 +972,7 @@ export default function HomeScreen() {
   // 상태만 바꾼다. startedAt(벽시계 기준 시각)로 경과시간을 계산하므로 이
   // 함수는 그 기준점만 세팅/정산한다.
   function toggleStopwatchRun(instanceId: string) {
+    trackClick("home", "stopwatch_toggle_run");
     updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) => {
         if (item.id !== instanceId || !item.stopwatch) return item;
@@ -1030,6 +1042,7 @@ export default function HomeScreen() {
   }
 
   function resetStopwatch(instanceId: string) {
+    trackClick("home", "stopwatch_reset");
     updateWorkoutsForDate(today, (workouts) =>
       workouts.map((item) =>
         item.id === instanceId && item.stopwatch
@@ -1050,6 +1063,7 @@ export default function HomeScreen() {
   // 모달로 이어진다. 스톱워치 값 자체는 toggleStopwatchRun이 이미 멈춰서
   // 정산해뒀다.
   function finishStopwatch(instanceId: string) {
+    trackClick("home", "stopwatch_finish");
     const workout = todayWorkouts.find((item) => item.id === instanceId);
     if (!workout) return;
 
@@ -1077,6 +1091,7 @@ export default function HomeScreen() {
   // 성공하면 그 쪽(savedWorkoutPlans 또는 그 날짜의 workoutsByDate)만
   // 갱신한다.
   async function updateDetailPlan(updatedPlan: WorkoutPlanDraft) {
+    trackClick("home", "plan_detail_save");
     if (!planDetailTarget) return;
 
     try {
@@ -1120,6 +1135,7 @@ export default function HomeScreen() {
   // DELETE /api/v1/daily-plans/{id}를 먼저 보내고, 성공했을 때만 로컬
   // 목록에서 지운다.
   async function deleteDetailPlan() {
+    trackClick("home", "plan_detail_delete");
     if (!planDetailTarget) return;
 
     if (planDetailTarget.kind === "saved") {
@@ -1169,6 +1185,7 @@ export default function HomeScreen() {
     pendingRecordPlanItemId !== MISSION_PLAN_ITEM_ID;
 
   function handleMissionCompletePress() {
+    trackClick("home", "mission_complete_toggle");
     if (missionStatus === "completed") {
       if (isMissionCompletedOnServer) return;
       setIsRecordMethodModalVisible(false);
@@ -1180,6 +1197,7 @@ export default function HomeScreen() {
   }
 
   function dismissRecordMethodModal() {
+    trackClick("home", "record_method_dismiss");
     setIsRecordMethodModalVisible(false);
     revertPendingRecord();
   }
@@ -1232,6 +1250,7 @@ export default function HomeScreen() {
   // "사진 생략"은 사진만 건너뛸 뿐, 기록 자체는 여전히 그 화면에서
   // 확정된다.
   function completeRecordWithoutPhoto() {
+    trackClick("home", "record_method_skip_photo");
     setIsRecordMethodModalVisible(false);
     const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
     const target = buildRecordTarget(planItemId);
@@ -1259,6 +1278,7 @@ export default function HomeScreen() {
   }
 
   function startRecordPhotoCapture() {
+    trackClick("home", "record_method_take_photo");
     setIsRecordMethodModalVisible(false);
     const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
     const target = buildRecordTarget(planItemId);
@@ -1286,6 +1306,7 @@ export default function HomeScreen() {
   // 뜨지 않는 문제가 있었다. 홈 화면은 이미 완전히 떠 있는 상태라 그 충돌이 없다.
   // 사진을 고르면 그때 /camera를 그 사진 미리보기(확인) 화면으로 바로 띄운다.
   async function startRecordLibraryPick() {
+    trackClick("home", "record_pick_library");
     setIsRecordMethodModalVisible(false);
     const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
     const target = buildRecordTarget(planItemId);
@@ -1359,12 +1380,13 @@ export default function HomeScreen() {
           today={today}
           selectedDate={selectedCalendarDate}
           onSelectDate={setSelectedCalendarDate}
-          onDayWithRecordPress={(dateKey) =>
+          onDayWithRecordPress={(dateKey) => {
+            trackClick("home", "calendar_day_with_record_open");
             router.push({
               pathname: "/day-record",
               params: { date: dateKey, index: "0" },
-            })
-          }
+            });
+          }}
           daysByDate={daysByDate}
           hasLocalScheduledWorkout={(date) =>
             getWorkoutsForDate(date).length > 0
@@ -1372,7 +1394,10 @@ export default function HomeScreen() {
           streakDays={streakDays}
           calendarError={calendarError}
           unreadPushCount={unreadPushCount}
-          onPressNotifications={() => router.push("/notifications")}
+          onPressNotifications={() => {
+            trackClick("home", "notifications_bell_open");
+            router.push("/notifications");
+          }}
         />
 
         {isSelectedDateToday && (
@@ -1406,16 +1431,19 @@ export default function HomeScreen() {
             }
             expanded={isTodayCardExpanded}
             onAddSavedPlan={handleAddSavedPlan}
-            onOpenSavedPlan={(planId) =>
-              setPlanDetailTarget({ kind: "saved", planId })
-            }
-            onOpenWorkoutDetail={(instanceId) =>
-              setPlanDetailTarget({ kind: "instance", instanceId })
-            }
+            onOpenSavedPlan={(planId) => {
+              trackClick("home", "today_workout_open_saved_plan");
+              setPlanDetailTarget({ kind: "saved", planId });
+            }}
+            onOpenWorkoutDetail={(instanceId) => {
+              trackClick("home", "today_workout_open_detail");
+              setPlanDetailTarget({ kind: "instance", instanceId });
+            }}
             onOpenWorkoutRecord={openTodayWorkoutRecord}
-            onToggleExpanded={() =>
-              setIsTodayCardExpanded((expanded) => !expanded)
-            }
+            onToggleExpanded={() => {
+              trackClick("home", "today_workout_toggle_expanded");
+              setIsTodayCardExpanded((expanded) => !expanded);
+            }}
             onStopwatchFinish={finishStopwatch}
             onStopwatchReset={resetStopwatch}
             onStopwatchResumeAfterCancel={resumeStopwatchAfterCancel}
@@ -1433,18 +1461,20 @@ export default function HomeScreen() {
             record={selectedDayRecord}
             serverRecordCount={selectedDayServerRecordCount}
             expanded={isTodayCardExpanded}
-            onToggleExpanded={() =>
-              setIsTodayCardExpanded((expanded) => !expanded)
-            }
-            onSelectRecord={(index) =>
+            onToggleExpanded={() => {
+              trackClick("home", "past_workout_toggle_expanded");
+              setIsTodayCardExpanded((expanded) => !expanded);
+            }}
+            onSelectRecord={(index) => {
+              trackClick("home", "past_workout_entry_select");
               router.push({
                 pathname: "/day-record",
                 params: {
                   date: toDateKey(selectedCalendarDate),
                   index: String(index),
                 },
-              })
-            }
+              });
+            }}
           />
         )}
 
@@ -1480,8 +1510,14 @@ export default function HomeScreen() {
       {isFocused && (
         <WorkoutLimitModal
           onClose={() => setIsWorkoutLimitModalVisible(false)}
-          onPlanTomorrow={() => showDateOnHome(addDays(today, 1), true)}
-          onViewTodayRecords={() => showDateOnHome(today, false)}
+          onPlanTomorrow={() => {
+            trackClick("home", "workout_limit_plan_tomorrow");
+            showDateOnHome(addDays(today, 1), true);
+          }}
+          onViewTodayRecords={() => {
+            trackClick("home", "workout_limit_view_today");
+            showDateOnHome(today, false);
+          }}
           visible={isWorkoutLimitModalVisible}
         />
       )}
