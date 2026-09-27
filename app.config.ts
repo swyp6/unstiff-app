@@ -56,6 +56,13 @@ const config: ExpoConfig = {
       "android.permission.READ_MEDIA_IMAGES",
       "android.permission.READ_MEDIA_VIDEO",
       "android.permission.READ_MEDIA_VISUAL_USER_SELECTED",
+      // 광고/어트리뷰션 기능은 쓰지 않고 Play Console 광고 ID 선언도 "아니요"로
+      // 유지한다. @react-native-firebase/analytics가 매니페스트 머지 시 자동으로
+      // 넣는 광고 ID 관련 권한 3개를 제거해 선언과 실제 매니페스트를 일치시킨다.
+      // Firebase Analytics 이벤트 수집 자체는 이 권한 없이도 정상 동작한다.
+      "com.google.android.gms.permission.AD_ID",
+      "android.permission.ACCESS_ADSERVICES_AD_ID",
+      "android.permission.ACCESS_ADSERVICES_ATTRIBUTION",
     ],
   },
 
