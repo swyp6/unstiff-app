@@ -139,45 +139,39 @@ export function ActualMeasureValueBottomSheet({
     >
       <View style={styles.pickerFrame}>
         <View pointerEvents="none" style={styles.selectionOverlay} />
-        <PickerColumn
-          columnStyle={
-            layout.minorItems ? styles.majorColumn : styles.soloColumn
-          }
-          items={layout.majorItems}
-          loop={false}
-          onChange={(next) => setMajor(Number(next))}
-          selected={String(major)}
-        />
-        <View
-          pointerEvents="none"
-          style={[
-            styles.unit,
-            layout.minorItems ? styles.majorUnit : styles.soloUnit,
-          ]}
-        >
-          <ThemedText style={styles.unitText} typography="caption-1-regular">
-            {layout.majorUnit}
-          </ThemedText>
+        <View style={styles.row}>
+          <PickerColumn
+            columnStyle={styles.column}
+            items={layout.majorItems}
+            loop={false}
+            onChange={(next) => setMajor(Number(next))}
+            selected={String(major)}
+          />
+          <View pointerEvents="none" style={styles.unit}>
+            <ThemedText style={styles.unitText} typography="caption-1-regular">
+              {layout.majorUnit}
+            </ThemedText>
+          </View>
+          {layout.minorItems && (
+            <>
+              <PickerColumn
+                columnStyle={styles.column}
+                items={layout.minorItems}
+                loop={false}
+                onChange={(next) => setMinor(Number(next))}
+                selected={String(minor)}
+              />
+              <View pointerEvents="none" style={styles.unit}>
+                <ThemedText
+                  style={styles.unitText}
+                  typography="caption-1-regular"
+                >
+                  {layout.minorUnit}
+                </ThemedText>
+              </View>
+            </>
+          )}
         </View>
-        {layout.minorItems && (
-          <>
-            <PickerColumn
-              columnStyle={styles.minorColumn}
-              items={layout.minorItems}
-              loop={false}
-              onChange={(next) => setMinor(Number(next))}
-              selected={String(minor)}
-            />
-            <View pointerEvents="none" style={[styles.unit, styles.minorUnit]}>
-              <ThemedText
-                style={styles.unitText}
-                typography="caption-1-regular"
-              >
-                {layout.minorUnit}
-              </ThemedText>
-            </View>
-          </>
-        )}
       </View>
 
       <View style={styles.confirmButtonWrapper}>
@@ -199,37 +193,26 @@ const styles = StyleSheet.create({
     position: "relative",
     width: "100%",
   },
-  unit: {
+  row: {
     alignItems: "center",
-    height: 44,
+    bottom: 0,
+    flexDirection: "row",
     justifyContent: "center",
+    left: 0,
     position: "absolute",
-    top: (PICKER_HEIGHT - 44) / 2,
+    right: 0,
+    top: 0,
+  },
+  column: {
+    position: "relative",
+    width: 60,
+  },
+  unit: {
+    marginHorizontal: 4,
     zIndex: 2,
-  },
-  majorUnit: {
-    left: "52%",
-  },
-  minorUnit: {
-    left: "80%",
-  },
-  soloUnit: {
-    left: "65%",
   },
   unitText: {
     color: semanticColors["label-subtle"],
-  },
-  majorColumn: {
-    left: "25%",
-    width: "20%",
-  },
-  minorColumn: {
-    left: "58%",
-    width: "20%",
-  },
-  soloColumn: {
-    left: "40%",
-    width: "20%",
   },
   selectionOverlay: {
     backgroundColor: semanticColors["background-normal"],
