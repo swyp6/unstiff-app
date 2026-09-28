@@ -16,6 +16,7 @@ import { addDays, toDateKey } from "@/features/calendar/date";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
 import {
   acceptMission,
+  dismissMission,
   getDailyMission,
   prefetchDailyMission,
 } from "@/features/missions/api";
@@ -319,6 +320,23 @@ export default function HomeScreen() {
       applyMissionResponse(await acceptMission(missionId));
     } catch {
       Alert.alert("오류", "미션을 수락하지 못했습니다. 다시 시도해주세요.");
+    }
+  }
+
+  async function handleMissionDismiss() {
+    trackClick("home", "mission_dismiss");
+    if (missionId == null) return;
+    try {
+      const response = await dismissMission(missionId);
+      applyMissionResponse(response);
+      // "10번마다" 같은 주기 판단은 서버가 이미 끝낸 결과다 — 여기서는 그
+      // 값만 그대로 믿는다. dismiss API 자체가 실패하면(위 catch) 이 분기에
+      // 도달하지 않으므로 feedback pending도 만들어지지 않는다.
+      if (response.requireUserFeedback) {
+        useMissionFeedbackStore.getState().requestFeedback(missionId);
+      }
+    } catch {
+      Alert.alert("오류", "미션을 닫지 못했습니다. 다시 시도해주세요.");
     }
   }
 
@@ -802,6 +820,7 @@ export default function HomeScreen() {
   }
 
   function openNewPlanSheet() {
+    // eslint-disable-next-line react-hooks/purity
     setNewPlanDraft(createBlankWorkoutPlanDraft(`saved-plan-${Date.now()}`));
   }
 
@@ -1403,9 +1422,11 @@ export default function HomeScreen() {
         {isSelectedDateToday && (
           <MissionCard
             arrivalLabel={missionArrivalLabel}
+            canDismiss={todayWorkouts.some((workout) => workout.isDone)}
             description={missionDescription}
             missionId={missionId}
             onAccept={handleMissionAccept}
+            onDismiss={handleMissionDismiss}
             onOpenRecord={
               isMissionCompletedOnServer ? openMissionRecord : undefined
             }
