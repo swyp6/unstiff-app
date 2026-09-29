@@ -1,4 +1,4 @@
-import { Modal, Pressable, StyleSheet, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { addDays } from "@/features/calendar/date";
@@ -73,7 +73,8 @@ export function WorkoutLimitModal({
         <View accessibilityViewIsModal style={styles.card}>
           <View style={styles.copy}>
             <ThemedText style={styles.title} typography="title-3-bold">
-              {`운동 ${DAILY_PLAN_LIMIT}개 완료!`}
+              운동 <Text style={styles.titleCount}>{DAILY_PLAN_LIMIT}</Text>개
+              완료!
             </ThemedText>
             <ThemedText
               style={styles.description}
@@ -157,11 +158,14 @@ const styles = StyleSheet.create({
     gap: 8,
     width: "100%",
   },
-  // Figma code context는 "5"만 white로 뽑히지만 실제 렌더는 제목 전체가
-  // charcoal/11이다 — 한 색으로 그린다.
   title: {
     color: primitiveColors.charcoal["11"],
     textAlign: "center",
+  },
+  // 제목의 개수 숫자만 status/negative/normal이다(Figma 인스턴스의 글자별
+  // fill — code context 추출은 이 값을 white로 잘못 뽑는다).
+  titleCount: {
+    color: semanticColors["status-negative-normal"],
   },
   description: {
     color: primitiveColors.charcoal["5"],

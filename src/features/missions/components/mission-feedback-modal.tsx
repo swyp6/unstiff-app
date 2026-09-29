@@ -1,23 +1,26 @@
-import { useState } from "react";
+import { Image } from "expo-image";
+import { type ReactNode, useState } from "react";
 import {
   KeyboardAvoidingView,
   Modal,
   Pressable,
+  type StyleProp,
   StyleSheet,
   TextInput,
   View,
+  type ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 
 import { submitMissionFeedback } from "../api";
 import type { MissionFeedbackRequest } from "../types";
 
 const COMMENT_MAX_LENGTH = 100;
 
-// overview("오늘 미션 어땠어요?") → reason("무엇이 아쉬웠나요?") → other(기타
+// overview("오늘 미션 어땠나요?") → reason("무엇이 아쉬웠나요?") → other(기타
 // 의견) 순서의 화면 계층. visible이 true가 될 때는 항상 overview부터
 // 시작한다.
 type Screen = "overview" | "reason" | "other";
@@ -28,12 +31,6 @@ type MissionFeedbackModalProps = {
   // 같은 프레임(dim/dialog 구조, `if (!visible) return null` 진입부)을 그대로
   // 따른다.
   missionId: number | null;
-  // overview 화면 subtitle에 표시할 실제 미션 제목. home.tsx의 mission 관련
-  // local state(missionId/missionTitle 등)는 NativeTabs가 탭 화면을 항상
-  // 마운트해두는 구조 덕분에 RecordEditor → RecordComplete → 홈으로
-  // 돌아오는 동안에도 그대로 남아 있다 — 그래서 feedback store에 title까지
-  // 복제하지 않고 이 prop 하나로 단순하게 전달한다.
-  missionTitle: string;
   // feedback POST 성공 시 호출 — 부모(home.tsx)가 pending을 지우고 성공
   // toast를 띄운다. 이 모달 자신은 toast를 그리지 않는다(모달이 닫혀도
   // toast의 등장→소멸 애니메이션은 별개로 계속 재생돼야 하므로).
@@ -42,14 +39,13 @@ type MissionFeedbackModalProps = {
   onSkip: () => void;
 };
 
-// Figma 2414:21129(오늘 미션 어땠어요?)/2414:21157(피드백 사유 선택)/
-// 2414:21372(기타 의견 입력) — 홈 화면 위에 뜨는 dim + 중앙 모달.
-// DeletePlanModal(features/workout-plan/components/delete-plan-modal.tsx)과
-// 같은 dialog 프레임을 따른다.
+// Figma 4513:47336(만족도 선택)/4501:31886(아쉬운 이유)/4501:32002·32118·
+// 32465(기타 의견 빈 폼·입력·100자 초과) — 홈 화면 위에 뜨는 dim + 중앙
+// 모달(300 고정, padding 26/20/18, 문구와 액션 사이 20). 만족도 선택만
+// radius 20이고 나머지 화면은 24다.
 export function MissionFeedbackModal({
   visible,
   missionId,
-  missionTitle,
   onComplete,
   onSkip,
 }: MissionFeedbackModalProps) {
@@ -125,12 +121,26 @@ export function MissionFeedbackModal({
   }
 
   const trimmedComment = comment.trim();
-  const canSend = trimmedComment.length > 0 && !isSubmitting;
+  // 입력을 100자에서 자르지 않는다 — 넘치면 Figma 4501:32465처럼 빨간
+  // 입력창/카운터/안내 문구를 보여주고 보내기만 막는다.
+  const isCommentTooLong = comment.length > COMMENT_MAX_LENGTH;
+  const canSend =
+    trimmedComment.length > 0 && !isCommentTooLong && !isSubmitting;
+
+  const errorMessage = error && (
+    <ThemedText style={styles.error} typography="caption-1-regular">
+      {error}
+    </ThemedText>
+  );
 
   return (
     <Modal
       animationType="fade"
+      // Android: 둘 다 켜야 dim이 status bar·navigation bar 뒤까지 이어진다
+      // (Figma는 화면 전체를 덮는다). ConfirmModal·WorkoutLimitModal과 같은 설정.
+      navigationBarTranslucent
       onRequestClose={handleRequestClose}
+      statusBarTranslucent
       transparent
       visible
     >
@@ -150,295 +160,142 @@ export function MissionFeedbackModal({
           />
 
           {screen === "overview" ? (
-            <View style={styles.dialog}>
-              <View style={styles.copy}>
-                <ThemedText style={styles.center} typography="title-3-bold">
-                  오늘 미션 어땠어요?
-                </ThemedText>
-                <ThemedText
-                  style={[styles.center, styles.description]}
-                  typography="caption-1-regular"
-                >
-                  {missionTitle}
-                </ThemedText>
-              </View>
-
-              <View style={styles.actions}>
-                <View style={styles.overviewRow}>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isSubmitting}
-                    onPress={() => submitFeedback({ reason: "GOOD" })}
-                    style={styles.overviewButtonPressable}
-                  >
-                    {({ pressed }) => (
-                      <View
-                        pointerEvents="none"
-                        style={[
-                          styles.primaryButton,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <ThemedText
-                          style={styles.primaryText}
-                          typography="body-2-bold"
-                        >
-                          좋았어요
-                        </ThemedText>
-                      </View>
-                    )}
-                  </Pressable>
-
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={isSubmitting}
-                    onPress={selectDissatisfied}
-                    style={styles.overviewButtonPressable}
-                  >
-                    {({ pressed }) => (
-                      <View
-                        pointerEvents="none"
-                        style={[
-                          styles.outlineButton,
-                          pressed && styles.pressed,
-                        ]}
-                      >
-                        <ThemedText typography="body-2-bold">
-                          아쉬웠어요
-                        </ThemedText>
-                      </View>
-                    )}
-                  </Pressable>
-                </View>
-
-                {error && (
-                  <ThemedText
-                    style={styles.error}
-                    typography="caption-1-regular"
-                  >
-                    {error}
-                  </ThemedText>
-                )}
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isSubmitting }}
+            <FeedbackDialog
+              description="다음 미션을 더 잘 고를게요"
+              descriptionTypography="body-3-regular"
+              radius={20}
+              title="오늘 미션 어땠나요?"
+            >
+              <View style={styles.overviewRow}>
+                <FeedbackButton
                   disabled={isSubmitting}
-                  onPress={handleSkip}
-                  style={styles.linkPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={pressed && !isSubmitting && styles.pressed}
-                    >
-                      <ThemedText
-                        style={styles.linkText}
-                        typography="caption-1-bold"
-                      >
-                        건너뛰기
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
+                  label="아쉬웠어요"
+                  onPress={selectDissatisfied}
+                  style={styles.overviewButtonPressable}
+                  variant="outline"
+                />
+                <FeedbackButton
+                  disabled={isSubmitting}
+                  label="좋았어요"
+                  onPress={() => submitFeedback({ reason: "GOOD" })}
+                  style={styles.overviewButtonPressable}
+                  variant="primary"
+                />
               </View>
-            </View>
+
+              {errorMessage}
+
+              <FeedbackLink
+                color={primitiveColors.charcoal["5"]}
+                disabled={isSubmitting}
+                label="건너뛰기"
+                onPress={handleSkip}
+                style={styles.overviewLinkPressable}
+              />
+            </FeedbackDialog>
           ) : screen === "reason" ? (
-            <View style={styles.dialog}>
-              <View style={styles.copy}>
-                <ThemedText style={styles.center} typography="title-3-bold">
-                  무엇이 아쉬웠나요?
-                </ThemedText>
-                <ThemedText
-                  style={[styles.center, styles.description]}
-                  typography="caption-1-regular"
-                >
-                  더 잘 맞는 미션을 고를게요
-                </ThemedText>
-              </View>
+            <FeedbackDialog
+              description="더 잘 맞는 미션을 고를게요"
+              radius={24}
+              title="무엇이 아쉬웠나요?"
+            >
+              <FeedbackButton
+                disabled={isSubmitting}
+                label="너무 힘들었어요"
+                onPress={() => submitFeedback({ reason: "TOO_HARD" })}
+                variant="option"
+              />
+              <FeedbackButton
+                disabled={isSubmitting}
+                label="하고 싶은 운동이 아니에요"
+                onPress={() => submitFeedback({ reason: "NOT_INTERESTED" })}
+                variant="option"
+              />
+              <FeedbackButton
+                disabled={isSubmitting}
+                label="그 외 의견 쓰기"
+                onPress={() => setScreen("other")}
+                variant="option"
+              />
 
-              <View style={styles.actions}>
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isSubmitting}
-                  onPress={() => submitFeedback({ reason: "TOO_HARD" })}
-                  style={styles.buttonPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={[styles.fillButton, pressed && styles.pressed]}
-                    >
-                      <ThemedText typography="body-2-bold">
-                        너무 힘들었어요
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
+              {errorMessage}
 
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isSubmitting}
-                  onPress={() => submitFeedback({ reason: "NOT_INTERESTED" })}
-                  style={styles.buttonPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={[styles.fillButton, pressed && styles.pressed]}
-                    >
-                      <ThemedText typography="body-2-bold">
-                        하고 싶은 운동이 아니에요
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
-
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={isSubmitting}
-                  onPress={() => setScreen("other")}
-                  style={styles.buttonPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={[styles.outlineButton, pressed && styles.pressed]}
-                    >
-                      <ThemedText typography="body-2-bold">
-                        그 외 의견 쓰기
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
-
-                {error && (
-                  <ThemedText
-                    style={styles.error}
-                    typography="caption-1-regular"
-                  >
-                    {error}
-                  </ThemedText>
-                )}
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isSubmitting }}
-                  disabled={isSubmitting}
-                  onPress={handleSkip}
-                  style={styles.linkPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={pressed && !isSubmitting && styles.pressed}
-                    >
-                      <ThemedText
-                        style={styles.linkText}
-                        typography="caption-1-bold"
-                      >
-                        건너뛰기
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
-              </View>
-            </View>
+              <FeedbackLink
+                color={primitiveColors.charcoal["3"]}
+                disabled={isSubmitting}
+                label="건너뛰기"
+                onPress={handleSkip}
+              />
+            </FeedbackDialog>
           ) : (
-            <View style={styles.dialog}>
-              <View style={styles.copy}>
-                <ThemedText style={styles.center} typography="title-3-bold">
-                  어떤 점이 아쉬웠나요?
-                </ThemedText>
-                <ThemedText
-                  style={[styles.center, styles.description]}
-                  typography="caption-1-regular"
+            <FeedbackDialog
+              description="짧게 남겨주셔도 좋아요"
+              radius={24}
+              title="어떤 점이 아쉬웠나요?"
+            >
+              <View style={styles.inputGroup}>
+                <View
+                  style={[
+                    styles.inputBox,
+                    isCommentTooLong && styles.inputBoxError,
+                  ]}
                 >
-                  짧게 남겨주셔도 좋아요
-                </ThemedText>
-              </View>
-
-              <View style={styles.actions}>
-                <View style={styles.inputBox}>
                   <TextInput
                     accessibilityLabel="기타 의견"
-                    maxLength={COMMENT_MAX_LENGTH}
                     multiline
                     onChangeText={setComment}
                     placeholder="의견을 적어주세요"
-                    placeholderTextColor={semanticColors["label-disabled"]}
+                    placeholderTextColor={primitiveColors.charcoal["3"]}
                     style={styles.input}
                     value={comment}
                   />
                   <ThemedText
-                    style={styles.counter}
+                    style={[
+                      styles.counter,
+                      comment.length > 0 && styles.counterFilled,
+                      isCommentTooLong && styles.counterError,
+                    ]}
                     typography="caption-2-regular"
                   >
                     {comment.length} / {COMMENT_MAX_LENGTH}
                   </ThemedText>
                 </View>
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: !canSend }}
-                  disabled={!canSend}
-                  onPress={() =>
-                    submitFeedback({ reason: "OTHER", comment: trimmedComment })
-                  }
-                  style={styles.buttonPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={[
-                        canSend ? styles.primaryButton : styles.fillButton,
-                        pressed && canSend && styles.pressed,
-                      ]}
+                {isCommentTooLong && (
+                  <View style={styles.inputErrorRow}>
+                    <Image
+                      contentFit="contain"
+                      source={require("@/assets/signup/icon-status-error.svg")}
+                      style={styles.inputErrorIcon}
+                    />
+                    <ThemedText
+                      style={styles.inputErrorText}
+                      typography="caption-1-regular"
                     >
-                      <ThemedText
-                        typography="body-2-bold"
-                        style={
-                          canSend ? styles.primaryText : styles.disabledText
-                        }
-                      >
-                        보내기
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
-
-                {error && (
-                  <ThemedText
-                    style={styles.error}
-                    typography="caption-1-regular"
-                  >
-                    {error}
-                  </ThemedText>
+                      {COMMENT_MAX_LENGTH}자까지 쓸 수 있어요
+                    </ThemedText>
+                  </View>
                 )}
-
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityState={{ disabled: isSubmitting }}
-                  disabled={isSubmitting}
-                  onPress={handleBackToReason}
-                  style={styles.linkPressable}
-                >
-                  {({ pressed }) => (
-                    <View
-                      pointerEvents="none"
-                      style={pressed && !isSubmitting && styles.pressed}
-                    >
-                      <ThemedText
-                        style={styles.linkText}
-                        typography="caption-1-bold"
-                      >
-                        취소하기
-                      </ThemedText>
-                    </View>
-                  )}
-                </Pressable>
               </View>
-            </View>
+
+              <FeedbackButton
+                disabled={!canSend}
+                label="보내기"
+                onPress={() =>
+                  submitFeedback({ reason: "OTHER", comment: trimmedComment })
+                }
+                variant={canSend ? "primary" : "disabled"}
+              />
+
+              {errorMessage}
+
+              <FeedbackLink
+                color={primitiveColors.charcoal["3"]}
+                disabled={isSubmitting}
+                label="취소하기"
+                onPress={handleBackToReason}
+              />
+            </FeedbackDialog>
           )}
         </SafeAreaView>
       </KeyboardAvoidingView>
@@ -446,13 +303,166 @@ export function MissionFeedbackModal({
   );
 }
 
+// 세 화면이 공유하는 카드 — 제목(title/3 bold)과 설명, 그 아래 액션 목록.
+// 설명 크기는 만족도 선택만 13/18이고 나머지는 12/16이다.
+function FeedbackDialog({
+  title,
+  description,
+  descriptionTypography = "caption-1-regular",
+  radius,
+  children,
+}: {
+  title: string;
+  description: string;
+  descriptionTypography?: "body-3-regular" | "caption-1-regular";
+  radius: number;
+  children: ReactNode;
+}) {
+  return (
+    <View style={[styles.dialog, { borderRadius: radius }]}>
+      <View style={styles.copy}>
+        <ThemedText style={styles.title} typography="title-3-bold">
+          {title}
+        </ThemedText>
+        <ThemedText
+          style={styles.description}
+          typography={descriptionTypography}
+        >
+          {description}
+        </ThemedText>
+      </View>
+      <View style={styles.actions}>{children}</View>
+    </View>
+  );
+}
+
+// primary: 좋았어요·보내기(활성) / outline: 아쉬웠어요 / option: 아쉬운 이유
+// 선택지 / disabled: 보내기(비활성). 모두 높이 50 pill, body/2 bold.
+type FeedbackButtonVariant = "primary" | "outline" | "option" | "disabled";
+
+// Pressable 자체에 배경/radius를 주면 fade Modal 안에서 버튼 배경이 그려지지
+// 않는 경우가 있어(WorkoutLimitModal 참고), Pressable은 터치 영역만 갖고
+// 시각 스타일은 pointerEvents="none" View가 갖는다.
+function FeedbackButton({
+  label,
+  variant,
+  disabled,
+  onPress,
+  style,
+}: {
+  label: string;
+  variant: FeedbackButtonVariant;
+  disabled: boolean;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.buttonPressable, style]}
+    >
+      {({ pressed }) => (
+        <View
+          pointerEvents="none"
+          style={[
+            styles.button,
+            buttonStyles[variant],
+            pressed && !disabled && styles.pressed,
+          ]}
+        >
+          <ThemedText
+            style={buttonTextStyles[variant]}
+            typography="body-2-bold"
+          >
+            {label}
+          </ThemedText>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+// 카드 맨 아래 보조 링크(건너뛰기·취소하기) — caption/1 bold, 위 padding 4.
+function FeedbackLink({
+  label,
+  color,
+  disabled,
+  onPress,
+  style,
+}: {
+  label: string;
+  color: string;
+  disabled: boolean;
+  onPress: () => void;
+  style?: StyleProp<ViewStyle>;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[styles.linkPressable, style]}
+    >
+      {({ pressed }) => (
+        <View
+          pointerEvents="none"
+          style={pressed && !disabled && styles.pressed}
+        >
+          <ThemedText style={{ color }} typography="caption-1-bold">
+            {label}
+          </ThemedText>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+const buttonStyles = StyleSheet.create({
+  primary: {
+    backgroundColor: primitiveColors.orange["500"],
+  },
+  outline: {
+    backgroundColor: semanticColors["background-normal"],
+    borderColor: primitiveColors.charcoal["3"],
+    borderWidth: 1,
+  },
+  option: {
+    borderColor: primitiveColors.charcoal["2"],
+    borderWidth: 1,
+  },
+  disabled: {
+    backgroundColor: primitiveColors.charcoal["1"],
+  },
+});
+
+const buttonTextStyles = StyleSheet.create({
+  primary: {
+    color: semanticColors["label-inverse"],
+  },
+  outline: {
+    color: primitiveColors.charcoal["11"],
+  },
+  option: {
+    color: primitiveColors.charcoal["11"],
+  },
+  disabled: {
+    color: primitiveColors.charcoal["3"],
+  },
+});
+
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
   },
+  // surface/dim — tokens.ts(auto-generated)에 없는 Figma 변수라
+  // ConfirmModal·WorkoutLimitModal과 같이 직접 쓴다.
   dim: {
     alignItems: "center",
-    backgroundColor: "rgba(13, 15, 20, 0.45)",
+    backgroundColor: "rgba(23, 23, 25, 0.45)",
     flex: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
@@ -462,8 +472,9 @@ const styles = StyleSheet.create({
   },
   dialog: {
     backgroundColor: semanticColors["background-normal"],
-    borderRadius: 20,
+    gap: 20,
     maxWidth: 300,
+    overflow: "hidden",
     paddingBottom: 18,
     paddingHorizontal: 20,
     paddingTop: 26,
@@ -473,13 +484,14 @@ const styles = StyleSheet.create({
   copy: {
     alignItems: "center",
     gap: 8,
-    marginBottom: 20,
   },
-  center: {
+  title: {
+    color: primitiveColors.charcoal["11"],
     textAlign: "center",
   },
   description: {
-    color: semanticColors["label-subtle"],
+    color: primitiveColors.charcoal["5"],
+    textAlign: "center",
   },
   actions: {
     gap: 10,
@@ -489,45 +501,25 @@ const styles = StyleSheet.create({
     height: 50,
     width: "100%",
   },
-  // overview 화면만 "좋았어요"/"아쉬웠어요"가 한 줄에 나란히 선다(Figma
-  // 2414:21129 "선택" — gap 8, 각각 flex:1). 나머지 화면은 버튼이 세로로
-  // 쌓이므로 기존 buttonPressable(width:"100%")을 그대로 쓴다.
+  // Figma는 50 높이에 radius 42(좋았어요/아쉬웠어요)·25(나머지)지만 둘 다
+  // 높이의 절반을 넘어 같은 pill로 그려진다.
+  button: {
+    alignItems: "center",
+    borderRadius: 25,
+    height: 50,
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  // 만족도 선택만 "아쉬웠어요"/"좋았어요"가 한 줄에 나란히 선다(각 125,
+  // gap 10 — 300 카드에서 flex:1이 정확히 125가 된다).
   overviewRow: {
     flexDirection: "row",
-    gap: 8,
+    gap: 10,
     width: "100%",
   },
+  // flex:1은 flexBasis 0이라 buttonPressable의 width:"100%"보다 우선한다.
   overviewButtonPressable: {
     flex: 1,
-    height: 50,
-  },
-  fillButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["fill-normal"],
-    borderRadius: 12,
-    height: 50,
-    justifyContent: "center",
-  },
-  outlineButton: {
-    alignItems: "center",
-    borderColor: semanticColors["line-normal"],
-    borderRadius: 12,
-    borderWidth: 1,
-    height: 50,
-    justifyContent: "center",
-  },
-  primaryButton: {
-    alignItems: "center",
-    backgroundColor: semanticColors["label-normal"],
-    borderRadius: 12,
-    height: 50,
-    justifyContent: "center",
-  },
-  primaryText: {
-    color: semanticColors["label-inverse"],
-  },
-  disabledText: {
-    color: semanticColors["label-disabled"],
   },
   linkPressable: {
     alignItems: "center",
@@ -535,33 +527,70 @@ const styles = StyleSheet.create({
     paddingTop: 4,
     width: "100%",
   },
-  linkText: {
-    color: semanticColors["label-disabled"],
+  // 만족도 선택의 "건너뛰기" 영역만 높이 30으로 고정돼 있다.
+  overviewLinkPressable: {
+    height: 30,
   },
   error: {
     color: "#ff6b6b",
     textAlign: "center",
   },
+  inputGroup: {
+    gap: 6,
+  },
+  // 입력창 안쪽 여백(stroke 안쪽 기준) — 문구 좌상단 12.5, 카운터 우/하
+  // 12.5·11.5.
   inputBox: {
-    backgroundColor: semanticColors["fill-normal"],
-    borderColor: semanticColors["line-normal"],
-    borderRadius: 12,
-    borderWidth: 1,
+    backgroundColor: "#fafafa",
+    borderColor: primitiveColors.orange["500"],
+    borderRadius: 16,
+    borderWidth: 1.5,
     height: 96,
-    paddingHorizontal: 13,
-    paddingVertical: 13,
+    paddingBottom: 11.5,
+    paddingHorizontal: 12.5,
+    paddingTop: 12.5,
+  },
+  // 100자 초과(4501:32465) — 높이 132, stroke 1.4 neg/normal, 안쪽 여백
+  // 좌우 14.6·상하 12.6(문구 폭 228).
+  inputBoxError: {
+    borderColor: semanticColors["status-negative-normal"],
+    borderWidth: 1.4,
+    height: 132,
+    paddingBottom: 12.6,
+    paddingHorizontal: 14.6,
+    paddingTop: 12.6,
   },
   input: {
-    color: semanticColors["label-normal"],
+    color: primitiveColors.charcoal["11"],
     flex: 1,
     fontFamily: "Pretendard-Regular",
     fontSize: 13,
     lineHeight: 18,
+    padding: 0,
     textAlignVertical: "top",
   },
   counter: {
     alignSelf: "flex-end",
-    color: semanticColors["label-disabled"],
+    color: primitiveColors.charcoal["3"],
+  },
+  counterFilled: {
+    color: primitiveColors.charcoal["5"],
+  },
+  counterError: {
+    color: semanticColors["status-negative-normal"],
+  },
+  inputErrorRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    gap: 6,
+  },
+  inputErrorIcon: {
+    height: 14,
+    width: 14,
+  },
+  inputErrorText: {
+    color: semanticColors["status-negative-normal"],
+    flex: 1,
   },
   pressed: {
     opacity: 0.7,
