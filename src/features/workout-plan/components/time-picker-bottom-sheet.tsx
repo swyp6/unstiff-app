@@ -205,14 +205,10 @@ export function PickerColumn({
   return (
     <View style={[styles.column, columnStyle]}>
       <FlatList
-        {...(loop
-          ? { initialScrollIndex: initialIndex }
-          : {
-              contentOffset: {
-                x: 0,
-                y: initialIndex * PICKER_ROW_HEIGHT,
-              },
-            })}
+        // loop 여부와 관계없이 initialScrollIndex로 시작 위치를 준다 —
+        // contentOffset만 주면 FlatList는 0번부터 렌더링 창을 잡아서, 뒤쪽
+        // 항목(예: 분 59)에서 시작하면 첫 스크롤 전까지 칸이 비어 보인다.
+        initialScrollIndex={initialIndex}
         contentContainerStyle={styles.columnContent}
         data={loopedItems}
         decelerationRate="fast"
