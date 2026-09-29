@@ -92,6 +92,12 @@ export function MissionFeedbackModal({
     setError(null);
   }
 
+  function selectOtherOpinion() {
+    if (isSubmitting) return;
+    setScreen("other");
+    setError(null);
+  }
+
   function handleBackToOverview() {
     if (isSubmitting) return;
     setScreen("overview");
@@ -214,7 +220,7 @@ export function MissionFeedbackModal({
               <FeedbackButton
                 disabled={isSubmitting}
                 label="그 외 의견 쓰기"
-                onPress={() => setScreen("other")}
+                onPress={selectOtherOpinion}
                 variant="option"
               />
 
