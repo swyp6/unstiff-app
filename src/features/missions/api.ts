@@ -57,6 +57,14 @@ export async function completeMission(missionId: number) {
   return data;
 }
 
+// POST /api/v1/missions/{missionId}/dismiss — 오늘의 미션 무시
+export async function dismissMission(missionId: number) {
+  const { data } = await apiClient.post<DailyMissionResponse>(
+    `/api/v1/missions/${missionId}/dismiss`,
+  );
+  return data;
+}
+
 // POST /api/v1/missions/{missionId}/feedback — 완료/무시 응답의
 // requireUserFeedback이 true일 때만 호출한다. 미션당 1건, 같은 missionId로
 // 다시 보내면 서버가 마지막 값으로 overwrite한다(재시도해도 여러 건 쌓이지

@@ -151,54 +151,48 @@ export function ActualMeasureValueBottomSheet({
     >
       <View style={styles.pickerFrame}>
         <View pointerEvents="none" style={styles.selectionOverlay} />
-        <PickerColumn
-          columnStyle={
-            layout.minorItems ? styles.majorColumn : styles.soloColumn
-          }
-          items={layout.majorItems}
-          loop={false}
-          onChange={(next) => {
-            const nextMajor = Number(next);
-            setMajor(nextMajor);
-            // 10시간으로 바뀌면 분 휠에 00만 남는다 — 이전 분(예: 30)이
-            // 화면에 없는 채로 state에 남지 않게 함께 00으로 맞춘다.
-            if (type === "time" && nextMajor === TIME_MAX_HOUR) setMinor(0);
-          }}
-          selected={String(major)}
-        />
-        <View
-          pointerEvents="none"
-          style={[
-            styles.unit,
-            layout.minorItems ? styles.majorUnit : styles.soloUnit,
-          ]}
-        >
-          <ThemedText style={styles.unitText} typography="caption-1-regular">
-            {layout.majorUnit}
-          </ThemedText>
+        <View style={styles.row}>
+          <PickerColumn
+            columnStyle={styles.column}
+            items={layout.majorItems}
+            loop={false}
+            onChange={(next) => {
+              const nextMajor = Number(next);
+              setMajor(nextMajor);
+              // 10시간으로 바뀌면 분 휠에 00만 남는다 — 이전 분(예: 30)이
+              // 화면에 없는 채로 state에 남지 않게 함께 00으로 맞춘다.
+              if (type === "time" && nextMajor === TIME_MAX_HOUR) setMinor(0);
+            }}
+            selected={String(major)}
+          />
+          <View pointerEvents="none" style={styles.unit}>
+            <ThemedText style={styles.unitText} typography="caption-1-regular">
+              {layout.majorUnit}
+            </ThemedText>
+          </View>
+          {layout.minorItems && (
+            <>
+              <PickerColumn
+                columnStyle={styles.column}
+                items={isMaxHour ? MAX_HOUR_MINUTE_ITEMS : layout.minorItems}
+                // PickerColumn은 마운트 이후 selected를 다시 읽지 않는다 —
+                // 분 목록이 바뀔 때 다시 마운트해 00 위치에서 시작하게 한다.
+                key={isMaxHour ? "max-hour" : "default"}
+                loop={false}
+                onChange={(next) => setMinor(Number(next))}
+                selected={String(minor)}
+              />
+              <View pointerEvents="none" style={styles.unit}>
+                <ThemedText
+                  style={styles.unitText}
+                  typography="caption-1-regular"
+                >
+                  {layout.minorUnit}
+                </ThemedText>
+              </View>
+            </>
+          )}
         </View>
-        {layout.minorItems && (
-          <>
-            <PickerColumn
-              columnStyle={styles.minorColumn}
-              items={isMaxHour ? MAX_HOUR_MINUTE_ITEMS : layout.minorItems}
-              // PickerColumn은 마운트 이후 selected를 다시 읽지 않는다 —
-              // 분 목록이 바뀔 때 다시 마운트해 00 위치에서 시작하게 한다.
-              key={isMaxHour ? "max-hour" : "default"}
-              loop={false}
-              onChange={(next) => setMinor(Number(next))}
-              selected={String(minor)}
-            />
-            <View pointerEvents="none" style={[styles.unit, styles.minorUnit]}>
-              <ThemedText
-                style={styles.unitText}
-                typography="caption-1-regular"
-              >
-                {layout.minorUnit}
-              </ThemedText>
-            </View>
-          </>
-        )}
       </View>
 
       <View style={styles.confirmButtonWrapper}>
@@ -220,37 +214,26 @@ const styles = StyleSheet.create({
     position: "relative",
     width: "100%",
   },
-  unit: {
+  row: {
     alignItems: "center",
-    height: 44,
+    bottom: 0,
+    flexDirection: "row",
     justifyContent: "center",
+    left: 0,
     position: "absolute",
-    top: (PICKER_HEIGHT - 44) / 2,
+    right: 0,
+    top: 0,
+  },
+  column: {
+    position: "relative",
+    width: 60,
+  },
+  unit: {
+    marginHorizontal: 4,
     zIndex: 2,
-  },
-  majorUnit: {
-    left: "52%",
-  },
-  minorUnit: {
-    left: "80%",
-  },
-  soloUnit: {
-    left: "65%",
   },
   unitText: {
     color: semanticColors["label-subtle"],
-  },
-  majorColumn: {
-    left: "25%",
-    width: "20%",
-  },
-  minorColumn: {
-    left: "58%",
-    width: "20%",
-  },
-  soloColumn: {
-    left: "40%",
-    width: "20%",
   },
   selectionOverlay: {
     backgroundColor: semanticColors["background-normal"],

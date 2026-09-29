@@ -55,6 +55,9 @@ export type TodayWorkoutInstance = {
 
 type MissionCardProps = {
   status: MissionStatus;
+  // 미션 수락 여부와 무관하게, 오늘의 운동에 완료된 항목이 하나라도
+  // 있으면 미션 카드를 닫을 수 있다.
+  canDismiss: boolean;
   // NOT_OFFERED 상태일 때만 쓰는 "오전 10시에 도착해요" 문구.
   arrivalLabel: string;
   // OFFERED 이후에만 서버가 내려주는 실제 미션 내용.
@@ -65,6 +68,7 @@ type MissionCardProps = {
   // 없으면(서버에서 이미 완료된 미션) 체크를 다시 눌러 되돌릴 수 없다 —
   // TodayWorkoutRow의 onToggle과 같은 규칙.
   onToggleComplete?: () => void;
+  onDismiss: () => void;
   // 서버에서 이미 완료된 미션(실제 기록이 존재) 전용 — 미션 행 전체를
   // 눌러 그 운동 기록(day-record) 화면을 연다. TodayWorkoutRow의
   // onOpenRecord와 같은 패턴.
@@ -77,12 +81,14 @@ type MissionCardProps = {
 
 export function MissionCard({
   status,
+  canDismiss,
   arrivalLabel,
   title,
   description,
   onReveal,
   onAccept,
   onToggleComplete,
+  onDismiss,
   onOpenRecord,
   missionId,
   onReported,
@@ -96,6 +102,18 @@ export function MissionCard({
   const isCompleted = status === "completed";
   // scheduled는 아직 실제 미션 내용이 없어 신고할 대상이 없다.
   const canReport = status !== "scheduled" && missionId != null;
+
+  const closeButton = canDismiss && (
+    <Pressable
+      accessibilityLabel="오늘의 미션 닫기"
+      accessibilityRole="button"
+      className="size-6 items-center justify-center"
+      hitSlop={8}
+      onPress={onDismiss}
+    >
+      <Ionicons color={semanticColors["label-subtle"]} name="close" size={20} />
+    </Pressable>
+  );
 
   const reportButton = canReport && (
     <Pressable
@@ -131,7 +149,10 @@ export function MissionCard({
           >
             오늘의 미션
           </ThemedText>
-          {reportButton}
+          <View className="flex-row items-center gap-2">
+            {reportButton}
+            {closeButton}
+          </View>
         </View>
       )}
 
@@ -158,12 +179,22 @@ export function MissionCard({
       {status === "revealed" && (
         <View className="items-center gap-4">
           <View className="items-center gap-1">
-            <ThemedText
-              typography="body-3-bold"
-              style={{ color: primitiveColors.orange["500"] }}
-            >
-              오늘의 미션
-            </ThemedText>
+            <View className="flex-row items-center gap-1.5">
+              <View className="rounded-full bg-orange-50 px-[9px] py-1">
+                <ThemedText
+                  typography="caption-1-bold"
+                  style={{ color: primitiveColors.orange["500"] }}
+                >
+                  NEW
+                </ThemedText>
+              </View>
+              <ThemedText
+                typography="body-3-bold"
+                style={{ color: primitiveColors.orange["500"] }}
+              >
+                오늘의 미션
+              </ThemedText>
+            </View>
             <ThemedText
               typography="title-2-bold"
               style={{ color: primitiveColors.charcoal["11"] }}
@@ -240,20 +271,13 @@ export function MissionCard({
         </MissionRowContainer>
       )}
 
-      {/* Figma 4305:33908: NEW뱃지는 우상단에 절대 위치로 뜬다 —
-          scheduled/revealed엔 위의 헤더 줄이 없어서 그 자리를 대신한다.
-          신고 `⋮`도 그 옆에 같이 둔다. */}
-      {status === "revealed" && (
+      {/* scheduled/revealed엔 isAccepted의 헤더 줄이 없어서, 신고 `⋮`·닫기
+          (X)를 우상단에 절대 위치로 대신 띄운다. NEW뱃지는 "오늘의 미션"
+          라벨 옆(중앙 콘텐츠 쪽)에 있어 여기 없다. */}
+      {(status === "scheduled" || status === "revealed") && (
         <View className="absolute right-5 top-5 flex-row items-center gap-2">
-          <View className="rounded-full bg-orange-50 px-[9px] py-1">
-            <ThemedText
-              typography="caption-1-bold"
-              style={{ color: primitiveColors.orange["500"] }}
-            >
-              NEW
-            </ThemedText>
-          </View>
           {reportButton}
+          {closeButton}
         </View>
       )}
 
