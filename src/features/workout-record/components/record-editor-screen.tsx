@@ -39,7 +39,10 @@ import {
 } from "@/features/workout-plan/model";
 
 import { saveWorkoutRecord } from "../api";
-import { toActualMeasuresDto } from "../actual-measure";
+import {
+  isActualMeasuresInRange,
+  toActualMeasuresDto,
+} from "../actual-measure";
 import { useRecordFlowStore } from "../record-flow-store";
 import { useMeasureSheets } from "../use-measure-sheets";
 
@@ -150,7 +153,11 @@ export function RecordEditorScreen({
   } | null>(null);
 
   const isMemoTooLong = memo.length > MEMO_MAX_LENGTH;
-  const canSubmit = selectedTypes.length > 0 && !isMemoTooLong && !isSubmitting;
+  const canSubmit =
+    selectedTypes.length > 0 &&
+    isActualMeasuresInRange(toActualMeasuresDto(selectedTypes, values)) &&
+    !isMemoTooLong &&
+    !isSubmitting;
 
   function toggleType(type: GoalType) {
     trackClick("record_editor", "goal_type_toggle");
