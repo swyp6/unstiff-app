@@ -219,6 +219,7 @@ export function WorkoutHistoryEditSheet({
             "time",
             ACTUAL_MEASURE_CONFIG.time.maximum,
           )}
+          minimumSeconds={API_MEASURE_RANGE.duration.minimum}
           minutes={Math.floor(totalSeconds / 60)}
           onClose={close}
           onConfirm={(minutes, seconds) => {
@@ -233,9 +234,16 @@ export function WorkoutHistoryEditSheet({
     return (
       <NumberValueInputSheet
         initialValue={goalValues[activeFieldSheet]!}
+        // 서버 필드는 Integer다 — 거리는 km→m 변환에서 반올림되지만
+        // 횟수·세트는 그대로 나가므로 입력부터 정수만 받는다.
+        integerOnly={activeFieldSheet !== "distance"}
         maximum={fromApiMeasureValue(
           activeFieldSheet,
           API_MEASURE_RANGE[GOAL_TYPE_TO_MEASURE_KEY[activeFieldSheet]].maximum,
+        )}
+        minimum={fromApiMeasureValue(
+          activeFieldSheet,
+          API_MEASURE_RANGE[GOAL_TYPE_TO_MEASURE_KEY[activeFieldSheet]].minimum,
         )}
         onClose={close}
         onConfirm={(value) => {

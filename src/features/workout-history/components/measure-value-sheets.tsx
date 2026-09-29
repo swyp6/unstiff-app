@@ -20,13 +20,15 @@ const NUMBER_INPUT_STYLE = {
 export function TimeValueInputSheet({
   minutes,
   seconds,
+  minimumSeconds,
   maximumSeconds,
   onClose,
   onConfirm,
 }: {
   minutes: number;
   seconds: number;
-  // 주어지면 합계(초)가 이 값을 넘을 때 확인 버튼을 막는다.
+  // 주어지면 합계(초)가 이 범위를 벗어날 때 확인 버튼을 막는다.
+  minimumSeconds?: number;
   maximumSeconds?: number;
   onClose: () => void;
   onConfirm: (minutes: number, seconds: number) => void;
@@ -34,8 +36,20 @@ export function TimeValueInputSheet({
   const [minuteText, setMinuteText] = useState(String(minutes));
   const [secondText, setSecondText] = useState(String(seconds));
   const keyboardHeight = useKeyboardHeight();
-  const nextMinutes = Math.max(0, Number(minuteText) || 0);
-  const nextSeconds = Math.min(59, Math.max(0, Number(secondText) || 0));
+  // 입력값을 0/59로 끌어다 맞추지 않는다 — number-pad여도 붙여넣기 등으로
+  // 소수·음수·문자가 들어올 수 있으니, 입력 그대로가 유효할 때만 확인을
+  // 허용한다. 빈 칸은 Number("")가 0이라 0으로 본다.
+  const nextMinutes = Number(minuteText);
+  const nextSeconds = Number(secondText);
+  const totalSeconds = nextMinutes * 60 + nextSeconds;
+  const isValid =
+    Number.isInteger(nextMinutes) &&
+    nextMinutes >= 0 &&
+    Number.isInteger(nextSeconds) &&
+    nextSeconds >= 0 &&
+    nextSeconds <= 59 &&
+    (minimumSeconds == null || totalSeconds >= minimumSeconds) &&
+    (maximumSeconds == null || totalSeconds <= maximumSeconds);
 
   return (
     <BottomSheet
@@ -73,12 +87,12 @@ export function TimeValueInputSheet({
       </View>
       <View style={{ paddingTop: 20, paddingBottom: keyboardHeight }}>
         <PrimaryActionButton
-          disabled={
-            maximumSeconds != null &&
-            nextMinutes * 60 + nextSeconds > maximumSeconds
-          }
+          disabled={!isValid}
           label="확인"
-          onPress={() => onConfirm(nextMinutes, nextSeconds)}
+          onPress={() => {
+            if (!isValid) return;
+            onConfirm(nextMinutes, nextSeconds);
+          }}
         />
       </View>
     </BottomSheet>
@@ -91,7 +105,9 @@ export function NumberValueInputSheet({
   title,
   unit,
   initialValue,
+  minimum,
   maximum,
+  integerOnly = false,
   quickAddAmounts,
   onClose,
   onConfirm,
@@ -99,8 +115,11 @@ export function NumberValueInputSheet({
   title: string;
   unit: string;
   initialValue: number;
-  // 주어지면 입력값이 이 값을 넘을 때 확인 버튼을 막는다.
+  // 주어지면 입력값이 이 범위를 벗어나거나(integerOnly면) 정수가 아닐 때
+  // 확인 버튼을 막는다.
+  minimum?: number;
   maximum?: number;
+  integerOnly?: boolean;
   quickAddAmounts?: number[];
   onClose: () => void;
   onConfirm: (value: number) => void;
@@ -108,6 +127,10 @@ export function NumberValueInputSheet({
   const [text, setText] = useState(String(initialValue));
   const keyboardHeight = useKeyboardHeight();
   const nextValue = Math.max(0, Number(text) || 0);
+  const isValid =
+    (minimum == null || nextValue >= minimum) &&
+    (maximum == null || nextValue <= maximum) &&
+    (!integerOnly || Number.isInteger(nextValue));
 
   return (
     <BottomSheet
@@ -156,9 +179,12 @@ export function NumberValueInputSheet({
 
       <View style={{ paddingTop: 20, paddingBottom: keyboardHeight }}>
         <PrimaryActionButton
-          disabled={maximum != null && nextValue > maximum}
+          disabled={!isValid}
           label="확인"
-          onPress={() => onConfirm(nextValue)}
+          onPress={() => {
+            if (!isValid) return;
+            onConfirm(nextValue);
+          }}
         />
       </View>
     </BottomSheet>
