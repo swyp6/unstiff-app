@@ -82,6 +82,10 @@ export default function RootLayout() {
               name="day-record"
               options={{ presentation: "fullScreenModal" }}
             />
+            <Stack.Screen
+              name="badge-earned"
+              options={{ presentation: "fullScreenModal" }}
+            />
             <Stack.Screen name="test" />
           </Stack>
         </ThemeProvider>

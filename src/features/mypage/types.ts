@@ -1,3 +1,5 @@
+import type { ImageSourcePropType } from "react-native";
+
 import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 
@@ -47,4 +49,24 @@ export type WorkoutReportResponse = {
   // 기록이 없는 구간은 담기지 않는다 — 빈 날짜를 채워 그리려면 호출부에서
   // 조회 범위를 직접 순회해야 한다.
   buckets: WorkoutReportBucket[];
+};
+
+// 마이페이지 "획득한 뱃지" — 백엔드 API 스펙이 아직 없어(#220) UI를 먼저
+// 만든다. image는 이미 컴포넌트가 바로 쓸 수 있게 정규화된 형태로 둔다 —
+// 지금은 mock에서 로컬 require()를 직접 담고, 실제 연동 시 api.ts에서
+// `imageUrl ? { uri: imageUrl } : null`로 변환해 채운다(타입은 그대로 유지).
+// earned=false면 image는 항상 무시하고 잠금 아이콘을 그린다 — 아직 없는
+// 뱃지의 아트를 미리 보여주지 않기 위함.
+export type Badge = {
+  id: string;
+  name: string;
+  description: string;
+  // 그리드 카드용 짧은 요약, 예: "3일 연속"
+  conditionSummary: string;
+  // 상세 모달/축하 화면용 전체 문장, 예: "3일 연속 운동이나 미션 완료"
+  conditionLabel: string;
+  earned: boolean;
+  earnedAt: string | null; // "YYYY-MM-DD"
+  image: ImageSourcePropType | null;
+  progress: { current: number; target: number } | null;
 };
