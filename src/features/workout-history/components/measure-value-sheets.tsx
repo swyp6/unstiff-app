@@ -20,17 +20,22 @@ const NUMBER_INPUT_STYLE = {
 export function TimeValueInputSheet({
   minutes,
   seconds,
+  maximumSeconds,
   onClose,
   onConfirm,
 }: {
   minutes: number;
   seconds: number;
+  // 주어지면 합계(초)가 이 값을 넘을 때 확인 버튼을 막는다.
+  maximumSeconds?: number;
   onClose: () => void;
   onConfirm: (minutes: number, seconds: number) => void;
 }) {
   const [minuteText, setMinuteText] = useState(String(minutes));
   const [secondText, setSecondText] = useState(String(seconds));
   const keyboardHeight = useKeyboardHeight();
+  const nextMinutes = Math.max(0, Number(minuteText) || 0);
+  const nextSeconds = Math.min(59, Math.max(0, Number(secondText) || 0));
 
   return (
     <BottomSheet
@@ -68,13 +73,12 @@ export function TimeValueInputSheet({
       </View>
       <View style={{ paddingTop: 20, paddingBottom: keyboardHeight }}>
         <PrimaryActionButton
-          label="확인"
-          onPress={() =>
-            onConfirm(
-              Math.max(0, Number(minuteText) || 0),
-              Math.min(59, Math.max(0, Number(secondText) || 0)),
-            )
+          disabled={
+            maximumSeconds != null &&
+            nextMinutes * 60 + nextSeconds > maximumSeconds
           }
+          label="확인"
+          onPress={() => onConfirm(nextMinutes, nextSeconds)}
         />
       </View>
     </BottomSheet>
@@ -87,6 +91,7 @@ export function NumberValueInputSheet({
   title,
   unit,
   initialValue,
+  maximum,
   quickAddAmounts,
   onClose,
   onConfirm,
@@ -94,12 +99,15 @@ export function NumberValueInputSheet({
   title: string;
   unit: string;
   initialValue: number;
+  // 주어지면 입력값이 이 값을 넘을 때 확인 버튼을 막는다.
+  maximum?: number;
   quickAddAmounts?: number[];
   onClose: () => void;
   onConfirm: (value: number) => void;
 }) {
   const [text, setText] = useState(String(initialValue));
   const keyboardHeight = useKeyboardHeight();
+  const nextValue = Math.max(0, Number(text) || 0);
 
   return (
     <BottomSheet
@@ -148,8 +156,9 @@ export function NumberValueInputSheet({
 
       <View style={{ paddingTop: 20, paddingBottom: keyboardHeight }}>
         <PrimaryActionButton
+          disabled={maximum != null && nextValue > maximum}
           label="확인"
-          onPress={() => onConfirm(Math.max(0, Number(text) || 0))}
+          onPress={() => onConfirm(nextValue)}
         />
       </View>
     </BottomSheet>

@@ -42,7 +42,10 @@ import {
   toApiIntensity,
   toPlanDateKey,
 } from "@/features/workout-plan/model";
-import { toActualMeasuresDto } from "@/features/workout-record/actual-measure";
+import {
+  isActualMeasuresInRange,
+  toActualMeasuresDto,
+} from "@/features/workout-record/actual-measure";
 import { saveWorkoutRecord } from "@/features/workout-record/api";
 import { ActualMeasureStepper } from "@/features/workout-record/components/actual-measure-stepper";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
@@ -109,6 +112,7 @@ export default function ManualRecordScreen() {
     !isMemoTooLong &&
     exerciseType.length > 0 &&
     selectedTypes.length > 0 &&
+    isActualMeasuresInRange(toActualMeasuresDto(selectedTypes, values)) &&
     !isSubmitting;
 
   function toggleType(type: GoalType) {

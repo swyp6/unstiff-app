@@ -24,7 +24,9 @@ import {
 import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 import {
   ACTUAL_MEASURE_CONFIG,
+  API_MEASURE_RANGE,
   formatActualMeasureValue,
+  isActualMeasuresInRange,
 } from "@/features/workout-record/actual-measure";
 
 import { updateWorkoutHistory } from "../api";
@@ -126,6 +128,7 @@ function MeasureFieldRow({
         accessibilityLabel={`${config.label} 늘리기`}
         accessibilityRole="button"
         className="h-10 w-10 items-center justify-center rounded-full bg-background-normal"
+        disabled={value >= config.maximum}
         onPress={increase}
       >
         <Ionicons color={semanticColors["label-normal"]} name="add" size={15} />
@@ -172,14 +175,17 @@ export function WorkoutHistoryEditSheet({
   );
   const [isSaving, setIsSaving] = useState(false);
 
+  const measures: ExerciseMeasuresDto = {};
+  for (const type of goalTypes) {
+    measures[GOAL_TYPE_TO_MEASURE_KEY[type]] = toApiMeasureValue(
+      type,
+      goalValues[type]!,
+    );
+  }
+  const isMeasuresInRange = isActualMeasuresInRange(measures);
+
   async function handleSubmit() {
-    const measures: ExerciseMeasuresDto = {};
-    for (const type of goalTypes) {
-      measures[GOAL_TYPE_TO_MEASURE_KEY[type]] = toApiMeasureValue(
-        type,
-        goalValues[type]!,
-      );
-    }
+    if (!isMeasuresInRange) return;
 
     setIsSaving(true);
     try {
@@ -207,6 +213,12 @@ export function WorkoutHistoryEditSheet({
       const totalSeconds = Math.round(current * 60);
       return (
         <TimeValueInputSheet
+          // 서버는 36059초까지 받지만, 프론트는 화면과 관계없이 10시간
+          // 00분 00초(ACTUAL_MEASURE_CONFIG.time.maximum)로 통일한다.
+          maximumSeconds={toApiMeasureValue(
+            "time",
+            ACTUAL_MEASURE_CONFIG.time.maximum,
+          )}
           minutes={Math.floor(totalSeconds / 60)}
           onClose={close}
           onConfirm={(minutes, seconds) => {
@@ -221,6 +233,10 @@ export function WorkoutHistoryEditSheet({
     return (
       <NumberValueInputSheet
         initialValue={goalValues[activeFieldSheet]!}
+        maximum={fromApiMeasureValue(
+          activeFieldSheet,
+          API_MEASURE_RANGE[GOAL_TYPE_TO_MEASURE_KEY[activeFieldSheet]].maximum,
+        )}
         onClose={close}
         onConfirm={(value) => {
           setGoalValues((c) => ({ ...c, [activeFieldSheet]: value }));
@@ -284,7 +300,7 @@ export function WorkoutHistoryEditSheet({
         </View>
 
         <ActionButton
-          disabled={isSaving}
+          disabled={isSaving || !isMeasuresInRange}
           label="수정하기"
           onPress={handleSubmit}
         />
