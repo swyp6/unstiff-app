@@ -2,7 +2,8 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect } from "react";
-import { Pressable, View } from "react-native";
+import LottieView from "lottie-react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -15,58 +16,13 @@ import {
 import { useBadgeEarnedStore } from "@/features/mypage/badge-earned-store";
 import { useBadgesStore } from "@/features/mypage/badges-store";
 
-// Figma "뱃지 획득 (전체 화면)" (6077:19217). 컨페티는 44개 조각을 낱개로
-// 배치해 뒀지만 순수 장식이라 그대로 옮기지 않고, 같은 색/모양 팔레트로
-// 절반 수만 고정 시드로 흩뿌린다 — 픽셀 단위로 같을 필요가 없다.
-// ponytail: 정적 흩뿌림, 떨어지는 낙하 애니메이션은 없음 — 필요해지면
-// reanimated로 추가.
-const CONFETTI_COLORS = ["#ff6326", "#ffa36e", "#7c5cff", "#0f9d8e"];
-const CONFETTI_COUNT = 22;
-
-function mulberry32(seed: number) {
-  let a = seed;
-  return () => {
-    a |= 0;
-    a = (a + 0x6d2b79f5) | 0;
-    let t = Math.imul(a ^ (a >>> 15), 1 | a);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
-const CONFETTI_PIECES = (() => {
-  const random = mulberry32(42);
-  return Array.from({ length: CONFETTI_COUNT }, (_, index) => ({
-    color: CONFETTI_COLORS[index % CONFETTI_COLORS.length],
-    left: `${Math.round(random() * 100)}%`,
-    rotate: `${Math.round(random() * 360)}deg`,
-    round: index % 3 === 0,
-    size: 7 + Math.round(random() * 6),
-    top: `${Math.round(random() * 55)}%`,
-  }));
-})();
-
-function Confetti() {
-  return (
-    <View className="absolute inset-0" pointerEvents="none">
-      {CONFETTI_PIECES.map((piece, index) => (
-        <View
-          className="absolute"
-          key={index}
-          style={{
-            backgroundColor: piece.color,
-            borderRadius: piece.round ? piece.size / 2 : 2,
-            height: piece.size,
-            left: piece.left as never,
-            top: piece.top as never,
-            transform: [{ rotate: piece.rotate }],
-            width: piece.size,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
+// Figma "뱃지 획득 (전체 화면)" (6077:19217)의 컨페티 대신 Lottie
+// (https://lottie.host/a1a9cbc9-ec44-4d55-ad32-7cfc4c374a28/vRNafYNNgt.lottie)
+// — dotLottie(.lottie) 압축 파일 안의 animations/12345.json만 꺼내
+// confetti.json으로 둔다. lottie-react-native가 순수 .json 소스를 더
+// 폭넓게 지원해 dotLottie 컨테이너를 그대로 쓰지 않는다. 1회 재생, 자동
+// 루프 없음(폭죽이 반복되면 어색하다).
+const CONFETTI_SOURCE = require("@/assets/mypage/badges/confetti.json");
 
 const ART_SIZE = 240;
 
@@ -111,11 +67,17 @@ export default function BadgeEarnedScreen() {
   return (
     <View className="flex-1">
       <LinearGradient
-        className="absolute inset-0"
         colors={["#ffd6c9", "#ffffff"]}
         locations={[0, 0.5]}
+        style={StyleSheet.absoluteFill}
       />
-      <Confetti />
+      <LottieView
+        autoPlay
+        loop={false}
+        resizeMode="cover"
+        source={CONFETTI_SOURCE}
+        style={[StyleSheet.absoluteFill, { pointerEvents: "none" }]}
+      />
       <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         <View className="flex-1 items-center justify-center px-[32px]">
           {pendingBadge.image && (
