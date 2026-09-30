@@ -1,13 +1,15 @@
-import Ionicons from "@expo/vector-icons/Ionicons";
+import { Image } from "expo-image";
 import { useEffect, useState } from "react";
-import { View } from "react-native";
+import { Platform, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import ReanimatedAnimated, { FadeIn, FadeOut } from "react-native-reanimated";
 
 import { ThemedText } from "@/components/themed-text";
-import { semanticColors } from "@/constants/tokens";
+import { primitiveColors, semanticColors } from "@/constants/tokens";
 
-// Figma 2211:14045 "피드백 완료 (토스트)".
+// Figma 4501:32234 "피드백 완료 (토스트)" — 탭바 위 16(812 프레임 기준 bottom
+// 110 = 탭바 94 + 16).
+const TOAST_TAB_BAR_GAP = 16;
 const TOAST_ENTER_MS = 220;
 const TOAST_HOLD_MS = 1500;
 const TOAST_EXIT_MS = 190;
@@ -56,7 +58,11 @@ export function MissionFeedbackToast({ onHide }: MissionFeedbackToastProps) {
         position: "absolute",
         left: 0,
         right: 0,
-        bottom: insets.bottom + 12,
+        // iOS NativeTabs는 탭바 높이를 safe-area bottom으로 보고하고 홈
+        // 화면이 그 뒤까지 깔린다. Android는 화면이 탭바 위에서 끝나고
+        // insets.bottom은 탭바가 이미 처리한 시스템 내비게이션 바다(home.tsx의
+        // Screen edges 참고).
+        bottom: (Platform.OS === "ios" ? insets.bottom : 0) + TOAST_TAB_BAR_GAP,
         alignItems: "center",
       }}
     >
@@ -65,22 +71,19 @@ export function MissionFeedbackToast({ onHide }: MissionFeedbackToastProps) {
           flexDirection: "row",
           alignItems: "center",
           gap: 10,
-          height: 48,
-          paddingLeft: 16,
-          paddingRight: 20,
+          paddingHorizontal: 20,
+          paddingVertical: 14,
           borderRadius: 999,
-          backgroundColor: semanticColors["label-normal"],
-          shadowColor: "#000000",
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.24,
-          shadowRadius: 20,
-          elevation: 6,
+          backgroundColor: primitiveColors.charcoal["11"],
+          // elevation/lg
+          boxShadow:
+            "0px 2px 6px 0px rgba(0, 23, 54, 0.06), 0px 12px 32px -8px rgba(0, 23, 54, 0.12)",
         }}
       >
-        <Ionicons
-          color={semanticColors["label-inverse"]}
-          name="checkmark-circle"
-          size={20}
+        <Image
+          contentFit="contain"
+          source={require("@/assets/home/icon-toast-check.svg")}
+          style={{ width: 20, height: 20 }}
         />
         <ThemedText
           accessibilityLiveRegion="polite"

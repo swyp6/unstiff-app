@@ -1546,7 +1546,6 @@ export default function HomeScreen() {
       {isFocused && (
         <MissionFeedbackModal
           missionId={pendingMissionFeedbackId}
-          missionTitle={missionTitle}
           onComplete={handleMissionFeedbackComplete}
           onSkip={handleMissionFeedbackSkip}
           visible={pendingMissionFeedbackId != null}
