@@ -10,8 +10,16 @@ import * as AppleAuthentication from "expo-apple-authentication";
 import { router } from "expo-router";
 import { Alert, Platform, View } from "react-native";
 
-import { logEvent, trackClick } from "@/features/analytics/analytics";
-import { hasUnagreedRequiredTerms, signIn } from "@/features/auth/api";
+import {
+  logEvent,
+  setAnalyticsUserId,
+  trackClick,
+} from "@/features/analytics/analytics";
+import {
+  getMyProfile,
+  hasUnagreedRequiredTerms,
+  signIn,
+} from "@/features/auth/api";
 import type { OAuth2SignInResponse } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
 import { useSignupStore } from "@/store/signup-store";
@@ -35,9 +43,18 @@ async function routeAfterSignIn(
   { accessToken, newUser }: OAuth2SignInResponse,
   method: "google" | "apple" | "kakao",
 ) {
+  useAuthStore.getState().setAccessToken(accessToken);
+
+  // GA user id는 login/sign_up 이벤트보다 먼저 설정해야 그 이벤트부터 연결된다.
+  // 신규 사용자도 sign-in 시점에 계정이 생성돼 /users/me가 id를 내려준다.
+  // Analytics 전용 조회라 실패해도 로그인 흐름은 그대로 진행한다.
+  try {
+    const profile = await getMyProfile();
+    await setAnalyticsUserId(String(profile.id));
+  } catch {}
+
   logEvent(newUser ? "sign_up" : "login", { method });
 
-  useAuthStore.getState().setAccessToken(accessToken);
   useSignupStore.getState().reset();
   useSignupStore.getState().setIsNewUser(newUser);
 

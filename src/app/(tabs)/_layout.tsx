@@ -2,6 +2,7 @@ import { Redirect } from "expo-router";
 import { useEffect, useState } from "react";
 
 import AppTabs from "@/components/app-tabs";
+import { setAnalyticsUserId } from "@/features/analytics/analytics";
 import { getMyProfile, hasUnagreedRequiredTerms } from "@/features/auth/api";
 import { useAuthStore } from "@/store/auth-store";
 import { useOnboardingStore } from "@/store/onboarding-store";
@@ -22,6 +23,9 @@ type EntryGate = "terms" | "nickname" | "ready";
 async function resolveEntryGate(): Promise<EntryGate> {
   if (await hasUnagreedRequiredTerms()) return "terms";
   const profile = await getMyProfile();
+  // 저장된 토큰으로 바로 들어온 사용자도 GA user id에 연결한다 — 판정과
+  // 무관하므로 기다리지 않고, 실패해도 탭 진입에 영향을 주지 않는다.
+  void setAnalyticsUserId(String(profile.id)).catch(() => {});
   return profile.nickname === null ? "nickname" : "ready";
 }
 
