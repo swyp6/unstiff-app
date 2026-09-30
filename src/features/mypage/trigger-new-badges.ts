@@ -12,8 +12,15 @@ export function triggerNewBadges(newBadges: number[]) {
   if (newBadges.length === 0) return;
   const earnedAt = new Date().toISOString();
   useBadgesStore.getState().markEarned(newBadges, earnedAt);
-  useBadgeEarnedStore
-    .getState()
-    .enqueue(newBadges.map((code) => badgeFromCode(code, earnedAt)));
-  router.push("/badge-earned");
+
+  const badgeEarnedStore = useBadgeEarnedStore.getState();
+  badgeEarnedStore.enqueue(
+    newBadges.map((code) => badgeFromCode(code, earnedAt)),
+  );
+  // 화면이 이미 떠 있으면(두 응답이 겹친 경우) 큐에만 더하고 또 push하지
+  // 않는다 — 안 그러면 /badge-earned가 중복으로 쌓인다.
+  if (!badgeEarnedStore.isScreenActive) {
+    badgeEarnedStore.setScreenActive(true);
+    router.push("/badge-earned");
+  }
 }

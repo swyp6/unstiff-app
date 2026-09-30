@@ -25,7 +25,18 @@ export default function BadgeEarnedScreen() {
   const queue = useBadgeEarnedStore((state) => state.queue);
   const dequeue = useBadgeEarnedStore((state) => state.dequeue);
   const clear = useBadgeEarnedStore((state) => state.clear);
+  const setScreenActive = useBadgeEarnedStore((state) => state.setScreenActive);
   const pendingBadge = queue[0] ?? null;
+
+  // trigger-new-badges.ts가 이 화면이 이미 떠 있는 동안엔 push를 또 부르지
+  // 않도록 마운트~언마운트 구간을 표시한다 — 이 화면이 완전히 사라져야
+  // (확인/뱃지 모아보기 어느 경로로 나가든) 다음 newBadges가 새로 push할 수
+  // 있다.
+  useEffect(() => {
+    setScreenActive(true);
+    return () => setScreenActive(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // record-complete.tsx와 같은 방어 — 큐가 비어 있는데 이 화면으로
   // 들어오면(딥링크, 새로고침 등) 뱃지를 지어내지 않고 바로 나간다. trigger-
@@ -52,10 +63,7 @@ export default function BadgeEarnedScreen() {
     // 남은 큐가 있어도 다 접고 마이페이지로 — 축하 화면을 더 보기보다
     // 지금 바로 뱃지 목록을 보고 싶다는 선택이다.
     clear();
-    // TODO: 마이페이지가 초기 탭을 파라미터로 받지 않아 "획득한 뱃지" 탭을
-    // 바로 열어주지 못한다 — mypage/index.tsx에 탭 딥링크가 생기면 여기서
-    // 같이 넘긴다.
-    router.dismissTo("/mypage");
+    router.dismissTo("/mypage?tab=badges");
   }
 
   return (

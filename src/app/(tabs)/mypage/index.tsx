@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -43,6 +43,21 @@ const TAB_REGION_CLASS: Record<MyPageTab, string> = {
 
 export default function MyPageScreen() {
   const [tab, setTab] = useState<MyPageTab>("streak");
+  // 뱃지 획득 축하 화면의 "뱃지 모아보기"처럼 특정 탭을 열어 마이페이지로
+  // 돌아오는 경로용 — 마이페이지는 탭 네비게이터라 이 화면이 이미 떠 있는
+  // 채로 다시 진입할 수 있어(초기 state가 아니라) params 변화를 지켜보는
+  // effect로 반영한다.
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
+  useEffect(() => {
+    if (
+      tabParam === "streak" ||
+      tabParam === "badges" ||
+      tabParam === "summary"
+    ) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setTab(tabParam);
+    }
+  }, [tabParam]);
   const nickname = useMyProfileStore((state) => state.nickname);
   const avatar = useMyProfileStore((state) => state.avatar);
   // Lives here rather than in StreakTab so switching between mypage tabs
