@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import AppTabs from "@/components/app-tabs";
 import { setAnalyticsUserId } from "@/features/analytics/analytics";
 import { getMyProfile, hasUnagreedRequiredTerms } from "@/features/auth/api";
+import type { UserProfile } from "@/features/auth/types";
 import { useAuthStore } from "@/store/auth-store";
 import { useOnboardingStore } from "@/store/onboarding-store";
 import { useSignupStore } from "@/store/signup-store";
@@ -12,7 +13,10 @@ import { useSignupStore } from "@/store/signup-store";
 // 둘 다 끝나기 전에는 AppTabs를 그리지 않는다.
 type EntryGate = "terms" | "nickname" | "ready";
 
-// 순서대로 판정한다. required 약관이 남아 있으면 프로필은 조회하지 않는다.
+// 순서대로 판정한다 — required 약관이 남아 있으면 프로필과 무관하게 "terms".
+// 프로필은 약관 조회와 함께 요청해, 약관 화면으로 보내질 사용자도 그 전에
+// onProfile(GA user id 설정)을 받게 한다. 판정 결과와 실패 처리는 약관 →
+// 프로필 순서로 조회하던 때와 같다.
 //
 // nickname은 서버가 프로필 설정(PUT /users/me/profile)이 끝나기 전까지 null로
 // 내려주므로(types.ts UserProfile), "약관은 다 동의했는데 nickname이 null"을
@@ -20,13 +24,18 @@ type EntryGate = "terms" | "nickname" | "ready";
 // reload에 날아가기 때문에 그 상태로는 신규/기존을 구분할 수 없고, 서버
 // nickname이 유일한 근거다. 빈 문자열은 계약상 미설정 상태가 아니라 정확히
 // null만 본다.
-async function resolveEntryGate(): Promise<EntryGate> {
-  if (await hasUnagreedRequiredTerms()) return "terms";
-  const profile = await getMyProfile();
-  // 저장된 토큰으로 바로 들어온 사용자도 GA user id에 연결한다 — 판정과
-  // 무관하므로 기다리지 않고, 실패해도 탭 진입에 영향을 주지 않는다.
-  void setAnalyticsUserId(String(profile.id)).catch(() => {});
-  return profile.nickname === null ? "nickname" : "ready";
+async function resolveEntryGate(
+  onProfile: (profile: UserProfile) => Promise<void>,
+): Promise<EntryGate> {
+  const [terms, profile] = await Promise.allSettled([
+    hasUnagreedRequiredTerms(),
+    getMyProfile(),
+  ]);
+  if (profile.status === "fulfilled") await onProfile(profile.value);
+  if (terms.status === "rejected") throw terms.reason;
+  if (terms.value) return "terms";
+  if (profile.status === "rejected") throw profile.reason;
+  return profile.value.nickname === null ? "nickname" : "ready";
 }
 
 // reload 뒤 signup-store는 initialState(isNewUser=false,
@@ -63,7 +72,18 @@ export default function TabsLayout() {
     if (!accessToken) return;
 
     let cancelled = false;
-    resolveEntryGate()
+    resolveEntryGate(async (profile) => {
+      // 저장된 토큰으로 바로 들어온 사용자도 GA user id에 연결한다. 응답 전에
+      // 로그아웃(토큰 null)이나 토큰 교체가 있었으면 이전 계정 id를 다시
+      // 설정하지 않는다. 판정 전에 완료를 기다려 이동할 화면의 첫 이벤트부터
+      // 연결되게 하고, 실패해도 탭 진입 판정에는 영향이 없다.
+      if (cancelled || useAuthStore.getState().accessToken !== accessToken) {
+        return;
+      }
+      try {
+        await setAnalyticsUserId(String(profile.id));
+      } catch {}
+    })
       .then((result) => {
         if (cancelled) return;
         if (result === "nickname") restoreSignupSequenceForNickname();
