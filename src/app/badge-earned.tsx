@@ -9,12 +9,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors } from "@/constants/tokens";
 import { trackClick } from "@/features/analytics/analytics";
-import {
-  todayCalendarDate,
-  toDateKey,
-} from "@/features/mypage/activity-report-period";
 import { useBadgeEarnedStore } from "@/features/mypage/badge-earned-store";
-import { useBadgesStore } from "@/features/mypage/badges-store";
 
 // Figma "뱃지 획득 (전체 화면)" (6077:19217)의 컨페티 대신 Lottie
 // (https://lottie.host/a1a9cbc9-ec44-4d55-ad32-7cfc4c374a28/vRNafYNNgt.lottie)
@@ -27,37 +22,36 @@ const CONFETTI_SOURCE = require("@/assets/mypage/badges/confetti.json");
 const ART_SIZE = 240;
 
 export default function BadgeEarnedScreen() {
-  const pendingBadge = useBadgeEarnedStore((state) => state.pendingBadge);
+  const queue = useBadgeEarnedStore((state) => state.queue);
+  const dequeue = useBadgeEarnedStore((state) => state.dequeue);
   const clear = useBadgeEarnedStore((state) => state.clear);
-  const earnBadge = useBadgesStore((state) => state.earnBadge);
+  const pendingBadge = queue[0] ?? null;
 
-  // record-complete.tsx와 같은 방어 — store가 비어 있는데 이 화면으로
-  // 들어오면(딥링크, 새로고침 등) 뱃지를 지어내지 않고 바로 나간다.
+  // record-complete.tsx와 같은 방어 — 큐가 비어 있는데 이 화면으로
+  // 들어오면(딥링크, 새로고침 등) 뱃지를 지어내지 않고 바로 나간다. trigger-
+  // new-badges.ts가 이미 badges-store에 획득 처리를 낙관적으로 반영해둔
+  // 뒤라, 이 화면은 큐를 보여주고 비우기만 하면 된다.
   useEffect(() => {
-    if (!pendingBadge) router.dismissTo("/mypage");
-  }, [pendingBadge]);
+    if (queue.length === 0) router.dismissTo("/mypage");
+  }, [queue.length]);
 
   if (!pendingBadge) return null;
-  const badgeId = pendingBadge.id;
-
-  // 실제로는 이 화면에 들어올 때 이미 서버가 획득 처리를 끝낸 뒤라 여기선
-  // 화면만 보여주면 된다. 지금은 그 API가 없어(#220) "확인/뱃지
-  // 모아보기"로 나가는 시점에 badges-store를 직접 갱신해 목데이터로도
-  // 획득 후 상태를 볼 수 있게 한다.
-  function markEarnedAndLeave() {
-    earnBadge(badgeId, toDateKey(todayCalendarDate()));
-    clear();
-  }
 
   function handleConfirm() {
     trackClick("badge_earned", "confirm");
-    markEarnedAndLeave();
-    router.back();
+    const isLast = queue.length <= 1;
+    dequeue();
+    // 큐에 다음 뱃지가 남아 있으면 이 화면에 그대로 머물러 다음 걸 보여준다
+    // (queue[0]이 바뀌면서 자동으로 다시 그려진다) — 마지막 하나였을 때만
+    // 원래 있던 곳(운동 기록 완료 화면 등)으로 돌아간다.
+    if (isLast) router.back();
   }
 
   function handleViewBadges() {
     trackClick("badge_earned", "view_badges");
-    markEarnedAndLeave();
+    // 남은 큐가 있어도 다 접고 마이페이지로 — 축하 화면을 더 보기보다
+    // 지금 바로 뱃지 목록을 보고 싶다는 선택이다.
+    clear();
     // TODO: 마이페이지가 초기 탭을 파라미터로 받지 않아 "획득한 뱃지" 탭을
     // 바로 열어주지 못한다 — mypage/index.tsx에 탭 딥링크가 생기면 여기서
     // 같이 넘긴다.
@@ -80,13 +74,11 @@ export default function BadgeEarnedScreen() {
       />
       <SafeAreaView className="flex-1" edges={["top", "bottom"]}>
         <View className="flex-1 items-center justify-center px-[32px]">
-          {pendingBadge.image && (
-            <Image
-              contentFit="contain"
-              source={pendingBadge.image}
-              style={{ height: ART_SIZE, width: ART_SIZE }}
-            />
-          )}
+          <Image
+            contentFit="contain"
+            source={pendingBadge.image}
+            style={{ height: ART_SIZE, width: ART_SIZE }}
+          />
           <View className="items-center gap-[6px] pt-[20px]">
             <ThemedText
               style={{

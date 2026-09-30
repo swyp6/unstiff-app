@@ -24,6 +24,7 @@ import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { trackClick } from "@/features/analytics/analytics";
 import { completeMission } from "@/features/missions/api";
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
+import { triggerNewBadges } from "@/features/mypage/trigger-new-badges";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
 import {
@@ -150,6 +151,7 @@ export function RecordEditorScreen({
     id: number;
     measures: ReturnType<typeof toActualMeasuresDto>;
     memo: string;
+    newBadges: number[];
   } | null>(null);
 
   const isMemoTooLong = memo.length > MEMO_MAX_LENGTH;
@@ -182,6 +184,7 @@ export function RecordEditorScreen({
       let measures: ReturnType<typeof toActualMeasuresDto>;
       let trimmedMemo: string;
       let savedId: number;
+      let newBadges: number[];
 
       if (savedWorkoutRef.current) {
         // 이전 시도에서 workout record는 이미 저장됐다(MISSION의
@@ -191,6 +194,7 @@ export function RecordEditorScreen({
         measures = savedWorkoutRef.current.measures;
         trimmedMemo = savedWorkoutRef.current.memo;
         savedId = savedWorkoutRef.current.id;
+        newBadges = savedWorkoutRef.current.newBadges;
       } else {
         const apiIntensity = toApiIntensity(intensity);
         measures = toActualMeasuresDto(selectedTypes, values);
@@ -207,7 +211,13 @@ export function RecordEditorScreen({
           ...(trimmedMemo ? { memo: trimmedMemo } : null),
         });
         savedId = saved.id;
-        savedWorkoutRef.current = { id: savedId, measures, memo: trimmedMemo };
+        newBadges = saved.newBadges;
+        savedWorkoutRef.current = {
+          id: savedId,
+          measures,
+          memo: trimmedMemo,
+          newBadges,
+        };
       }
 
       // 실제 수행 기록 저장이 성공한 뒤에만 미션 자체를 완료 처리한다 —
@@ -256,6 +266,9 @@ export function RecordEditorScreen({
       // 풀리면 그 사이 CTA를 다시 눌러 같은 요청이 한 번 더 나갈 수 있다.
       // 이 화면은 곧 unmount되므로 그때 함께 사라지게 둔다.
       router.replace("/record-complete");
+      // record-complete 위에 축하 화면을 쌓는다 — "확인"을 누르면 그 화면
+      // (여기)이 아니라 방금 replace한 record-complete로 돌아간다.
+      triggerNewBadges(newBadges);
     } catch {
       submissionLockRef.current = false;
       setIsSubmitting(false);

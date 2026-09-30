@@ -51,22 +51,39 @@ export type WorkoutReportResponse = {
   buckets: WorkoutReportBucket[];
 };
 
-// 마이페이지 "획득한 뱃지" — 백엔드 API 스펙이 아직 없어(#220) UI를 먼저
-// 만든다. image는 이미 컴포넌트가 바로 쓸 수 있게 정규화된 형태로 둔다 —
-// 지금은 mock에서 로컬 require()를 직접 담고, 실제 연동 시 api.ts에서
-// `imageUrl ? { uri: imageUrl } : null`로 변환해 채운다(타입은 그대로 유지).
-// earned=false면 image는 항상 무시하고 잠금 아이콘을 그린다 — 아직 없는
-// 뱃지의 아트를 미리 보여주지 않기 위함.
-export type Badge = {
-  id: string;
+// 마이페이지 "획득한 뱃지" (#220). 서버는 code(번호)와 획득 여부/진행도만
+// 주고, 이미지·이름·문구는 앱이 code로 BADGE_CATALOG(badges-catalog.ts)에서
+// 찾는다 — GET /api/v1/badges 설명의 대응표 그대로.
+export type BadgeCatalogEntry = {
+  code: number;
   name: string;
   description: string;
   // 그리드 카드용 짧은 요약, 예: "3일 연속"
   conditionSummary: string;
   // 상세 모달/축하 화면용 전체 문장, 예: "3일 연속 운동이나 미션 완료"
   conditionLabel: string;
+  image: ImageSourcePropType;
+};
+
+// GET /api/v1/badges 응답의 항목 하나. earnedAt이 null이면 미획득.
+export type BadgeListItem = {
+  code: number;
+  earnedAt: string | null; // ISO date-time
+};
+
+// GET /api/v1/badges/{code} — 미획득 뱃지 진행 막대용 상세.
+export type BadgeDetailResponse = {
+  code: number;
+  earnedAt: string | null; // ISO date-time
+  current: number;
+  goal: number;
+};
+
+// 화면에서 실제로 쓰는 뱃지 = 카탈로그(이미지/문구) + 서버 상태(획득 여부·
+// 진행도)를 합친 것. progress는 상세 API를 따로 불러야 채워지므로, 목록
+// 화면에서는 항상 null이다가 상세 모달을 열 때 채워진다.
+export type Badge = BadgeCatalogEntry & {
   earned: boolean;
-  earnedAt: string | null; // "YYYY-MM-DD"
-  image: ImageSourcePropType | null;
-  progress: { current: number; target: number } | null;
+  earnedAt: string | null; // ISO date-time
+  progress: { current: number; goal: number } | null;
 };

@@ -26,6 +26,7 @@ import { AiContentReportToast } from "@/features/reports/components/ai-content-r
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
 import { formatOfferArrivalLabel } from "@/features/missions/offer-time";
 import type { DailyMissionResponse } from "@/features/missions/types";
+import { triggerNewBadges } from "@/features/mypage/trigger-new-badges";
 import { useUnreadPushCount } from "@/features/notifications/use-unread-push-count";
 import { getWorkoutHistory } from "@/features/workout-history/api";
 import { summarizeWorkoutHistoryEntry } from "@/features/workout-history/model";
@@ -898,8 +899,11 @@ export default function HomeScreen() {
     }
 
     try {
-      const { id } = await createPlanPreset(toPlanRequestFields(plan));
+      const { id, newBadges } = await createPlanPreset(
+        toPlanRequestFields(plan),
+      );
       setSavedWorkoutPlans((plans) => [...plans, { ...plan, id: String(id) }]);
+      triggerNewBadges(newBadges);
     } catch {
       Alert.alert("오류", "루틴을 등록하지 못했습니다. 다시 시도해주세요.");
     }

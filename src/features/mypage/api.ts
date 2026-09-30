@@ -1,6 +1,11 @@
 import { apiClient } from "@/lib/api-client";
 
-import type { WorkoutActivityResponse, WorkoutReportResponse } from "./types";
+import type {
+  BadgeDetailResponse,
+  BadgeListItem,
+  WorkoutActivityResponse,
+  WorkoutReportResponse,
+} from "./types";
 
 // GET /api/v1/workouts/activity — 마이페이지 활동 기록 조회 (연속 기록 +
 // 해당 월에 기록이 있는 날짜별 기록 수). 홈 캘린더의 /api/v1/calendar와는
@@ -33,6 +38,26 @@ export async function getWorkoutReport(
       params: { from, to, exerciseTypes },
       paramsSerializer: { indexes: null },
     },
+  );
+  return data;
+}
+
+// GET /api/v1/badges — 뱃지 전체 목록. "서비스가 제공하는 뱃지를 화면에
+// 그릴 순서대로 모두 반환한다"고 스웨거에 명시돼 있어, 응답 배열 순서를
+// 그대로 그리드 순서로 쓴다(code로 다시 정렬하지 않는다). 이미지/문구는
+// badges-catalog.ts의 BADGE_CATALOG에서 code로 찾는다.
+export async function getBadges() {
+  const { data } = await apiClient.get<{ badges: BadgeListItem[] }>(
+    "/api/v1/badges",
+  );
+  return data.badges;
+}
+
+// GET /api/v1/badges/{code} — 미획득 뱃지의 진행 막대(current/goal)를 그릴
+// 때만 부른다. 목록 API는 진행도를 안 준다.
+export async function getBadgeDetail(code: number) {
+  const { data } = await apiClient.get<BadgeDetailResponse>(
+    `/api/v1/badges/${code}`,
   );
   return data;
 }

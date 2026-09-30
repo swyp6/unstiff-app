@@ -1,8 +1,11 @@
 import { Image } from "expo-image";
+import { useEffect, useState } from "react";
 import { Modal, Pressable, View } from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { primitiveColors } from "@/constants/tokens";
+import { getBadgeDetail } from "@/features/mypage/api";
+import { formatBadgeEarnedDate } from "@/features/mypage/badges-catalog";
 import type { Badge } from "@/features/mypage/types";
 
 // Figma "모달 / 뱃지 상세" — 획득(6046:18119) / 미획득(6065:18729) 두
@@ -11,8 +14,8 @@ import type { Badge } from "@/features/mypage/types";
 const ART_SIZE = 160;
 const PROGRESS_BAR_HEIGHT = 10;
 
-function ProgressBar({ current, target }: { current: number; target: number }) {
-  const percent = Math.min(100, (current / target) * 100);
+function ProgressBar({ current, goal }: { current: number; goal: number }) {
+  const percent = Math.min(100, (current / goal) * 100);
   return (
     <View className="w-full gap-[8px]">
       <View className="flex-row items-center justify-between">
@@ -33,7 +36,7 @@ function ProgressBar({ current, target }: { current: number; target: number }) {
             style={{ color: primitiveColors.charcoal["4"] }}
             typography="caption-1-regular"
           >
-            {` / ${target}`}
+            {` / ${goal}`}
           </ThemedText>
         </View>
       </View>
@@ -57,6 +60,33 @@ export function BadgeDetailModal({
   badge: Badge | null;
   onClose: () => void;
 }) {
+  // 진행도는 목록 API에 없어 GET /api/v1/badges/{code}로 따로 불러야 한다 —
+  // 미획득 뱃지를 열 때만 부르고, 로딩 중엔 막대를 생략한다(획득 조건
+  // 텍스트만 먼저 보인다).
+  const [progress, setProgress] = useState<{
+    current: number;
+    goal: number;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!badge || badge.earned) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setProgress(null);
+      return;
+    }
+    let cancelled = false;
+    setProgress(null);
+    getBadgeDetail(badge.code)
+      .then((detail) => {
+        if (cancelled) return;
+        setProgress({ current: detail.current, goal: detail.goal });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [badge]);
+
   if (!badge) return null;
 
   return (
@@ -79,7 +109,7 @@ export function BadgeDetailModal({
           onPress={onClose}
         />
         <View className="w-full max-w-[360px] items-center gap-0 rounded-[28px] bg-white px-[24px] pb-[24px] pt-[32px] shadow-[0px_20px_44px_0px_rgba(23,23,26,0.18)]">
-          {badge.earned && badge.image ? (
+          {badge.earned ? (
             <Image
               contentFit="contain"
               source={badge.image}
@@ -143,14 +173,11 @@ export function BadgeDetailModal({
                 style={{ color: primitiveColors.charcoal["4"] }}
                 typography="caption-1-regular"
               >
-                {`${badge.earnedAt.replaceAll("-", ". ")} 획득`}
+                {`${formatBadgeEarnedDate(badge.earnedAt)} 획득`}
               </ThemedText>
             )}
-            {!badge.earned && badge.progress && (
-              <ProgressBar
-                current={badge.progress.current}
-                target={badge.progress.target}
-              />
+            {!badge.earned && progress && (
+              <ProgressBar current={progress.current} goal={progress.goal} />
             )}
           </View>
 
