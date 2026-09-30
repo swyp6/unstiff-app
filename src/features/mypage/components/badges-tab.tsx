@@ -66,7 +66,8 @@ function BadgeCard({ badge, onPress }: { badge: Badge; onPress: () => void }) {
 
 export function BadgesTab() {
   const badges = useBadgesStore((state) => state.badges);
-  const isLoading = useBadgesStore((state) => state.isLoading);
+  const hasLoaded = useBadgesStore((state) => state.hasLoaded);
+  const loadError = useBadgesStore((state) => state.loadError);
   const load = useBadgesStore((state) => state.load);
   const [selectedBadge, setSelectedBadge] = useState<Badge | null>(null);
   const earnedCount = badges.filter((badge) => badge.earned).length;
@@ -97,15 +98,15 @@ export function BadgesTab() {
         </View>
         {badges.length === 0 ? (
           <View className="h-[200px] items-center justify-center">
-            {isLoading ? (
-              <ActivityIndicator color={semanticColors["label-normal"]} />
-            ) : (
+            {hasLoaded && loadError ? (
               <ThemedText
                 style={{ color: primitiveColors.charcoal["5"] }}
                 typography="caption-1-medium"
               >
                 뱃지를 불러오지 못했어요
               </ThemedText>
+            ) : (
+              <ActivityIndicator color={semanticColors["label-normal"]} />
             )}
           </View>
         ) : (
