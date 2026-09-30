@@ -1,10 +1,17 @@
 import {
   getAnalytics,
   logEvent as logFirebaseEvent,
+  setUserId,
 } from "@react-native-firebase/analytics";
 
 export function logEvent(name: string, params?: Record<string, unknown>) {
   return logFirebaseEvent(getAnalytics(), name, params);
+}
+
+// 로그인 세션 단위로 서버 user id를 연결한다 — 이벤트 payload마다 user_id를
+// 넣지 않고, 설정 이후 전송되는 이벤트에 Firebase가 붙여 준다. 로그아웃 시 null.
+export function setAnalyticsUserId(userId: string | null) {
+  return setUserId(getAnalytics(), userId);
 }
 
 // GA4 이벤트 이름 40자 제한 때문에 버튼 이벤트 이름엔 페이지명을 넣지 않는다 —
