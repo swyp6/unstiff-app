@@ -28,6 +28,11 @@ type BadgesState = {
   optimisticEarnedAt: Record<number, string>;
   load: () => Promise<void>;
   markEarned: (codes: number[], earnedAt: string) => void;
+  // logout()에서 호출 — 계정에 묶인 상태라 다음 계정 로그인 때 이전 계정의
+  // badges/optimisticEarnedAt이 잠깐 보이거나 섞이면 안 된다. latestLoadId도
+  // 같이 올려서, 로그아웃 시점에 아직 응답이 안 온 이전 계정의 load()가
+  // 나중에 도착해도 무시되게 한다.
+  reset: () => void;
 };
 
 let latestLoadId = 0;
@@ -83,4 +88,14 @@ export const useBadgesStore = create<BadgesState>((set) => ({
         optimisticEarnedAt,
       };
     }),
+  reset: () => {
+    latestLoadId++;
+    set({
+      badges: [],
+      hasLoaded: false,
+      isLoading: false,
+      loadError: false,
+      optimisticEarnedAt: {},
+    });
+  },
 }));

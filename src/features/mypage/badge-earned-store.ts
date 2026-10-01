@@ -20,6 +20,10 @@ type BadgeEarnedState = {
   dequeue: () => void;
   clear: () => void;
   setScreenActive: (active: boolean) => void;
+  // logout()에서 호출 — 계정에 묶인 상태라 다음 계정으로 넘어갈 때 이전
+  // 계정이 땄던 뱃지 큐가 남아있으면 안 된다. clear()와 달리
+  // isScreenActive도 같이 되돌린다.
+  reset: () => void;
 };
 
 export const useBadgeEarnedStore = create<BadgeEarnedState>((set) => ({
@@ -28,5 +32,6 @@ export const useBadgeEarnedStore = create<BadgeEarnedState>((set) => ({
   enqueue: (badges) => set((state) => ({ queue: [...state.queue, ...badges] })),
   isScreenActive: false,
   queue: [],
+  reset: () => set({ isScreenActive: false, queue: [] }),
   setScreenActive: (active) => set({ isScreenActive: active }),
 }));
