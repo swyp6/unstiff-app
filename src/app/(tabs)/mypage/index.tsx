@@ -46,7 +46,10 @@ export default function MyPageScreen() {
   // 뱃지 획득 축하 화면의 "뱃지 모아보기"처럼 특정 탭을 열어 마이페이지로
   // 돌아오는 경로용 — 마이페이지는 탭 네비게이터라 이 화면이 이미 떠 있는
   // 채로 다시 진입할 수 있어(초기 state가 아니라) params 변화를 지켜보는
-  // effect로 반영한다.
+  // effect로 반영한다. 적용한 뒤 바로 setParams로 지운다 — 안 그러면 route에
+  // tab=badges가 그대로 남아서, 사용자가 다른 탭으로 직접 바꾼 뒤(로컬
+  // state만 바뀌고 param은 안 바뀐다) 똑같이 ?tab=badges로 다시 들어와도
+  // 값이 "badges→badges"라 deps가 안 바뀌어 effect가 재실행되지 않는다.
   const { tab: tabParam } = useLocalSearchParams<{ tab?: string }>();
   useEffect(() => {
     if (
@@ -56,6 +59,7 @@ export default function MyPageScreen() {
     ) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setTab(tabParam);
+      router.setParams({ tab: undefined });
     }
   }, [tabParam]);
   const nickname = useMyProfileStore((state) => state.nickname);
