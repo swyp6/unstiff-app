@@ -32,9 +32,20 @@ export default function BadgeEarnedScreen() {
   // 않도록 마운트~언마운트 구간을 표시한다 — 이 화면이 완전히 사라져야
   // (확인/뱃지 모아보기 어느 경로로 나가든) 다음 newBadges가 새로 push할 수
   // 있다.
+  //
+  // 안드로이드 하드웨어 뒤로가기나 스와이프로 닫으면 handleConfirm을 거치지
+  // 않아 지금 보여주던 뱃지가 dequeue되지 않는다 — 그대로 두면 다음에 새
+  // 뱃지를 땄을 때 이미 본 이 뱃지가 큐 맨 앞에 남아 먼저 다시 뜬다. 화면이
+  // 어떤 경로로 사라지든 unmount 시점에 getState()로 최신 큐를 읽어, 아직
+  // 안 비워졌으면(confirm 경로는 이미 비워서 여기서 다시 지우지 않는다)
+  // 지금 보여주던 한 개만 치운다.
   useEffect(() => {
     setScreenActive(true);
-    return () => setScreenActive(false);
+    return () => {
+      const store = useBadgeEarnedStore.getState();
+      store.setScreenActive(false);
+      if (store.queue.length > 0) store.dequeue();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
