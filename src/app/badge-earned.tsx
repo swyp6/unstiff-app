@@ -38,13 +38,16 @@ export default function BadgeEarnedScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // record-complete.tsx와 같은 방어 — 큐가 비어 있는데 이 화면으로
-  // 들어오면(딥링크, 새로고침 등) 뱃지를 지어내지 않고 바로 나간다. trigger-
-  // new-badges.ts가 이미 badges-store에 획득 처리를 낙관적으로 반영해둔
-  // 뒤라, 이 화면은 큐를 보여주고 비우기만 하면 된다.
+  // record-complete.tsx와 같은 방어 — 큐가 비어 있는 채로 이 화면에
+  // 들어오면(딥링크, 새로고침 등) 뱃지를 지어내지 않고 바로 나간다. 마운트
+  // 시 1회만 확인한다 — deps를 queue.length로 두면 handleConfirm이 마지막
+  // 뱃지를 dequeue()해 큐를 비우는 바로 그 순간에도 이 effect가 같이
+  // 걸려서, 막 호출한 router.back()을 dismissTo("/mypage")가 덮어써버린다
+  // (정상 종료 경로의 네비게이션은 버튼 핸들러가 전담한다).
   useEffect(() => {
     if (queue.length === 0) router.dismissTo("/mypage");
-  }, [queue.length]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (!pendingBadge) return null;
 
