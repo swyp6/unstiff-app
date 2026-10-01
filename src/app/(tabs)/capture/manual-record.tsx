@@ -36,24 +36,27 @@ import {
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
 import {
   getIntensityLabel,
-  GOAL_TYPES,
   type GoalType,
   type Intensity,
   toApiIntensity,
   toPlanDateKey,
 } from "@/features/workout-plan/model";
 import {
+  DEFAULT_ACTUAL_MEASURE_VALUES,
   isActualMeasuresInRange,
   toActualMeasuresDto,
+  toggleActualMeasureType,
 } from "@/features/workout-record/actual-measure";
 import { saveWorkoutRecord } from "@/features/workout-record/api";
 import { ActualMeasureStepper } from "@/features/workout-record/components/actual-measure-stepper";
+import {
+  isRecordMemoTooLong,
+  RecordMemoField,
+} from "@/features/workout-record/components/record-memo-field";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
 import { useMeasureSheets } from "@/features/workout-record/use-measure-sheets";
 
 const TITLE_MAX_LENGTH = 20;
-// 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
-const MEMO_MAX_LENGTH = 50;
 
 // Figma 4173:30739 "2.2.2.1 신규 운동 기록 입력 -> 운동종류 선택시" — 기존
 // 오늘의 운동/미션에 연결하지 않고 사용자가 직접 운동명·종류·수행값을 적는
@@ -76,12 +79,9 @@ export default function ManualRecordScreen() {
   const [exerciseType, setExerciseType] = useState("");
   const [isTypeSheetVisible, setIsTypeSheetVisible] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<GoalType[]>([]);
-  const [values, setValues] = useState<Record<GoalType, number>>({
-    time: 1,
-    distance: 0.1,
-    reps: 1,
-    sets: 1,
-  });
+  const [values, setValues] = useState<Record<GoalType, number>>(
+    DEFAULT_ACTUAL_MEASURE_VALUES,
+  );
   const [intensity, setIntensity] = useState<Intensity>(null);
   const { intensitySheet, measureSheet, openIntensitySheet, openMeasureSheet } =
     useMeasureSheets({
@@ -105,7 +105,7 @@ export default function ManualRecordScreen() {
   const submissionLockRef = useRef(false);
 
   const isTitleTooLong = title.length > TITLE_MAX_LENGTH;
-  const isMemoTooLong = memo.length > MEMO_MAX_LENGTH;
+  const isMemoTooLong = isRecordMemoTooLong(memo);
   const canSubmit =
     title.trim().length > 0 &&
     !isTitleTooLong &&
@@ -117,13 +117,7 @@ export default function ManualRecordScreen() {
 
   function toggleType(type: GoalType) {
     trackClick("capture_manual_record", "goal_type_toggle");
-    setSelectedTypes((current) =>
-      current.includes(type)
-        ? current.filter((item) => item !== type)
-        : GOAL_TYPES.filter(
-            (goalType) => current.includes(goalType) || goalType === type,
-          ),
-    );
+    setSelectedTypes((current) => toggleActualMeasureType(current, type));
   }
 
   // MANUAL 저장은 POST /api/v1/workouts 한 번이다 — refId를 보내지 않고
@@ -410,73 +404,7 @@ export default function ManualRecordScreen() {
                 />
               </View>
 
-              <View>
-                <SectionLabel
-                  optional
-                  trailing={
-                    <ThemedText
-                      typography="caption-1-regular"
-                      style={{
-                        color: isMemoTooLong
-                          ? primitiveColors.red["6"]
-                          : semanticColors["label-disabled"],
-                      }}
-                    >
-                      {memo.length} / {MEMO_MAX_LENGTH}
-                    </ThemedText>
-                  }
-                >
-                  한 줄 기록
-                </SectionLabel>
-                <TextInput
-                  accessibilityLabel="한 줄 기록"
-                  multiline
-                  onChangeText={setMemo}
-                  placeholder="기록을 남겨보세요"
-                  placeholderTextColor={semanticColors["label-disabled"]}
-                  returnKeyType="done"
-                  style={{
-                    backgroundColor: semanticColors["fill-subtle"],
-                    borderColor: isMemoTooLong
-                      ? primitiveColors.red["6"]
-                      : "transparent",
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    color: semanticColors["label-normal"],
-                    fontFamily: "Pretendard-Medium",
-                    fontSize: 16,
-                    lineHeight: 24,
-                    minHeight: 50,
-                    paddingBottom: 14,
-                    paddingHorizontal: 16,
-                    paddingTop: 10,
-                    textAlignVertical: "top",
-                  }}
-                  value={memo}
-                />
-                {isMemoTooLong && (
-                  <View
-                    style={{
-                      alignItems: "center",
-                      flexDirection: "row",
-                      gap: 4,
-                      marginTop: 6,
-                    }}
-                  >
-                    <Ionicons
-                      color={primitiveColors.red["6"]}
-                      name="alert-circle"
-                      size={14}
-                    />
-                    <ThemedText
-                      typography="caption-1-regular"
-                      style={{ color: primitiveColors.red["6"] }}
-                    >
-                      {MEMO_MAX_LENGTH}자까지 쓸 수 있어요
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
+              <RecordMemoField onChangeText={setMemo} value={memo} />
 
               {error && (
                 <ThemedText
