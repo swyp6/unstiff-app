@@ -7,7 +7,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,7 +19,7 @@ import ReanimatedAnimated, {
 
 import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
-import { primitiveColors, semanticColors } from "@/constants/tokens";
+import { semanticColors } from "@/constants/tokens";
 import { trackClick } from "@/features/analytics/analytics";
 import { completeMission } from "@/features/missions/api";
 import { useMissionFeedbackStore } from "@/features/missions/mission-feedback-store";
@@ -32,7 +31,6 @@ import {
 } from "@/features/workout-plan/components/workout-plan-screen-ui";
 import {
   getIntensityLabel,
-  GOAL_TYPES,
   type GoalType,
   type Intensity,
   toApiIntensity,
@@ -40,16 +38,16 @@ import {
 
 import { saveWorkoutRecord } from "../api";
 import {
+  DEFAULT_ACTUAL_MEASURE_VALUES,
   isActualMeasuresInRange,
   toActualMeasuresDto,
+  toggleActualMeasureType,
 } from "../actual-measure";
 import { useRecordFlowStore } from "../record-flow-store";
 import { useMeasureSheets } from "../use-measure-sheets";
 
 import { ActualMeasureStepper } from "./actual-measure-stepper";
-
-// 운동 추가하기 시트(workout-plan-edit-sheet.tsx)의 한 줄 메모와 동일한 길이.
-const MEMO_MAX_LENGTH = 50;
+import { isRecordMemoTooLong, RecordMemoField } from "./record-memo-field";
 
 // "사진 없이 기록하기"로 들어와 photo가 없을 때 그 자리에 대신 보여주는 스탬프.
 const STAMP_IMAGE = require("@/assets/home/stamp.png");
@@ -115,10 +113,7 @@ export function RecordEditorScreen({
       : [],
   );
   const [values, setValues] = useState<Record<GoalType, number>>(() => ({
-    time: 1,
-    distance: 0.1,
-    reps: 1,
-    sets: 1,
+    ...DEFAULT_ACTUAL_MEASURE_VALUES,
     ...(target?.mode === "LINKED" ? target.initialGoalValues : null),
   }));
   const [intensity, setIntensity] = useState<Intensity>(null);
@@ -152,7 +147,7 @@ export function RecordEditorScreen({
     memo: string;
   } | null>(null);
 
-  const isMemoTooLong = memo.length > MEMO_MAX_LENGTH;
+  const isMemoTooLong = isRecordMemoTooLong(memo);
   const canSubmit =
     selectedTypes.length > 0 &&
     isActualMeasuresInRange(toActualMeasuresDto(selectedTypes, values)) &&
@@ -161,13 +156,7 @@ export function RecordEditorScreen({
 
   function toggleType(type: GoalType) {
     trackClick("record_editor", "goal_type_toggle");
-    setSelectedTypes((current) =>
-      current.includes(type)
-        ? current.filter((item) => item !== type)
-        : GOAL_TYPES.filter(
-            (goalType) => current.includes(goalType) || goalType === type,
-          ),
-    );
+    setSelectedTypes((current) => toggleActualMeasureType(current, type));
   }
 
   async function handleSubmit() {
@@ -411,73 +400,7 @@ export function RecordEditorScreen({
                 />
               </View>
 
-              <View>
-                <SectionLabel
-                  optional
-                  trailing={
-                    <ThemedText
-                      typography="caption-1-regular"
-                      style={{
-                        color: isMemoTooLong
-                          ? primitiveColors.red["6"]
-                          : semanticColors["label-disabled"],
-                      }}
-                    >
-                      {memo.length} / {MEMO_MAX_LENGTH}
-                    </ThemedText>
-                  }
-                >
-                  한 줄 기록
-                </SectionLabel>
-                <TextInput
-                  accessibilityLabel="한 줄 기록"
-                  multiline
-                  onChangeText={setMemo}
-                  placeholder="기록을 남겨보세요"
-                  placeholderTextColor={semanticColors["label-disabled"]}
-                  returnKeyType="done"
-                  style={{
-                    backgroundColor: semanticColors["fill-subtle"],
-                    borderColor: isMemoTooLong
-                      ? primitiveColors.red["6"]
-                      : "transparent",
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    color: semanticColors["label-normal"],
-                    fontFamily: "Pretendard-Medium",
-                    fontSize: 16,
-                    lineHeight: 24,
-                    minHeight: 50,
-                    paddingBottom: 14,
-                    paddingHorizontal: 16,
-                    paddingTop: 10,
-                    textAlignVertical: "top",
-                  }}
-                  value={memo}
-                />
-                {isMemoTooLong && (
-                  <View
-                    style={{
-                      alignItems: "center",
-                      flexDirection: "row",
-                      gap: 4,
-                      marginTop: 6,
-                    }}
-                  >
-                    <Ionicons
-                      color={primitiveColors.red["6"]}
-                      name="alert-circle"
-                      size={14}
-                    />
-                    <ThemedText
-                      typography="caption-1-regular"
-                      style={{ color: primitiveColors.red["6"] }}
-                    >
-                      {MEMO_MAX_LENGTH}자까지 쓸 수 있어요
-                    </ThemedText>
-                  </View>
-                )}
-              </View>
+              <RecordMemoField onChangeText={setMemo} value={memo} />
 
               {error && (
                 <ThemedText

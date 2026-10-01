@@ -74,6 +74,12 @@ type BottomSheetProps = PropsWithChildren<{
   // 콘텐츠가 그대로 다 보이는 높이라 접어도 버튼이 사라지지 않는다. 안쪽
   // 콘텐츠는 ScrollView로 감싸야 넘치는 부분이 잘리지 않고 스크롤된다.
   expandOnKeyboardShow?: boolean;
+  // 콘텐츠 높이에 맞춰 열리는(fullHeight/fixedHeightRatio가 아닌) 시트에서
+  // 내용이 fullSheetHeight보다 길어지면 시트를 그 높이에서 멈추고 안쪽 영역을
+  // 줄인다. 이 값이 없으면 넘친 부분은 overflow:hidden에 그냥 잘려 닿을 수
+  // 없다. 줄어든 높이는 children 안의 ScrollView(flexGrow:0)가 받아서 넘치는
+  // 부분만 스크롤하고, 내용이 짧으면 기존과 똑같이 내용 높이로 열린다.
+  shrinkContentToFit?: boolean;
   // "inline"으로 임베드해 화면의 콘텐츠 영역(=탭바 위)에서만 겹쳐 그릴 때는
   // 시트 아래가 기기 바닥이 아니라 이미 safe-area를 지키는 Native TabBar라,
   // bottom 여백을 또 더하면 빈 공간이 생긴다 — 그런 호출부는 []를 넘긴다.
@@ -106,6 +112,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       overlay,
       keyboardAvoiding = true,
       expandOnKeyboardShow = false,
+      shrinkContentToFit = false,
       safeAreaEdges = ["bottom"],
       onClose,
       onExpanded,
@@ -143,6 +150,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
       ? fullSheetHeight
       : (fixedSheetHeight ?? (fullHeight ? fullSheetHeight : undefined));
     const hasConstrainedHeight = sheetHeight !== undefined;
+    // 높이가 고정되지 않은 시트의 안쪽 레이어들이 시트 maxHeight에 맞춰
+    // 줄어들 수 있게 한다(shrinkContentToFit 주석 참고).
+    const shrinkStyle =
+      shrinkContentToFit && !hasConstrainedHeight ? styles.shrink : undefined;
     const collapsedTranslateY = fullHeight
       ? Math.max(0, fullSheetHeight - windowHeight * initialHeightRatio)
       : 0;
@@ -429,6 +440,10 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
           style={[
             styles.sheet,
             sheetHeight !== undefined && { height: sheetHeight },
+            // 기본 maxHeight(96%)는 iOS 상단 인셋(노치/다이내믹 아일랜드)보다
+            // 위까지 올라갈 수 있어, 줄어드는 시트는 키보드로 펼칠 때와 같은
+            // fullSheetHeight에서 멈춘다.
+            shrinkStyle && { maxHeight: fullSheetHeight },
             { transform: [{ translateY }] },
           ]}
         >
@@ -448,9 +463,9 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
             keyboardVerticalOffset={
               isKeyboardExpanded ? windowHeight - fullSheetHeight : 0
             }
-            style={hasConstrainedHeight ? styles.flex : undefined}
+            style={hasConstrainedHeight ? styles.flex : shrinkStyle}
           >
-            <View style={hasConstrainedHeight ? styles.flex : undefined}>
+            <View style={hasConstrainedHeight ? styles.flex : shrinkStyle}>
               {/* 손잡이(20px)만 잡히면 너무 좁아서 놓치기 쉬우니, 그 아래
                   제목 줄까지 한 덩어리로 드래그 영역을 넓힌다. */}
               <View {...panResponder.panHandlers}>
@@ -482,6 +497,7 @@ export const BottomSheet = forwardRef<BottomSheetHandle, BottomSheetProps>(
                 style={[
                   styles.content,
                   hasConstrainedHeight && styles.constrainedContent,
+                  shrinkStyle,
                   contentMaxHeight != null && { maxHeight: contentMaxHeight },
                   // iOS: 이 중첩 오버레이 구조에서 insets.bottom이 홈 인디케이터
                   // (34)보다 훨씬 큰 값을 기기별로 다르게 반환해 고정 24를 쓴다.
@@ -575,6 +591,10 @@ const styles = StyleSheet.create({
   },
   constrainedContent: {
     flex: 1,
+    minHeight: 0,
+  },
+  shrink: {
+    flexShrink: 1,
     minHeight: 0,
   },
 });

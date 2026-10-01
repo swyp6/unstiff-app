@@ -42,7 +42,36 @@ export const ACTUAL_MEASURE_CONFIG: Record<
   sets: { label: "세트", unit: "세트", step: 1, minimum: 1, maximum: 99 },
 };
 
-const GOAL_TYPE_TO_MEASURE_KEY: Record<GoalType, keyof ExerciseMeasuresDto> = {
+// 신규 기록(record-editor-screen·manual-record)과 기록 수정 시트가 같은
+// 기준으로 항목을 켜고 값을 채우도록 한 군데에 둔다.
+//
+// 항목을 처음 켰을 때의 값(UI 단위: 분/km/회/세트). "입력 안 함"은 0이나 빈
+// 값이 아니라 항목이 꺼져 있는 것으로만 표현한다.
+export const DEFAULT_ACTUAL_MEASURE_VALUES: Record<GoalType, number> = {
+  time: 1,
+  distance: 0.1,
+  reps: 1,
+  sets: 1,
+};
+
+// "기록할 항목" 칩 토글 — 모두 끌 수 있고(저장 버튼이 막는다), 켠 항목은
+// 항상 시간 → 거리 → 횟수 → 세트 순으로 둔다.
+export function toggleActualMeasureType(
+  selectedTypes: GoalType[],
+  type: GoalType,
+): GoalType[] {
+  return selectedTypes.includes(type)
+    ? selectedTypes.filter((item) => item !== type)
+    : ACTUAL_MEASURE_TYPES.filter(
+        (measureType) =>
+          selectedTypes.includes(measureType) || measureType === type,
+      );
+}
+
+export const GOAL_TYPE_TO_MEASURE_KEY: Record<
+  GoalType,
+  keyof ExerciseMeasuresDto
+> = {
   time: "duration",
   distance: "distance",
   reps: "count",
