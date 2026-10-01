@@ -14,6 +14,7 @@ import type {
   AiConversationType,
   ChatMessage,
 } from "@/features/chat/types";
+import { triggerNewBadges } from "@/features/mypage/trigger-new-badges";
 import { useAuthStore } from "@/store/auth-store";
 
 const CONVERSATION_TYPE: AiConversationType = "DAILY_DISCOVERY";
@@ -225,6 +226,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
         entryState: "ready",
         isLoading: false,
       });
+      triggerNewBadges(response.newBadges);
     } catch (error) {
       logChatError("loadConversation:start", error);
       if (!isCurrent(generation)) return;
@@ -254,6 +256,7 @@ export const useChatStore = create<ChatState>()((set, get) => {
           isTyping: false,
           canSend: !response.stop,
         }));
+        triggerNewBadges(response.newBadges);
       })
       .catch((error) => {
         logChatError("sendMessage", error);

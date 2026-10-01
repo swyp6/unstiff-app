@@ -25,6 +25,9 @@ export type PlanPresetCreateRequest = {
 
 export type PlanPresetCreateResponse = {
   id: number;
+  // 이 요청으로 새로 획득한 뱃지 번호. 없으면 빈 배열. 번호 ↔ 뱃지 대응은
+  // mypage/badges-catalog.ts의 BADGE_CATALOG를 본다.
+  newBadges: number[];
 };
 
 // POST /api/v1/daily-plans — stopwatchEnabled 필수인 이유는 위 PlanPresetCreateRequest 참고.

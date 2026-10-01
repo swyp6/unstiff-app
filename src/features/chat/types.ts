@@ -30,6 +30,10 @@ export type AiChatMessageResponse = {
   options?: string[];
   stop: boolean;
   createdAt: string;
+  // 대화가 종료된 응답(stop=true)에서만 값이 실릴 수 있는 신규 획득 뱃지
+  // 번호. 없으면 빈 배열. 번호 ↔ 뱃지 대응은 mypage/badges-catalog.ts의
+  // BADGE_CATALOG를 본다.
+  newBadges: number[];
 };
 
 // POST /api/v1/chat/ai/enter — available(오늘 더 보낼 수 있는지)과

@@ -1,3 +1,5 @@
+import type { ImageSourcePropType } from "react-native";
+
 import type { ExerciseMeasuresDto } from "@/features/workout-plan/types";
 import type { WorkoutHistoryResponse } from "@/features/workout-history/types";
 
@@ -47,4 +49,41 @@ export type WorkoutReportResponse = {
   // 기록이 없는 구간은 담기지 않는다 — 빈 날짜를 채워 그리려면 호출부에서
   // 조회 범위를 직접 순회해야 한다.
   buckets: WorkoutReportBucket[];
+};
+
+// 마이페이지 "획득한 뱃지" (#220). 서버는 code(번호)와 획득 여부/진행도만
+// 주고, 이미지·이름·문구는 앱이 code로 BADGE_CATALOG(badges-catalog.ts)에서
+// 찾는다 — GET /api/v1/badges 설명의 대응표 그대로.
+export type BadgeCatalogEntry = {
+  code: number;
+  name: string;
+  description: string;
+  // 그리드 카드용 짧은 요약, 예: "3일 연속"
+  conditionSummary: string;
+  // 상세 모달/축하 화면용 전체 문장, 예: "3일 연속 운동이나 미션 완료"
+  conditionLabel: string;
+  image: ImageSourcePropType;
+};
+
+// GET /api/v1/badges 응답의 항목 하나. earnedAt이 null이면 미획득.
+export type BadgeListItem = {
+  code: number;
+  earnedAt: string | null; // ISO date-time
+};
+
+// GET /api/v1/badges/{code} — 미획득 뱃지 진행 막대용 상세.
+export type BadgeDetailResponse = {
+  code: number;
+  earnedAt: string | null; // ISO date-time
+  current: number;
+  goal: number;
+};
+
+// 화면에서 실제로 쓰는 뱃지 = 카탈로그(이미지/문구) + 서버 상태(획득 여부·
+// 진행도)를 합친 것. progress는 상세 API를 따로 불러야 채워지므로, 목록
+// 화면에서는 항상 null이다가 상세 모달을 열 때 채워진다.
+export type Badge = BadgeCatalogEntry & {
+  earned: boolean;
+  earnedAt: string | null; // ISO date-time
+  progress: { current: number; goal: number } | null;
 };

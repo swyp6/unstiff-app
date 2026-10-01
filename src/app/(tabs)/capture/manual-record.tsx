@@ -25,6 +25,7 @@ import { ThemedText } from "@/components/themed-text";
 import { ActionButton } from "@/components/ui/action-button";
 import { primitiveColors, semanticColors } from "@/constants/tokens";
 import { trackClick } from "@/features/analytics/analytics";
+import { triggerNewBadges } from "@/features/mypage/trigger-new-badges";
 import { getOptimizedImageUrl } from "@/features/upload/image-transform";
 import { GoalTypeSelector } from "@/features/workout-plan/components/goal-type-selector";
 import { WorkoutLimitModal } from "@/features/workout-plan/components/workout-limit-modal";
@@ -170,6 +171,9 @@ export default function ManualRecordScreen() {
       // 풀리면 그 사이 CTA를 다시 눌러 같은 요청이 한 번 더 나갈 수 있다.
       // 이 화면은 곧 unmount되므로 그때 함께 사라지게 둔다.
       router.replace("/record-complete");
+      // record-complete 위에 축하 화면을 쌓는다 — "확인"을 누르면 그 화면
+      // (여기)이 아니라 방금 replace한 record-complete로 돌아간다.
+      triggerNewBadges(saved.newBadges);
     } catch (submitError) {
       submissionLockRef.current = false;
       setIsSubmitting(false);

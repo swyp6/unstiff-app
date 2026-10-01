@@ -26,6 +26,10 @@ export type WorkoutHistoryResponse = {
   intensity?: IntensityDto;
   imageUrl?: string;
   memo?: string;
+  // 이 요청으로 새로 획득한 뱃지 번호. 조회(GET) 응답에서는 항상 빈
+  // 배열이다 — POST /api/v1/workouts 응답에서만 값이 실린다. 번호 ↔ 뱃지
+  // 대응은 mypage/badges-catalog.ts의 BADGE_CATALOG를 본다.
+  newBadges: number[];
 };
 
 export type WorkoutHistoryListResponse = {
