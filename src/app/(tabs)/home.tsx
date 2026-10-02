@@ -1,6 +1,11 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
-import { router, useFocusEffect, useIsFocused } from "expo-router";
+import {
+  router,
+  useFocusEffect,
+  useIsFocused,
+  useNavigation,
+} from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -274,6 +279,7 @@ export default function HomeScreen() {
   // workout plan detail bottom sheet's Modal could stay visible over the
   // chat/mypage tabs after switching away without closing it first.
   const isFocused = useIsFocused();
+  const navigation = useNavigation();
   const [isTodayCardExpanded, setIsTodayCardExpanded] = useState(true);
   const [missionId, setMissionId] = useState<number | null>(null);
   const [missionStatus, setMissionStatus] =
@@ -1415,9 +1421,13 @@ export default function HomeScreen() {
     useRecordFlowStore.getState().setTarget(target);
     setIsRecordPhotoUploading(true);
     try {
+      // 업로드 도중 다른 탭으로 떠났다면 끝난 뒤 기록 입력 화면으로 강제
+      // 이동시키지 않는다(카메라 탭과 같은 정책). isFocused는 렌더 시점 값이라
+      // 업로드가 끝난 그 순간의 포커스를 navigation에서 직접 읽는다.
       await submitRecordPhoto(photo, {
         linkedTarget: { refType: target.refType, refId: target.refId },
         title: recordModalTitle,
+        shouldContinue: () => navigation.isFocused(),
       });
     } catch (uploadError) {
       logImageUploadError("daily photo upload failed", uploadError);
