@@ -1,5 +1,4 @@
 import Ionicons from "@expo/vector-icons/Ionicons";
-import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
 import {
   router,
@@ -9,16 +8,18 @@ import {
 } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
-import { AppState, Image, Pressable, View } from "react-native";
+import { Image, Pressable, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
 import { semanticColors } from "@/constants/tokens";
 import { trackClick } from "@/features/analytics/analytics";
-import { openOsSettings } from "@/features/permissions/api";
+import { ViewfinderCorner } from "@/features/camera/viewfinder-corner";
 import { logImageUploadError } from "@/features/upload/cloudinary";
-import { uploadPickedImage } from "@/features/upload/upload-image";
-import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
+import {
+  type RecordPhotoFile,
+  submitRecordPhoto,
+} from "@/features/workout-record/submit-record-photo";
 
 // Figma 1917:24863/1917:24879 배경색과 동일한 값 — 하드코딩 대신 토큰을 쓴다.
 const CAMERA_BG = semanticColors["label-normal"];
@@ -52,73 +53,29 @@ function parseLinkedTarget(
   return { refType, refId: parsedRefId };
 }
 
-type CapturedPhoto = {
-  uri: string;
-  width: number;
-  height: number;
-};
-
-function ViewfinderCorner({
-  position,
-}: {
-  position: "tl" | "tr" | "bl" | "br";
-}) {
-  const isTop = position === "tl" || position === "tr";
-  const isLeft = position === "tl" || position === "bl";
-
-  return (
-    <View
-      pointerEvents="none"
-      style={{
-        position: "absolute",
-        width: 32,
-        height: 32,
-        borderColor: "rgba(255,255,255,0.4)",
-        ...(isTop
-          ? { top: 24, borderTopWidth: 2 }
-          : { bottom: 24, borderBottomWidth: 2 }),
-        ...(isLeft
-          ? { left: 24, borderLeftWidth: 2 }
-          : { right: 24, borderRightWidth: 2 }),
-      }}
-    />
-  );
-}
-
-// [체크] 1.10/1.10.2 카메라 · 촬영 결과 (Figma) — 오늘의 미션/계획 완료 시,
-// 또는 하단 카메라 탭에서 곧장 인증 사진을 촬영하는 커스텀 카메라 화면.
-// 촬영 후 확인까지 마치면 Cloudinary 업로드를 수행하고, 결과는
-// record-flow-store를 거쳐 다음 화면으로 넘어간다:
-// - refType/refId가 이미 있으면(PLAN/MISSION에서 진입) 대상 선택을 건너뛰고
-//   바로 실제 수행값 입력(record-editor)으로 이어간다.
-// - 없으면(하단 카메라 탭에서 진입) 대상 선택 화면(record-target)에서
-//   오늘의 미션/오늘의 운동/루틴 중 무엇에 연결할지 고르게 한다.
+// [체크] 1.10.2 촬영 결과 (Figma) — 홈의 "기록 방식 선택"에서 "앨범에서
+// 선택"으로 고른 사진을 확인하고 업로드하는 화면(root /camera). 사진 촬영은
+// 앱 안에서 하지 않고 OS 기본 카메라를 쓰며, 그 경우 시스템 UI가 확인까지
+// 하므로 이 화면을 거치지 않는다(home.tsx startRecordPhotoCapture, 하단
+// 카메라 탭은 features/camera/system-camera-capture.tsx). 앨범 picker는 고르는
+// 즉시 확정되므로 이 화면이 앨범 사진의 유일한 확인 단계다.
+// 확인을 마치면 공통 흐름(submitRecordPhoto: 업로드 → record-flow-store →
+// 다음 화면)으로 넘긴다 — refType/refId가 있으면(PLAN/MISSION) 바로 실제
+// 수행값 입력(record-editor)으로, 없으면 대상 선택 화면으로 이어간다.
 export default function CameraScreen() {
   const { title, refType, refId, pickedUri, pickedWidth, pickedHeight } =
     useLocalSearchParams<{
       title?: string;
-      // PLAN/MISSION 화면에서 이미 대상이 정해진 채로 들어올 때만 채워짐
-      // — 하단 카메라 탭(standalone)에서는 둘 다 비어 있다.
+      // PLAN/MISSION 화면에서 이미 대상이 정해진 채로 들어올 때만 채워짐.
       refType?: "PLAN" | "MISSION";
       refId?: string;
-      // "기록 방식 선택" 모달에서 "앨범에서 선택"으로 들어온 경우, 홈
-      // 화면에서 이미 앨범 picker로 골라온 사진 — 이 화면은 바로 확인
-      // 미리보기로 시작한다(라이브 카메라를 띄우지 않는다).
+      // 홈 화면에서 이미 앨범 picker로 골라온 사진.
       pickedUri?: string;
       pickedWidth?: string;
       pickedHeight?: string;
     }>();
-  // expo-camera 문서: "Only one Camera preview can be active at any given
-  // time. If you have multiple screens in your app, you should unmount
-  // Camera components whenever a screen is unfocused." 이 화면(/camera)은
-  // Stack push/pop으로 마운트/언마운트되지만, 뒤로 나가는 전환 애니메이션이
-  // 끝나기 전에 다시 진입하면 이전 인스턴스가 아직 언마운트되는 중일 수
-  // 있다 — isFocused로 CameraView를 직접 게이팅해 그 순간에도 두 세션이
-  // 겹치지 않게 한다.
   const isFocused = useIsFocused();
-  const [permission, requestPermission, getPermission] = useCameraPermissions();
-  const [facing, setFacing] = useState<"front" | "back">("back");
-  const [photo, setPhoto] = useState<CapturedPhoto | null>(() =>
+  const [photo, setPhoto] = useState<RecordPhotoFile | null>(() =>
     pickedUri && pickedWidth && pickedHeight
       ? {
           uri: pickedUri,
@@ -127,11 +84,8 @@ export default function CameraScreen() {
         }
       : null,
   );
-  const [isCameraReady, setIsCameraReady] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const cameraRef = useRef<CameraView>(null);
   const navigation = useNavigation();
   // fullScreenModal로 뜨는 화면이라 <SafeAreaView>의 네이티브 인셋 측정이
   // 상단(상태바 영역)을 0으로 잡는 경우가 있어 — 명시적으로 훅에서 읽은
@@ -139,12 +93,11 @@ export default function CameraScreen() {
   const insets = useSafeAreaInsets();
 
   // 업로드 도중 사용자가 닫기/뒤로가기로 이 화면을 벗어날 수 있다. 업로드
-  // 자체(및 setResult)는 화면을 나가도 계속 끝까지 진행되어야 하지만,
-  // 그 시점에 router.back()을 또 호출하면 그 사이 사용자가 이동해 있을
-  // 수도 있는 엉뚱한 화면을 팝시켜버리므로 이 화면에 남아있을 때만 부른다.
-  // unmount 시점(화면 전환 애니메이션 이후)엔 이미 늦을 수 있어, 제거가
-  // 시작되는 즉시(버튼 탭·제스처·하드웨어 back 공통) 동기적으로 도는
-  // beforeRemove에서 플래그를 세운다.
+  // 자체는 화면을 나가도 계속 끝까지 진행되어야 하지만, 그 결과로 store를
+  // 건드리거나 다음 화면으로 넘기면 그 사이 사용자가 이동해 있을 수도 있는
+  // 엉뚱한 상태를 만든다. unmount 시점(화면 전환 애니메이션 이후)엔 이미
+  // 늦을 수 있어, 제거가 시작되는 즉시(버튼 탭·제스처·하드웨어 back 공통)
+  // 동기적으로 도는 beforeRemove에서 플래그를 세운다.
   const hasLeftRef = useRef(false);
   useEffect(() => {
     return navigation.addListener("beforeRemove", () => {
@@ -152,107 +105,10 @@ export default function CameraScreen() {
     });
   }, [navigation]);
 
-  // 포커스를 잃는 즉시(cleanup) ready 상태를 내려서, 화면이 아직 완전히
-  // unmount되지 않은 전환 애니메이션 도중에도 셔터가 눌리지 않게 막는다.
-  // 다시 포커스를 받으면 CameraView가 새로 mount되며 onCameraReady가 다시
-  // 불릴 때까지는 계속 false로 남는다.
-  useEffect(() => {
-    if (!isFocused) return;
-    return () => setIsCameraReady(false);
-  }, [isFocused]);
-
-  // 권한을 한 번 거부하면(iOS 항상, Android는 "다시 묻지 않음") OS가 더는
-  // 팝업을 띄우지 않아 사용자는 설정 앱에서 직접 허용해야 한다. 그렇게
-  // 허용하고 앱으로 돌아와도 hook의 permission state는 마운트 시점 값
-  // (denied)에 머물러 있으므로, 앱이 다시 active가 될 때마다 상태를 한 번
-  // 재조회해 CameraView 렌더링 조건이 다시 평가되게 한다. 훅의
-  // getPermission은 unmount 후 setState를 스스로 막으므로(isMounted ref)
-  // 별도 cancelled 플래그는 필요 없다.
-  useEffect(() => {
-    const subscription = AppState.addEventListener("change", (nextState) => {
-      if (nextState !== "active") return;
-      getPermission().catch((permissionError) => {
-        logImageUploadError(
-          "camera permission refresh failed",
-          permissionError,
-        );
-      });
-    });
-    return () => subscription.remove();
-  }, [getPermission]);
-
-  // "권한 허용" 버튼 — 설정 화면 기기 권한 행(handlePermissionRowPress)과
-  // 같은 정책: 아직 물어볼 수 있으면 OS 팝업(requestPermission), 더는 물어볼
-  // 수 없으면(canAskAgain=false — iOS는 한 번 거부하면 항상, Android는
-  // "다시 묻지 않음") requestPermission이 팝업 없이 즉시 denied로 끝나므로
-  // 설정 앱으로 보낸다. 다만 그 헬퍼는 granted여도 설정으로 보내는 반면
-  // 여기서는 granted면 기존 카메라 흐름에 맡겨야 해서 직접 분기한다.
-  // hook state가 아직 null이거나(초기 조회 전) stale할 수 있어 탭 시점에
-  // getPermission으로 한 번 다시 읽는다 — 이 호출과 requestPermission 모두
-  // hook state를 갱신하므로 결과가 렌더링 조건에 바로 반영된다.
-  async function handleRequestPermission() {
-    trackClick("camera", "permission_request");
-    try {
-      const status = await getPermission();
-      if (status.granted) return;
-
-      if (!status.canAskAgain) {
-        await openOsSettings();
-        return;
-      }
-
-      // Android는 getPermission이 canAskAgain=true라고 해도 실제 요청이
-      // 팝업 없이 blocked로 끝날 수 있다 — 그 경우 두 번 탭하게 두지 않고
-      // 바로 설정으로 보낸다(설정 화면과 동일).
-      const result = await requestPermission();
-      if (!result.granted && !result.canAskAgain) {
-        await openOsSettings();
-      }
-    } catch (permissionError) {
-      logImageUploadError("camera permission request failed", permissionError);
-      setError("권한 요청에 실패했어요. 다시 시도해 주세요.");
-    }
-  }
-
-  async function handleCapture() {
-    trackClick("camera", "shutter");
-    try {
-      if (!permission?.granted) {
-        const result = await requestPermission();
-        if (!result.granted) {
-          setError("카메라 접근 권한이 필요합니다.");
-        }
-        return;
-      }
-
-      // expo-camera는 onCameraReady 콜백 전에 takePictureAsync를 호출하지
-      // 말라고 명시한다 — 셔터 버튼이 비활성화돼 있어도 혹시 모를 호출을
-      // 한 번 더 막는다. isCapturing은 촬영 중 연타로 takePictureAsync가
-      // 중복 실행되는 것을 막는다.
-      if (!isCameraReady || isCapturing) return;
-
-      setIsCapturing(true);
-      const result = await cameraRef.current?.takePictureAsync();
-      if (result) {
-        setError(null);
-        setPhoto({
-          uri: result.uri,
-          width: result.width,
-          height: result.height,
-        });
-      }
-    } catch (captureError) {
-      logImageUploadError("camera capture failed", captureError);
-      setError("사진 촬영에 실패했어요. 다시 시도해 주세요.");
-    } finally {
-      setIsCapturing(false);
-    }
-  }
-
-  // 라이브 카메라 화면 하단의 갤러리 아이콘 전용 — 이 화면이 이미 완전히
-  // 떠 있는 상태에서 사용자가 직접 누르는 경우라 present 충돌이 없다("앨범
-  // 에서 선택"으로 처음 들어올 때 쓰는 picker는 home.tsx의
-  // startRecordLibraryPick이 화면 전환 전에 따로 연다).
+  // "다시 선택" — 이 화면이 이미 완전히 떠 있는 상태에서 사용자가 직접
+  // 누르는 경우라 present 충돌이 없다(처음 들어올 때 쓰는 picker는 home.tsx의
+  // startRecordLibraryPick이 화면 전환 전에 따로 연다). 취소하면 지금 사진을
+  // 그대로 둔다.
   async function handlePickFromLibrary() {
     trackClick("camera", "pick_from_library");
     try {
@@ -284,57 +140,15 @@ export default function CameraScreen() {
     setIsUploading(true);
     setError(null);
     try {
-      const secureUrl = await uploadPickedImage(
-        photo.uri,
-        photo.width,
-        photo.height,
-        "DAILY_PHOTO",
-      );
-
       // 화면을 이미 벗어났으면(뒤로가기 등) 업로드 자체는 끝까지 흘러가게
-      // 두되, 그 결과로 전역 record-flow-store를 건드리지 않는다 — 그 사이
-      // 사용자가 새 기록을 시작했다면 store에는 이미 새 photo/target이 들어가
-      // 있고, 여기서 setPhoto를 부르면 뒤늦게 도착한 이전 기록의 사진이 그
-      // 새 기록의 사진을 덮어써 버린다. 다음 화면으로 밀어넣지 않는 것도
-      // 마찬가지 이유(예상 밖의 화면 전환)로 그대로 유지한다.
-      if (hasLeftRef.current) return;
-
-      useRecordFlowStore.getState().setPhoto({ secureUrl });
-
-      const linkedTarget = parseLinkedTarget(refType, refId);
-      if (linkedTarget) {
-        // home.tsx가 이 화면으로 넘어오기 전에(사진 촬영/앨범 선택 시작
-        // 시점) 이미 PLAN 목표값(initialGoalTypes/initialGoalValues)까지
-        // 포함한 full target을 store에 심어둔다 — 지금 route param
-        // (refType/refId)과 정확히 같은 대상이면 그 target을 그대로 두고
-        // 덮어쓰지 않는다. 여기서 무조건 refType/refId만으로 새 target을
-        // 만들면 그 초기 목표값이 사라진다. store에 남아있는 target이 다른
-        // PLAN/MISSION의 것이거나(예: 이전 기록을 하다 만 상태) 아예
-        // 없으면(딥링크로 곧장 들어온 경우 등) 재사용하지 않고 route param
-        // 기반 최소 target으로 새로 만든다 — stale target을 현재 사진에
-        // 잘못 연결하지 않기 위함이다.
-        const existingTarget = useRecordFlowStore.getState().target;
-        const hasMatchingExistingTarget =
-          existingTarget?.mode === "LINKED" &&
-          existingTarget.refType === linkedTarget.refType &&
-          existingTarget.refId === linkedTarget.refId;
-
-        if (!hasMatchingExistingTarget) {
-          useRecordFlowStore.getState().setTarget({
-            mode: "LINKED",
-            refType: linkedTarget.refType,
-            refId: linkedTarget.refId,
-            title: title ?? "",
-          });
-        }
-        router.push("/record-editor");
-      } else {
-        // 하단 카메라 탭(capture/index)에서 진입한 경우만 여기로 온다
-        // — 대상 선택 화면은 그 탭의 nested route(capture/target)라
-        // Native TabBar가 계속 보인다(camera 탭 자체가 root fullScreenModal
-        // 이 아니라 탭 콘텐츠라서 이 분기는 항상 그 안에서만 실행된다).
-        router.push("/capture/target");
-      }
+      // 두되, 그 결과로 전역 record-flow-store를 건드리거나 다음 화면으로
+      // 밀어넣지 않는다 — 그 사이 사용자가 새 기록을 시작했다면 뒤늦게 도착한
+      // 이전 기록의 사진이 새 기록의 사진을 덮어써 버린다.
+      await submitRecordPhoto(photo, {
+        linkedTarget: parseLinkedTarget(refType, refId),
+        title,
+        shouldContinue: () => !hasLeftRef.current,
+      });
     } catch (uploadError) {
       logImageUploadError("daily photo upload failed", uploadError);
       setError("업로드에 실패했어요. 다시 시도해 주세요.");
@@ -345,10 +159,8 @@ export default function CameraScreen() {
 
   return (
     <View className="flex-1" style={{ backgroundColor: CAMERA_BG }}>
-      {/* RN StatusBar는 마운트된 <StatusBar> 중 마지막 것이 이기는 스택이라,
-          하단 카메라 탭(capture/index)으로 한 번 들어오면 이 화면이 탭 콘텐츠로
-          계속 마운트돼 있어 다른 탭(홈/채팅/마이)의 밝은 배경에서도 흰 아이콘이
-          남았다. 포커스 동안만 올려서 벗어나면 _layout.tsx의 "dark"로 돌아간다. */}
+      {/* RN StatusBar는 마운트된 <StatusBar> 중 마지막 것이 이기는 스택이라
+          포커스 동안만 올린다 — 벗어나면 _layout.tsx의 "dark"로 돌아간다. */}
       {isFocused && <StatusBar style="light" />}
       <View
         style={{
@@ -375,62 +187,7 @@ export default function CameraScreen() {
         </View>
 
         <View className="relative flex-1 overflow-hidden bg-[#292e33]">
-          {permission?.granted && isFocused ? (
-            // photo 유무와 무관하게 계속 mount된 상태로 둔다 — "다시
-            // 찍기"마다 이 CameraView를 unmount/remount하면(예전엔 photo가
-            // 있을 때 이 자리에 <Image>를 대신 렌더해 매번 없앴다가 다시
-            // 만들었다) 네이티브 세션이 새로 뜨는 도중에 촬영하는 셈이 돼
-            // takePictureAsync가 응답하지 않는 문제가 실기기/시뮬레이터
-            // 모두에서 재현됐다. 촬영된 사진은 이 위에 <Image>로 덮어
-            // 보여주고, 세션 자체는 화면 포커스를 잃을 때만 내린다.
-            <CameraView
-              // facing이 바뀔 때만 강제로 재마운트해 새 카메라 세션이 열릴
-              // 때까지(onCameraReady가 다시 불릴 때까지) 촬영이 막히도록
-              // 한다 — photo는 이제 이 key에 관여하지 않는다.
-              key={facing}
-              ref={cameraRef}
-              style={{ flex: 1 }}
-              facing={facing}
-              onCameraReady={() => setIsCameraReady(true)}
-              onMountError={(mountError) => {
-                setIsCameraReady(false);
-                setError(mountError.message || "카메라를 열지 못했어요.");
-              }}
-            />
-          ) : permission?.granted ? (
-            // 포커스를 잃은 동안(전환 애니메이션 등)에는 CameraView 자체를
-            // 렌더하지 않는다 — expo-camera 문서 권고: 동시에 활성화된
-            // 프리뷰는 하나만 유지해야 한다.
-            <View style={{ flex: 1 }} />
-          ) : !photo ? (
-            <Pressable
-              className="flex-1 items-center justify-center gap-4 px-8"
-              accessibilityRole="button"
-              onPress={handleRequestPermission}
-            >
-              {/* alignSelf: stretch — 부모가 items-center라 Text가 콘텐츠
-                  폭으로 측정되면 반올림 오차로 마지막 어절("필요합니다")이
-                  세 번째 줄로 밀린 채 2줄 높이에 잘린다(confirm-modal의
-                  w-full과 같은 이유). 가용 폭을 전부 주고 textAlign으로
-                  가운데 맞춘다. */}
-              <ThemedText
-                typography="body-2-bold"
-                style={{
-                  color: "#ffffff",
-                  textAlign: "center",
-                  alignSelf: "stretch",
-                }}
-              >
-                카메라로 촬영하려면{"\n"}접근 권한이 필요합니다
-              </ThemedText>
-              <View className="rounded-2xl bg-white px-6 py-3">
-                <ThemedText typography="body-3-bold">권한 허용</ThemedText>
-              </View>
-            </Pressable>
-          ) : null}
           {photo && (
-            // CameraView 위를 완전히 덮는 오버레이로 찍은 사진을 보여준다 —
-            // 아래 CameraView는 이 동안에도 계속 살아 있다(위 주석 참고).
             <Image
               source={{ uri: photo.uri }}
               className="absolute inset-0"
@@ -463,19 +220,13 @@ export default function CameraScreen() {
                 className="h-[52px] flex-1 items-center justify-center rounded-full bg-white/[0.16]"
                 accessibilityRole="button"
                 disabled={isUploading}
-                // CameraView는 photo가 있는 동안에도 계속 mount돼 있으므로
-                // (위 뷰파인더 참고) isCameraReady를 여기서 다시 false로
-                // 내릴 필요가 없다 — 이미 준비된 같은 세션을 그대로 쓴다.
-                onPress={() => {
-                  trackClick("camera", "retake");
-                  setPhoto(null);
-                }}
+                onPress={handlePickFromLibrary}
               >
                 <ThemedText
                   typography="body-3-bold"
                   style={{ color: "#ffffff" }}
                 >
-                  다시 찍기
+                  다시 선택
                 </ThemedText>
               </Pressable>
               <Pressable
@@ -493,48 +244,20 @@ export default function CameraScreen() {
               </Pressable>
             </View>
           ) : (
-            <View className="h-[76px] flex-row items-center justify-between">
-              <Pressable
-                className="size-[59px] items-center justify-center rounded-2xl bg-white/[0.16]"
-                accessibilityRole="button"
-                accessibilityLabel="갤러리에서 선택"
-                onPress={handlePickFromLibrary}
+            // 사진 없이 열린 경우(딥링크 등) — 확인할 사진이 없으니 앨범에서
+            // 고르게 한다.
+            <Pressable
+              className="h-[52px] items-center justify-center rounded-full bg-white"
+              accessibilityRole="button"
+              onPress={handlePickFromLibrary}
+            >
+              <ThemedText
+                typography="body-3-bold"
+                style={{ color: semanticColors["label-normal"] }}
               >
-                <Ionicons name="images-outline" size={28} color="#ffffff" />
-              </Pressable>
-
-              <Pressable
-                className="items-center justify-center rounded-full border-2 border-white/60 p-[5px]"
-                accessibilityRole="button"
-                accessibilityLabel="촬영"
-                disabled={!isCameraReady || isCapturing}
-                onPress={handleCapture}
-              >
-                <View
-                  className="size-[58px] rounded-full bg-white"
-                  style={{ opacity: isCameraReady ? 1 : 0.4 }}
-                />
-              </Pressable>
-
-              <Pressable
-                className="size-[59px] items-center justify-center rounded-full bg-white/[0.16]"
-                accessibilityRole="button"
-                accessibilityLabel="카메라 전환"
-                onPress={() => {
-                  trackClick("camera", "flip");
-                  setIsCameraReady(false);
-                  setFacing((current) =>
-                    current === "back" ? "front" : "back",
-                  );
-                }}
-              >
-                <Ionicons
-                  name="camera-reverse-outline"
-                  size={28}
-                  color="#ffffff"
-                />
-              </Pressable>
-            </View>
+                앨범에서 선택
+              </ThemedText>
+            </Pressable>
           )}
         </View>
       </View>
