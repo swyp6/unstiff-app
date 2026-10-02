@@ -58,14 +58,32 @@ export function toggleGoalTypeSelection(
   return GOAL_TYPES.filter((type) => next.includes(type));
 }
 
+// maximum은 GoalStepper의 +와 목표값 직접 입력 휠(MeasureValueBottomSheet)이
+// 함께 쓰는 상한이다. 서버는
+// 계획 targets도 실제 기록과 같은 ExerciseMeasures(@Max)로 검증하므로 그
+// 상한을 UI 단위로 옮겼다 — 시간 36059초(600분 59초)는 분 단위 휠로 표현
+// 가능한 600분, 거리 99900m는 99.9km, 횟수 9999, 세트 99. 실제 기록 범위
+// (ACTUAL_MEASURE_CONFIG)와는 별개로 둔다.
 export const GOAL_CONFIG: Record<
   GoalType,
-  { label: string; step: number; minimum: number; unit: string }
+  {
+    label: string;
+    step: number;
+    minimum: number;
+    maximum: number;
+    unit: string;
+  }
 > = {
-  time: { label: "시간", step: 5, minimum: 5, unit: "분" },
-  distance: { label: "거리", step: 0.1, minimum: 0.1, unit: "km" },
-  reps: { label: "횟수", step: 1, minimum: 1, unit: "회" },
-  sets: { label: "세트", step: 1, minimum: 1, unit: "세트" },
+  time: { label: "시간", step: 5, minimum: 5, maximum: 600, unit: "분" },
+  distance: {
+    label: "거리",
+    step: 0.1,
+    minimum: 0.1,
+    maximum: 99.9,
+    unit: "km",
+  },
+  reps: { label: "횟수", step: 1, minimum: 1, maximum: 9999, unit: "회" },
+  sets: { label: "세트", step: 1, minimum: 1, maximum: 99, unit: "세트" },
 };
 
 export const INTENSITY_OPTIONS: {
