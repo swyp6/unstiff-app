@@ -29,6 +29,12 @@ export function ConfirmModal({
   // 버튼 두 개 아래에 놓이는 보조 액션(Figma "모달(캡션)" 변형) — 예: "사진 없이
   // 기록하기". 260x36 영역 안에 caption-1-bold charcoal/5로 그린다.
   captionAction,
+  // iOS 전용: 모달이 실제로 화면에서 사라진(네이티브 닫힘 애니메이션 완료) 뒤
+  // 호출된다 — 닫자마자 다른 네이티브 화면(시스템 카메라 등)을 띄워야 할 때,
+  // 닫히는 도중에 present해 iOS가 무시하지 않도록 이 시점을 기다린다. 넘기면
+  // visible=false에도 Modal을 마운트한 채 닫는다(넘기지 않으면 기존처럼
+  // 언마운트). Android RN Modal은 이 콜백을 부르지 않는다.
+  onDismissed,
 }: {
   visible: boolean;
   title: string;
@@ -41,8 +47,9 @@ export function ConfirmModal({
   onDismiss?: () => void;
   swapButtons?: boolean;
   captionAction?: { label: string; onPress: () => void };
+  onDismissed?: () => void;
 }) {
-  if (!visible) return null;
+  if (!visible && !onDismissed) return null;
 
   const handleDismiss = onDismiss ?? onCancel;
 
@@ -87,13 +94,16 @@ export function ConfirmModal({
       // Android: 둘 다 켜야 dim(surface/dim)이 status bar·navigation bar 뒤까지
       // 이어진다 — Figma는 화면 전체를 덮는다. WorkoutLimitModal과 같은 설정.
       navigationBarTranslucent
+      onDismiss={onDismissed}
       onRequestClose={handleDismiss}
       statusBarTranslucent
       transparent
-      visible
+      visible={visible}
     >
+      {/* 닫히는 중(fade-out)에는 버튼이 다시 눌리지 않게 터치를 막는다. */}
       <View
         className="flex-1 items-center justify-center px-6"
+        pointerEvents={visible ? "auto" : "none"}
         style={{ backgroundColor: "rgba(23, 23, 25, 0.45)" }}
       >
         <Pressable

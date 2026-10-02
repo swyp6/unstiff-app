@@ -2,7 +2,14 @@ import Ionicons from "@expo/vector-icons/Ionicons";
 import * as ImagePicker from "expo-image-picker";
 import { router, useFocusEffect, useIsFocused } from "expo-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Alert, Platform, Pressable, ScrollView, View } from "react-native";
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  Pressable,
+  ScrollView,
+  View,
+} from "react-native";
 
 import { ThemedText } from "@/components/themed-text";
 import { AddItemButton } from "@/components/ui/add-item-button";
@@ -14,6 +21,11 @@ import { getCalendarMonth } from "@/features/calendar/api";
 import { HomeCalendar } from "@/features/calendar/components/home-calendar";
 import { addDays, toDateKey } from "@/features/calendar/date";
 import type { CalendarDay, CalendarResponse } from "@/features/calendar/types";
+import {
+  ensureCameraPermission,
+  launchSystemCamera,
+  readSystemCameraResult,
+} from "@/features/camera/system-camera";
 import {
   acceptMission,
   dismissMission,
@@ -70,6 +82,10 @@ import {
 import { RecordMethodModal } from "@/features/upload/components/record-method-modal";
 import { logImageUploadError } from "@/features/upload/cloudinary";
 import { useRecordFlowStore } from "@/features/workout-record/record-flow-store";
+import {
+  type RecordPhotoFile,
+  submitRecordPhoto,
+} from "@/features/workout-record/submit-record-photo";
 
 // Figma 홈 화면 바탕(surface/background #fafafa, node 4305:33601). Screen의
 // 기본 배경(background-normal #ffffff)과 같으면 흰색 카드·"운동 추가하기"
@@ -632,6 +648,15 @@ export default function HomeScreen() {
   );
   const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
     useState(false);
+  // "사진 촬영"으로 찍은 사진을 업로드하는 동안 — 시스템 카메라가 닫힌 뒤
+  // 기록 입력 화면으로 넘어가기 전까지 홈 위에 로딩을 덮어 중복 입력을 막는다.
+  const [isRecordPhotoUploading, setIsRecordPhotoUploading] = useState(false);
+  // "카메라"를 눌러 기록 방식 모달이 닫히기를 기다리는 중 — iOS는 모달이 실제로
+  // 사라진 뒤(onDismissed)에야 시스템 카메라를 띄운다.
+  const pendingRecordCameraRef = useRef(false);
+  // 시스템 카메라 → 업로드 → 화면 이동이 진행 중인 동안 — 연타나 중복 콜백으로
+  // 카메라가 두 번 뜨거나 같은 사진이 두 번 처리되지 않게 한다.
+  const isRecordCameraBusyRef = useRef(false);
   // 체크 탭 즉시 완료 상태를 낙관적으로 바꾸지만, 기록 방식(사진 촬영/앨범/
   // 사진 없이)이 아직 확정되지 않은 동안에는 어떤 항목(미션 또는 특정 오늘의
   // 운동 instance)이 대기 중인지 이 id로 남겨둔다 — 확정 없이 홈으로
@@ -724,7 +749,11 @@ export default function HomeScreen() {
   // blur 시점에만 실행되므로 마운트 시 stale 값 문제가 없다.
   useFocusEffect(
     useCallback(() => {
-      return () => setIsRecordMethodModalVisible(false);
+      return () => {
+        setIsRecordMethodModalVisible(false);
+        // 모달이 닫히기 전에 다른 탭으로 떠났다면 그 뒤에 카메라를 띄우지 않는다.
+        pendingRecordCameraRef.current = false;
+      };
     }, []),
   );
 
@@ -1191,6 +1220,9 @@ export default function HomeScreen() {
   // 기록 방식 선택 모달을 연다 — 모달 결과를 기다렸다가 그때 체크하지 않는다.
   // 이미 체크된 상태를 다시 누르면(완료 취소) 기존처럼 즉시 되돌린다.
   function openRecordMethodModal(planItemId: string, title: string) {
+    // 이전 모달의 "카메라" 대기 표시가 (닫힘 콜백을 못 받아) 남아 있어도 새
+    // 모달에서 다시 누를 수 있게 비운다.
+    pendingRecordCameraRef.current = false;
     setPendingRecordPlanItemId(planItemId);
     setRecordModalTitle(title);
     setIsRecordMethodModalVisible(true);
@@ -1300,27 +1332,100 @@ export default function HomeScreen() {
     };
   }
 
+  // "카메라" — 기록 방식 모달(네이티브 Modal)이 닫히는 도중에 시스템 카메라를
+  // present하면 iOS가 그 present를 무시할 수 있어, 먼저 모달만 닫고 실제로
+  // 사라진 뒤(handleRecordMethodModalDismissed)에 연다. Android RN Modal은
+  // 닫힘 콜백이 없고 카메라 앱(Activity) 실행이 다이얼로그 닫힘과 충돌하지
+  // 않아 바로 연다.
   function startRecordPhotoCapture() {
+    if (pendingRecordCameraRef.current || isRecordCameraBusyRef.current) {
+      return;
+    }
     trackClick("home", "record_method_take_photo");
     setIsRecordMethodModalVisible(false);
+    if (Platform.OS === "ios") {
+      pendingRecordCameraRef.current = true;
+      return;
+    }
+    captureRecordPhoto();
+  }
+
+  // 모달이 어떤 이유로 닫히든 불리므로(앨범/사진 없이/백드롭 포함) "카메라"를
+  // 눌러 대기 중일 때만 카메라를 연다 — 대기 표시는 한 번 쓰면 지운다.
+  function handleRecordMethodModalDismissed() {
+    if (!pendingRecordCameraRef.current) return;
+    pendingRecordCameraRef.current = false;
+    captureRecordPhoto();
+  }
+
+  async function captureRecordPhoto() {
+    if (isRecordCameraBusyRef.current) return;
+    isRecordCameraBusyRef.current = true;
+    try {
+      await launchAndSubmitRecordPhoto();
+    } finally {
+      isRecordCameraBusyRef.current = false;
+    }
+  }
+
+  // OS 기본 카메라를 여기(홈 화면)에서 바로 연다 — 앨범 선택(아래)과 같은
+  // 이유로 /camera 같은 fullScreenModal을 먼저 띄운 뒤 그 안에서 열지 않는다.
+  // 촬영 확인(다시 찍기/사진 사용)은 시스템 UI가 하므로, 사진을 받으면 곧바로
+  // 공통 흐름(업로드 → record-flow-store → record-editor)으로 넘긴다.
+  async function launchAndSubmitRecordPhoto() {
     const planItemId = pendingRecordPlanItemId ?? MISSION_PLAN_ITEM_ID;
     const target = buildRecordTarget(planItemId);
     if (!target) {
       revertPendingRecord();
       return;
     }
-    // camera.tsx가 업로드 완료 후 route param(refType/refId)만으로 target을
-    // 다시 만들면 여기서 계산한 initialGoalTypes/initialGoalValues(PLAN
-    // 목표값 prefill)가 사라진다 — 카메라로 넘어가기 전에 미리 full target을
-    // store에 심어 두면 camera.tsx가 이 값을 그대로 보존해 쓴다(camera.tsx의
-    // handleUsePhoto 참고). 이전 세션에서 남은 사진이 있을 수 있어 함께
-    // 정리한다.
+
+    let photo: RecordPhotoFile;
+    try {
+      const permission = await ensureCameraPermission();
+      if (permission !== "granted") {
+        Alert.alert("카메라 접근 권한이 필요합니다.");
+        revertPendingRecord();
+        return;
+      }
+
+      const outcome = readSystemCameraResult(await launchSystemCamera());
+      if (outcome.kind === "canceled") {
+        revertPendingRecord();
+        return;
+      }
+      if (outcome.kind === "invalid") {
+        Alert.alert("사진을 불러오지 못했어요. 다시 시도해 주세요.");
+        revertPendingRecord();
+        return;
+      }
+      photo = outcome.photo;
+    } catch (cameraError) {
+      logImageUploadError("system camera launch failed", cameraError);
+      Alert.alert("카메라를 열지 못했어요. 다시 시도해 주세요.");
+      revertPendingRecord();
+      return;
+    }
+
+    // 사진이 실제로 확정된 뒤에만(취소/권한 거부 시에는 건드리지 않는다) PLAN
+    // 목표값(initialGoalTypes/initialGoalValues)까지 포함한 full target을
+    // store에 심는다 — submitRecordPhoto가 같은 대상이면 이 target을 그대로
+    // 보존한다. 이전 세션에서 남은 사진이 있을 수 있어 함께 정리한다.
     useRecordFlowStore.getState().setPhoto(null);
     useRecordFlowStore.getState().setTarget(target);
-    router.push({
-      pathname: "/camera",
-      params: buildRecordCameraParams(),
-    });
+    setIsRecordPhotoUploading(true);
+    try {
+      await submitRecordPhoto(photo, {
+        linkedTarget: { refType: target.refType, refId: target.refId },
+        title: recordModalTitle,
+      });
+    } catch (uploadError) {
+      logImageUploadError("daily photo upload failed", uploadError);
+      Alert.alert("업로드에 실패했어요. 다시 시도해 주세요.");
+      revertPendingRecord();
+    } finally {
+      setIsRecordPhotoUploading(false);
+    }
   }
 
   // 앨범 picker는 여기(홈 화면)에서 바로 연다 — /camera 화면이 fullScreenModal로
@@ -1523,6 +1628,7 @@ export default function HomeScreen() {
 
       <RecordMethodModal
         onClose={dismissRecordMethodModal}
+        onDismissed={handleRecordMethodModalDismissed}
         onPickFromLibrary={startRecordLibraryPick}
         onSkipPhoto={completeRecordWithoutPhoto}
         onTakePhoto={startRecordPhotoCapture}
@@ -1580,6 +1686,17 @@ export default function HomeScreen() {
           value={newPlanDraft}
           visible
         />
+      )}
+
+      {/* 네이티브 Modal 대신 화면 안 오버레이 — 시스템 카메라가 닫히는
+          애니메이션 도중에 두 번째 네이티브 present를 시도하지 않는다. */}
+      {isRecordPhotoUploading && (
+        <View
+          className="absolute inset-0 items-center justify-center bg-black/40"
+          accessibilityLabel="사진 업로드 중"
+        >
+          <ActivityIndicator color="#ffffff" />
+        </View>
       )}
     </Screen>
   );

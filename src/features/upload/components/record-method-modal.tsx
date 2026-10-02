@@ -8,6 +8,9 @@ type RecordMethodModalProps = {
   onTakePhoto: () => void;
   onPickFromLibrary: () => void;
   onSkipPhoto: () => void;
+  // iOS에서 모달이 실제로 닫힌 뒤 — "카메라"를 누른 경우 시스템 카메라는 이
+  // 시점에 띄운다(ConfirmModal onDismissed 참고).
+  onDismissed: () => void;
 };
 
 // Figma "기록 방식 선택"(4305:35621) — 공통 ConfirmModal의 "모달(캡션)" 변형
@@ -21,6 +24,7 @@ export function RecordMethodModal({
   onTakePhoto,
   onPickFromLibrary,
   onSkipPhoto,
+  onDismissed,
 }: RecordMethodModalProps) {
   return (
     <ConfirmModal
@@ -32,6 +36,7 @@ export function RecordMethodModal({
       onCancel={onTakePhoto}
       onConfirm={onPickFromLibrary}
       onDismiss={onClose}
+      onDismissed={onDismissed}
       title={title}
       visible={visible}
     />
