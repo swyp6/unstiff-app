@@ -165,6 +165,10 @@ const config: ExpoConfig = {
     eas: {
       projectId: "11509332-c0c8-48fd-92f4-8e152f7052a1",
     },
+    // test.tsx의 강제 크래시 버튼 등 production 사용자에게 노출되면 안 되는
+    // 디버그 기능을 런타임에 가리는 데 쓴다 — scheme 딥링크(unstiff://test)로는
+    // __DEV__와 무관하게 production 빌드에서도 라우트에 접근 가능하기 때문.
+    isProductionBuild: process.env.EAS_BUILD_PROFILE === "production",
   },
 };
 

@@ -1,4 +1,5 @@
 import { crash, getCrashlytics } from "@react-native-firebase/crashlytics";
+import Constants from "expo-constants";
 import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -110,21 +111,30 @@ export default function TestScreen() {
           ))}
         </View>
 
-        <SectionTitle>Crashlytics</SectionTitle>
-        {/* __DEV__에선 crash-reporting.ts가 수집을 꺼두므로, 실제 리포트
-            확인은 release/프로덕션 빌드에서 눌러야 한다. */}
-        <Pressable
-          onPress={() => crash(getCrashlytics())}
-          style={{
-            alignSelf: "flex-start",
-            paddingVertical: 10,
-            paddingHorizontal: 16,
-            borderRadius: radius.default,
-            backgroundColor: semanticColors["primary-normal"],
-          }}
-        >
-          <ThemedText style={{ color: "#fff" }}>강제 크래시 발생</ThemedText>
-        </Pressable>
+        {/* unstiff://test 딥링크는 production 빌드에서도 __DEV__와 무관하게
+            열리므로, 실제 사용자가 강제 크래시 버튼을 누를 수 없도록 production
+            EAS 빌드에서는 섹션 자체를 숨긴다. preview/development 빌드에선
+            crash-reporting.ts가 수집을 켜두니(!__DEV__) 그대로 눌러 리포트를
+            확인할 수 있다. */}
+        {!Constants.expoConfig?.extra?.isProductionBuild && (
+          <>
+            <SectionTitle>Crashlytics</SectionTitle>
+            <Pressable
+              onPress={() => crash(getCrashlytics())}
+              style={{
+                alignSelf: "flex-start",
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: radius.default,
+                backgroundColor: semanticColors["primary-normal"],
+              }}
+            >
+              <ThemedText style={{ color: "#fff" }}>
+                강제 크래시 발생
+              </ThemedText>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
