@@ -1686,6 +1686,7 @@ export default function HomeScreen() {
 
       {newPlanDraft && isFocused && (
         <WorkoutPlanEditSheet
+          enableGoalValuePicker
           onClose={() => setNewPlanDraft(null)}
           onDelete={() => setNewPlanDraft(null)}
           onSave={saveNewPlan}

@@ -26,6 +26,7 @@ import {
   canUseStopwatch,
   formatStartTime,
   getIntensityLabel,
+  GOAL_CONFIG,
   type GoalType,
   PLAN_MEMO_MAX_LENGTH,
   toggleGoalTypeSelection,
@@ -35,6 +36,7 @@ import {
 import { GoalStepper } from "./goal-stepper";
 import { GoalTypeSelector } from "./goal-type-selector";
 import { IntensityBottomSheet } from "./intensity-bottom-sheet";
+import { MeasureValueBottomSheet } from "./measure-value-bottom-sheet";
 import { TimePickerBottomSheet } from "./time-picker-bottom-sheet";
 import { WorkoutTypeBottomSheet } from "./workout-type-bottom-sheet";
 import { SectionLabel, SelectionRow } from "./workout-plan-screen-ui";
@@ -65,6 +67,10 @@ type WorkoutPlanEditSheetProps = {
   // 2112:52614, 탭바가 보이는 채로 뜨는 루틴 추가 시트) 전용. home.tsx는
   // 계속 기본값(modal)을 쓰므로 동작이 바뀌지 않는다.
   presentation?: "modal" | "inline";
+  // 목표값(시간/거리/횟수/세트)의 가운데 값을 눌러 휠 피커로 직접 입력하게
+  // 한다 — 큰 값을 -/+로 맞추기 번거로운 "오늘의 운동 추가"(home.tsx 신규
+  // 추가)에서만 켠다. 기존 계획 편집 흐름은 기본값(false)이라 그대로다.
+  enableGoalValuePicker?: boolean;
 };
 
 export function WorkoutPlanEditSheet({
@@ -78,6 +84,7 @@ export function WorkoutPlanEditSheet({
   showDelete = true,
   showAddToTodayToggle = false,
   presentation = "modal",
+  enableGoalValuePicker = false,
 }: WorkoutPlanEditSheetProps) {
   const [draft, setDraft] = useState<WorkoutPlanDraft>(value);
   const [saveAsRoutine, setSaveAsRoutine] = useState(false);
@@ -99,11 +106,19 @@ export function WorkoutPlanEditSheet({
     useState(false);
   const [isTimeSheetVisible, setIsTimeSheetVisible] = useState(false);
   const [isIntensitySheetVisible, setIsIntensitySheetVisible] = useState(false);
+  // 휠 피커로 직접 입력 중인 목표 항목(없으면 null) — GoalStepper의 값을
+  // 누르면 그 타입으로 켜진다.
+  const [goalValueSheetType, setGoalValueSheetType] = useState<GoalType | null>(
+    null,
+  );
   // 자식 시트(운동 종류의 "직접 입력")에서 뜬 키보드로 이 시트까지 펼쳐지면
   // 자식을 닫은 뒤 부모 높이가 바뀌어 있게 된다 — 자식이 열려 있는 동안은
   // 키보드에 반응하지 않는다.
   const isChildSheetVisible =
-    isWorkoutTypeSheetVisible || isTimeSheetVisible || isIntensitySheetVisible;
+    isWorkoutTypeSheetVisible ||
+    isTimeSheetVisible ||
+    isIntensitySheetVisible ||
+    goalValueSheetType !== null;
   const scrollRef = useRef<ScrollView>(null);
   const sheetRef = useRef<BottomSheetHandle>(null);
 
@@ -152,6 +167,28 @@ export function WorkoutPlanEditSheet({
             setIsIntensitySheetVisible(false);
           }}
           value={draft.intensity}
+          visible
+        />
+      )}
+      {goalValueSheetType && (
+        <MeasureValueBottomSheet
+          embedded
+          maximum={GOAL_CONFIG[goalValueSheetType].maximum}
+          minimum={GOAL_CONFIG[goalValueSheetType].minimum}
+          onClose={() => setGoalValueSheetType(null)}
+          onConfirm={(goalValue) => {
+            setDraft((current) => ({
+              ...current,
+              goalValues: {
+                ...current.goalValues,
+                [goalValueSheetType]: goalValue,
+              },
+            }));
+            setGoalValueSheetType(null);
+          }}
+          title={GOAL_CONFIG[goalValueSheetType].label}
+          type={goalValueSheetType}
+          value={draft.goalValues[goalValueSheetType]}
           visible
         />
       )}
@@ -264,6 +301,11 @@ export function WorkoutPlanEditSheet({
                       [type]: goalValue,
                     },
                   }))
+                }
+                onPressValue={
+                  enableGoalValuePicker
+                    ? () => setGoalValueSheetType(type)
+                    : undefined
                 }
                 type={type}
                 value={draft.goalValues[type]}
