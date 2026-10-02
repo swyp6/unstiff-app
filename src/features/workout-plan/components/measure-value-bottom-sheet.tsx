@@ -11,82 +11,101 @@ import { PickerColumn } from "./time-picker-bottom-sheet";
 
 type PickerItem = { label: string; value: string };
 
-function buildItems(
-  min: number,
-  max: number,
-  format?: (value: number) => string,
-): PickerItem[] {
-  return Array.from({ length: max - min + 1 }, (_, index) => {
-    const value = min + index;
-    return {
-      label: format ? format(value) : String(value),
-      value: String(value),
-    };
-  });
-}
-
-const formatMinute = (value: number) => String(value).padStart(2, "0");
-const MINUTE_ITEMS = buildItems(0, 59, formatMinute);
-const DECIMAL_ITEMS = buildItems(0, 9);
-
-// 각 타입의 "휠 1개당 어떤 값"과 "그 옆에 붙는 단위 글자"를 정의한다 — 시간은
-// 시/분, 거리는 정수km/소수, 횟수·세트는 컬럼 하나만 쓴다. 휠 범위는 호출부가
-// 넘긴 minimum/maximum으로 만든다(어느 설정을 쓸지는 호출부가 정한다).
-function buildLayout(type: GoalType, minimum: number, maximum: number) {
-  if (type === "time") {
-    return {
-      majorItems: buildItems(0, Math.floor(maximum / 60)),
-      majorUnit: "시간",
-      minorItems: MINUTE_ITEMS,
-      minorUnit: "분",
-      // 최대값(예: 600분=10시간)까지만 노출한다 — 마지막 시간대에서는 분도
-      // 최대값의 나머지(00분)까지만 고를 수 있다.
-      maxHourMinuteItems: buildItems(0, maximum % 60, formatMinute),
-    };
+// 값을 정수 "칸"(tick)으로 바꿔 다룬다 — 시간은 1분, 거리는 0.1km, 횟수·세트는
+// 1이 한 칸이다. 시간·거리는 큰 단위(60분=1시간, 10칸=1km)를 기준으로 두
+// 컬럼(시/분, 정수/소수)에 나누고, 횟수·세트는 컬럼 하나만 쓴다.
+const TYPE_LAYOUT: Record<
+  GoalType,
+  {
+    ticksPerUnit: number;
+    ticksPerMajor?: number;
+    majorUnit: string;
+    minorUnit?: string;
+    formatMinor?: (value: number) => string;
   }
-  if (type === "distance") {
-    return {
-      majorItems: buildItems(0, Math.trunc(maximum)),
-      majorUnit: ".",
-      minorItems: DECIMAL_ITEMS,
-      minorUnit: "km",
-    };
-  }
+> = {
+  time: {
+    ticksPerUnit: 1,
+    ticksPerMajor: 60,
+    majorUnit: "시간",
+    minorUnit: "분",
+    formatMinor: (value) => String(value).padStart(2, "0"),
+  },
+  distance: {
+    ticksPerUnit: 10,
+    ticksPerMajor: 10,
+    majorUnit: ".",
+    minorUnit: "km",
+  },
+  reps: { ticksPerUnit: 1, majorUnit: "회" },
+  sets: { ticksPerUnit: 1, majorUnit: "세트" },
+};
+
+type TickRange = { first: number; last: number; step: number };
+
+// 휠에는 저장 가능한 값(minimum~maximum 안의 step 배수)만 노출한다 — 고른
+// 값을 선택 완료 때 다른 값으로 바꾸지 않기 위해서다.
+function getTickRange(
+  type: GoalType,
+  minimum: number,
+  maximum: number,
+  step: number,
+): TickRange {
+  const { ticksPerUnit } = TYPE_LAYOUT[type];
+  const stepTicks = Math.round(step * ticksPerUnit);
   return {
-    majorItems: buildItems(minimum, maximum),
-    majorUnit: type === "reps" ? "회" : "세트",
+    first:
+      Math.ceil(Math.round(minimum * ticksPerUnit) / stepTicks) * stepTicks,
+    last:
+      Math.floor(Math.round(maximum * ticksPerUnit) / stepTicks) * stepTicks,
+    step: stepTicks,
   };
 }
 
-function toMajorMinor(type: GoalType, rawValue: number, maximum: number) {
-  // 휠에 없는 값(최대값 초과)으로 시작하면 보이는 칸과 state가 어긋나므로
-  // 휠이 가진 최대값에 맞춰 시작한다.
-  const value = Math.min(maximum, rawValue);
-  if (type === "time") {
-    return { major: Math.floor(value / 60), minor: value % 60 };
-  }
-  if (type === "distance") {
-    const integer = Math.trunc(value);
-    const decimal = Math.round((value - Math.trunc(value)) * 10) % 10;
-    return { major: integer, minor: decimal };
-  }
-  return { major: Math.round(value), minor: 0 };
+function rangeValues(from: number, to: number, step: number) {
+  const values: number[] = [];
+  for (let value = from; value <= to; value += step) values.push(value);
+  return values;
 }
 
-function fromMajorMinor(
-  type: GoalType,
-  major: number,
-  minor: number,
-  range: { minimum: number; maximum: number },
-) {
-  if (type === "time") {
-    return Math.max(range.minimum, Math.min(range.maximum, major * 60 + minor));
-  }
-  if (type === "distance") {
-    const combined = Number((major + minor / 10).toFixed(1));
-    return Math.max(range.minimum, Math.min(range.maximum, combined));
-  }
-  return Math.max(range.minimum, Math.min(range.maximum, major));
+function toItems(values: number[], format: (value: number) => string = String) {
+  return values.map((value): PickerItem => ({
+    label: format(value),
+    value: String(value),
+  }));
+}
+
+// 큰 단위 하나(예: 0시간)에서 고를 수 있는 작은 단위 값들 — 범위 끝에 걸친
+// 시간대는 일부만 남는다(계획 시간 0시간 → 05~55분, 10시간 → 00분).
+function getMinorValues(major: number, perMajor: number, range: TickRange) {
+  const low = Math.max(range.first, major * perMajor);
+  const high = Math.min(range.last, major * perMajor + perMajor - 1);
+  return rangeValues(
+    Math.ceil(low / range.step) * range.step,
+    high,
+    range.step,
+  ).map((tick) => tick - major * perMajor);
+}
+
+function nearest(values: number[], target: number) {
+  return values.reduce((best, value) =>
+    Math.abs(value - target) < Math.abs(best - target) ? value : best,
+  );
+}
+
+// 휠은 저장 가능한 값만 가지므로, 그 밖의 값(최대값 초과 또는 step에 안
+// 맞는 값)으로 열리면 가장 가까운 칸에서 시작한다. 이건 시작 위치일 뿐이라
+// 닫으면 원래 값이 그대로 남고, 선택 완료를 눌러야만 보이는 값으로 바뀐다.
+function toInitialTick(type: GoalType, value: number, range: TickRange) {
+  const tick = Math.round(
+    Math.round(value * TYPE_LAYOUT[type].ticksPerUnit) / range.step,
+  );
+  return Math.min(range.last, Math.max(range.first, tick * range.step));
+}
+
+function fromTick(type: GoalType, tick: number) {
+  const value = tick / TYPE_LAYOUT[type].ticksPerUnit;
+  return type === "distance" ? Number(value.toFixed(1)) : value;
 }
 
 const PICKER_HEIGHT = 200;
@@ -94,10 +113,11 @@ const PICKER_HEIGHT = 200;
 type MeasureValueBottomSheetProps = {
   type: GoalType;
   title: string;
-  // 휠 범위이자 선택 완료 시 clamp 범위 — 실제 기록은 ACTUAL_MEASURE_CONFIG,
-  // 계획 목표는 GOAL_CONFIG에서 호출부가 골라 넘긴다.
+  // 휠에 노출할 값의 범위와 간격 — 실제 기록은 ACTUAL_MEASURE_CONFIG, 계획
+  // 목표는 GOAL_CONFIG에서 호출부가 골라 넘긴다.
   minimum: number;
   maximum: number;
+  step: number;
   visible: boolean;
   embedded?: boolean;
   embeddedBottomInset?: number;
@@ -115,6 +135,7 @@ export function MeasureValueBottomSheet({
   title,
   minimum,
   maximum,
+  step,
   visible,
   embedded = false,
   embeddedBottomInset,
@@ -122,15 +143,35 @@ export function MeasureValueBottomSheet({
   onClose,
   onConfirm,
 }: MeasureValueBottomSheetProps) {
-  const layout = useMemo(
-    () => buildLayout(type, minimum, maximum),
-    [type, minimum, maximum],
+  const layout = TYPE_LAYOUT[type];
+  const perMajor = layout.ticksPerMajor;
+  const range = useMemo(
+    () => getTickRange(type, minimum, maximum, step),
+    [type, minimum, maximum, step],
   );
-  const maxHour = Math.floor(maximum / 60);
-  const initial = toMajorMinor(type, value, maximum);
-  const [major, setMajor] = useState(initial.major);
-  const [minor, setMinor] = useState(initial.minor);
-  const isMaxHour = type === "time" && major === maxHour;
+  const [tick, setTick] = useState(() => toInitialTick(type, value, range));
+  const major = perMajor ? Math.floor(tick / perMajor) : tick;
+  const minor = perMajor ? tick % perMajor : 0;
+  const majorItems = useMemo(
+    () =>
+      perMajor
+        ? toItems(
+            rangeValues(
+              Math.floor(range.first / perMajor),
+              Math.floor(range.last / perMajor),
+              1,
+            ),
+          )
+        : toItems(rangeValues(range.first, range.last, range.step)),
+    [perMajor, range],
+  );
+  const minorItems = useMemo(
+    () =>
+      perMajor
+        ? toItems(getMinorValues(major, perMajor, range), layout.formatMinor)
+        : undefined,
+    [major, perMajor, range, layout.formatMinor],
+  );
 
   return (
     <BottomSheet
@@ -145,14 +186,25 @@ export function MeasureValueBottomSheet({
         <View style={styles.row}>
           <PickerColumn
             columnStyle={styles.column}
-            items={layout.majorItems}
+            items={majorItems}
             loop={false}
             onChange={(next) => {
               const nextMajor = Number(next);
-              setMajor(nextMajor);
-              // 마지막 시간대로 바뀌면 분 휠에 00만 남는다 — 이전 분(예: 30)이
-              // 화면에 없는 채로 state에 남지 않게 함께 00으로 맞춘다.
-              if (type === "time" && nextMajor === maxHour) setMinor(0);
+              if (!perMajor) {
+                setTick(nextMajor);
+                return;
+              }
+              // 시간대가 바뀌어 지금 분이 새 목록에 없으면(예: 1시간 00분 →
+              // 0시간, 0시간엔 05분부터) 가장 가까운 칸으로 옮긴다 — 화면에
+              // 없는 분이 state에 남지 않게 한다.
+              setTick((current) => {
+                const minors = getMinorValues(nextMajor, perMajor, range);
+                const currentMinor = current % perMajor;
+                const nextMinor = minors.includes(currentMinor)
+                  ? currentMinor
+                  : nearest(minors, currentMinor);
+                return nextMajor * perMajor + nextMinor;
+              });
             }}
             selected={String(major)}
           />
@@ -161,20 +213,22 @@ export function MeasureValueBottomSheet({
               {layout.majorUnit}
             </ThemedText>
           </View>
-          {layout.minorItems && (
+          {perMajor !== undefined && minorItems && (
             <>
               <PickerColumn
                 columnStyle={styles.column}
-                items={
-                  isMaxHour && layout.maxHourMinuteItems
-                    ? layout.maxHourMinuteItems
-                    : layout.minorItems
-                }
+                items={minorItems}
                 // PickerColumn은 마운트 이후 selected를 다시 읽지 않는다 —
-                // 분 목록이 바뀔 때 다시 마운트해 00 위치에서 시작하게 한다.
-                key={isMaxHour ? "max-hour" : "default"}
+                // 목록이 바뀔 때(범위 끝 시간대 진입/이탈) 다시 마운트해 옮긴
+                // 칸에서 시작하게 한다. 목록은 연속 구간이라 첫 값+길이로 구분된다.
+                key={`${minorItems[0]?.value}-${minorItems.length}`}
                 loop={false}
-                onChange={(next) => setMinor(Number(next))}
+                onChange={(next) =>
+                  setTick(
+                    (current) =>
+                      Math.floor(current / perMajor) * perMajor + Number(next),
+                  )
+                }
                 selected={String(minor)}
               />
               <View pointerEvents="none" style={styles.unit}>
@@ -193,9 +247,8 @@ export function MeasureValueBottomSheet({
       <View style={styles.confirmButtonWrapper}>
         <ActionButton
           label="선택 완료"
-          onPress={() =>
-            onConfirm(fromMajorMinor(type, major, minor, { minimum, maximum }))
-          }
+          // 휠에는 저장 가능한 값만 있으므로 보이는 값이 그대로 전달된다.
+          onPress={() => onConfirm(fromTick(type, tick))}
         />
       </View>
     </BottomSheet>

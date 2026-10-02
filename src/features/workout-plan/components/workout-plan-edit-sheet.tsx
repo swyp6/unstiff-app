@@ -186,6 +186,7 @@ export function WorkoutPlanEditSheet({
             }));
             setGoalValueSheetType(null);
           }}
+          step={GOAL_CONFIG[goalValueSheetType].step}
           title={GOAL_CONFIG[goalValueSheetType].label}
           type={goalValueSheetType}
           value={draft.goalValues[goalValueSheetType]}

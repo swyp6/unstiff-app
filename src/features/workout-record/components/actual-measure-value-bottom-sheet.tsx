@@ -14,7 +14,8 @@ type ActualMeasureValueBottomSheetProps = {
 };
 
 // 실제 시간/거리/횟수/세트 직접 입력 — 휠 UI는 계획 목표 입력과 공유하고,
-// 범위·제목만 실제 수행값 전용(ACTUAL_MEASURE_CONFIG, "실제 ○○")으로 넘긴다.
+// 범위·간격·제목만 실제 수행값 전용(ACTUAL_MEASURE_CONFIG, "실제 ○○")으로
+// 넘긴다.
 export function ActualMeasureValueBottomSheet({
   type,
   ...props
@@ -25,6 +26,7 @@ export function ActualMeasureValueBottomSheet({
       {...props}
       maximum={config.maximum}
       minimum={config.minimum}
+      step={config.step}
       title={`실제 ${config.label}`}
       type={type}
     />
