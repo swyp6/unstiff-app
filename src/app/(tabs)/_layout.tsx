@@ -5,6 +5,7 @@ import AppTabs from "@/components/app-tabs";
 import { setAnalyticsUserId } from "@/features/analytics/analytics";
 import { getMyProfile, hasUnagreedRequiredTerms } from "@/features/auth/api";
 import type { UserProfile } from "@/features/auth/types";
+import { setCrashUserId } from "@/features/crash-reporting/crash-reporting";
 import { useAuthStore } from "@/store/auth-store";
 import { useOnboardingStore } from "@/store/onboarding-store";
 import { useSignupStore } from "@/store/signup-store";
@@ -82,6 +83,7 @@ export default function TabsLayout() {
       }
       try {
         await setAnalyticsUserId(String(profile.id));
+        await setCrashUserId(String(profile.id));
       } catch {}
     })
       .then((result) => {

@@ -21,6 +21,7 @@ import {
   signIn,
 } from "@/features/auth/api";
 import type { OAuth2SignInResponse } from "@/features/auth/types";
+import { setCrashUserId } from "@/features/crash-reporting/crash-reporting";
 import { useAuthStore } from "@/store/auth-store";
 import { useSignupStore } from "@/store/signup-store";
 
@@ -51,6 +52,7 @@ async function routeAfterSignIn(
   try {
     const profile = await getMyProfile();
     await setAnalyticsUserId(String(profile.id));
+    await setCrashUserId(String(profile.id));
   } catch {}
 
   logEvent(newUser ? "sign_up" : "login", { method });
