@@ -1,4 +1,5 @@
 import "@/global.css";
+import "@/features/crash-reporting/crash-reporting";
 
 import { useFonts } from "expo-font";
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
@@ -9,6 +10,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
+import { ErrorBoundary } from "@/features/crash-reporting/error-boundary";
 import { useScreenTracking } from "@/features/analytics/use-screen-tracking";
 import { useNotificationLanding } from "@/features/notifications/use-notification-landing";
 import { useRegisterPushToken } from "@/features/notifications/use-register-push-token";
@@ -53,41 +55,43 @@ export default function RootLayout() {
               내려가면 여기 값으로 돌아온다. */}
           <StatusBar style="dark" />
           <AnimatedSplashOverlay />
-          <Stack screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="index" />
-            <Stack.Screen name="(tabs)" />
-            <Stack.Screen name="splash" />
-            <Stack.Screen name="onboarding" />
-            <Stack.Screen name="login" />
-            <Stack.Screen name="terms-agreement" />
-            <Stack.Screen name="terms-document/[type]" />
-            <Stack.Screen
-              name="camera"
-              options={{ presentation: "fullScreenModal" }}
-            />
-            {/* record-target(3642)은 root route가 아니다 — Figma에 Native
-                TabBar가 보여서 (tabs)/capture/target.tsx로 그 탭의 nested
-                stack 안에 있다(capture/_layout.tsx 참고). record-editor/
-                record-complete는 Figma에 탭바가 없어 root fullScreenModal로
-                남는다. */}
-            <Stack.Screen
-              name="record-editor"
-              options={{ presentation: "fullScreenModal" }}
-            />
-            <Stack.Screen
-              name="record-complete"
-              options={{ presentation: "fullScreenModal" }}
-            />
-            <Stack.Screen
-              name="day-record"
-              options={{ presentation: "fullScreenModal" }}
-            />
-            <Stack.Screen
-              name="badge-earned"
-              options={{ presentation: "fullScreenModal" }}
-            />
-            <Stack.Screen name="test" />
-          </Stack>
+          <ErrorBoundary>
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="splash" />
+              <Stack.Screen name="onboarding" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="terms-agreement" />
+              <Stack.Screen name="terms-document/[type]" />
+              <Stack.Screen
+                name="camera"
+                options={{ presentation: "fullScreenModal" }}
+              />
+              {/* record-target(3642)은 root route가 아니다 — Figma에 Native
+                  TabBar가 보여서 (tabs)/capture/target.tsx로 그 탭의 nested
+                  stack 안에 있다(capture/_layout.tsx 참고). record-editor/
+                  record-complete는 Figma에 탭바가 없어 root fullScreenModal로
+                  남는다. */}
+              <Stack.Screen
+                name="record-editor"
+                options={{ presentation: "fullScreenModal" }}
+              />
+              <Stack.Screen
+                name="record-complete"
+                options={{ presentation: "fullScreenModal" }}
+              />
+              <Stack.Screen
+                name="day-record"
+                options={{ presentation: "fullScreenModal" }}
+              />
+              <Stack.Screen
+                name="badge-earned"
+                options={{ presentation: "fullScreenModal" }}
+              />
+              <Stack.Screen name="test" />
+            </Stack>
+          </ErrorBoundary>
         </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

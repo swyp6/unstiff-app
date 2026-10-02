@@ -1,4 +1,5 @@
-import { ScrollView, View } from "react-native";
+import { crash, getCrashlytics } from "@react-native-firebase/crashlytics";
+import { Pressable, ScrollView, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { ThemedText } from "@/components/themed-text";
@@ -108,6 +109,22 @@ export default function TestScreen() {
             </View>
           ))}
         </View>
+
+        <SectionTitle>Crashlytics</SectionTitle>
+        {/* __DEV__에선 crash-reporting.ts가 수집을 꺼두므로, 실제 리포트
+            확인은 release/프로덕션 빌드에서 눌러야 한다. */}
+        <Pressable
+          onPress={() => crash(getCrashlytics())}
+          style={{
+            alignSelf: "flex-start",
+            paddingVertical: 10,
+            paddingHorizontal: 16,
+            borderRadius: radius.default,
+            backgroundColor: semanticColors["primary-normal"],
+          }}
+        >
+          <ThemedText style={{ color: "#fff" }}>강제 크래시 발생</ThemedText>
+        </Pressable>
       </ScrollView>
     </SafeAreaView>
   );
