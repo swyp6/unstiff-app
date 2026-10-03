@@ -116,6 +116,14 @@ const config: ExpoConfig = {
             "https://devrepo.kakao.com/nexus/content/groups/public/",
           ],
         },
+        ios: {
+          // FirebaseCrashlytics/FirebaseSessions(Swift pod)가 GoogleDataTransport/nanopb를
+          // 모듈로 정의하지 않아 static 링크 시 pod install이 실패함 — modular_headers로 해결
+          extraPods: [
+            { name: "GoogleDataTransport", modular_headers: true },
+            { name: "nanopb", modular_headers: true },
+          ],
+        },
       },
     ],
 
