@@ -91,6 +91,7 @@ import {
   type RecordPhotoFile,
   submitRecordPhoto,
 } from "@/features/workout-record/submit-record-photo";
+import { useCurrentDateKey } from "@/hooks/use-current-date-key";
 
 // Figma 홈 화면 바탕(surface/background #fafafa, node 4305:33601). Screen의
 // 기본 배경(background-normal #ffffff)과 같으면 흰색 카드·"운동 추가하기"
@@ -320,12 +321,22 @@ export default function HomeScreen() {
     setMissionArrivalLabel(formatOfferArrivalLabel(response.offerTime));
   }
 
-  // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
+  // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번, 그리고
+  // 앱을 켜둔 채 자정을 넘기거나 자정 이후 foreground로 돌아와 날짜 key가
+  // 바뀔 때마다 다시 불러온다(서버가 요청 시점 날짜로 미션을 정한다). 날짜가
+  // 바뀌기 전에 보낸 요청이 늦게 도착해 새 날짜 응답을 덮어쓰지 않게 막는다.
+  const todayDateKey = useCurrentDateKey();
   useEffect(() => {
+    let cancelled = false;
     getDailyMission()
-      .then(applyMissionResponse)
+      .then((response) => {
+        if (!cancelled) applyMissionResponse(response);
+      })
       .catch((error) => console.error("Failed to load daily mission", error));
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [todayDateKey]);
 
   async function handleMissionReveal() {
     trackClick("home", "mission_reveal");
@@ -652,6 +663,38 @@ export default function HomeScreen() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(
     () => new Date(),
   );
+
+  // 자정 rollover(todayDateKey 변경) 직후 화면을 새 오늘 기준으로 맞춘다.
+  // effect가 아니라 렌더 중에 직전 key와 비교해 바로 조정해야(React의 "값이
+  // 바뀔 때 state 조정" 패턴) 날짜가 바뀐 첫 화면부터 전날 미션 CTA가 그려지지
+  // 않는다. 같은 날 foreground 복귀로는 todayDateKey가 안 바뀌어 여기 안 온다.
+  const [rolloverDateKey, setRolloverDateKey] = useState(todayDateKey);
+  if (rolloverDateKey !== todayDateKey) {
+    setRolloverDateKey(todayDateKey);
+    // 전날의 "오늘"을 보고 있었다면 새 오늘로 따라가고(캘린더 달도 그 달을
+    // 보고 있었을 때만 함께 넘긴다), 다른 날짜를 골라 보고 있었다면 그대로 둔다.
+    // todayDateKey는 서버(Asia/Seoul) 기준이고 캘린더는 기기 로컬 날짜라,
+    // 기기 timezone이 한국과 같을 때 두 날짜가 일치한다.
+    if (toDateKey(selectedCalendarDate) === rolloverDateKey) {
+      const previousToday = selectedCalendarDate;
+      const newToday = new Date();
+      setSelectedCalendarDate(newToday);
+      setViewedMonth((current) =>
+        current.getFullYear() === previousToday.getFullYear() &&
+        current.getMonth() === previousToday.getMonth()
+          ? new Date(newToday.getFullYear(), newToday.getMonth(), 1)
+          : current,
+      );
+    }
+    // 새 날짜의 GET /missions/daily 응답(위 effect)이 올 때까지 전날
+    // missionId/CTA가 눌리지 않게, 첫 조회 전과 같은 초기 상태로 되돌린다 —
+    // missionId가 null이면 수락/닫기/기록 열기/신고가 모두 막힌다.
+    setMissionId(null);
+    setMissionStatus("scheduled");
+    setMissionTitle("");
+    setMissionDescription("");
+    setMissionArrivalLabel("");
+  }
   const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
     useState(false);
   // "사진 촬영"으로 찍은 사진을 업로드하는 동안 — 시스템 카메라가 닫힌 뒤
