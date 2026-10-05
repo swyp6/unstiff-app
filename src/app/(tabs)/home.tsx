@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   Platform,
   Pressable,
   ScrollView,
@@ -91,6 +92,11 @@ import {
   type RecordPhotoFile,
   submitRecordPhoto,
 } from "@/features/workout-record/submit-record-photo";
+import {
+  getServerDateKey,
+  useLocalDateKey,
+  useServerDateKey,
+} from "@/hooks/use-current-date-key";
 
 // Figma 홈 화면 바탕(surface/background #fafafa, node 4305:33601). Screen의
 // 기본 배경(background-normal #ffffff)과 같으면 흰색 카드·"운동 추가하기"
@@ -114,6 +120,9 @@ const DAILY_MISSION_STATUS_MAP: Record<
 // createTodayWorkoutInstance receives (see addSavedPlanToDate/
 // loadWorkoutsForDate). Never sent as a PLAN refId — see buildRecordTarget.
 const MISSION_PLAN_ITEM_ID = "daily-mission";
+// 자정 직후 서버가 아직 전날 미션을 돌려줬을 때 한 번 더 조회하기까지의 대기.
+// 몇 초 수준의 기기/서버 시계 차이만 흡수하려는 값이다.
+const STALE_MISSION_RETRY_DELAY_MS = 2000;
 
 // GET /api/v1/workouts?date=(운동 기록 조회) 응답을 그대로 매핑한다 — 미션인지
 // (refType === "MISSION") 여부까지 서버가 내려주므로 로컬에서 따로 추적할
@@ -312,20 +321,139 @@ export default function HomeScreen() {
     useMissionFeedbackStore.getState().clearFeedback();
   }
 
+  // 미션 응답은 서버 기준 "지금 오늘"의 미션(missionDate)일 때만 반영한다 —
+  // 자정 직전에 보낸 요청(조회/미리받기/수락/닫기/재조회)의 응답이 자정 이후
+  // 도착하면 전날 미션이라 버린다. 그 사이 아래 rollover가 이미 상태를 비우고
+  // 새 날짜로 다시 조회한다. 반영했으면 true — 오늘 미션이 반영됐으니 남아
+  // 있던 재조회 예약(실패 기록·stale 재시도)도 함께 지운다.
   function applyMissionResponse(response: DailyMissionResponse) {
+    if (response.missionDate !== getServerDateKey()) return false;
+    failedMissionDateKeyRef.current = null;
+    if (staleMissionRetryTimerRef.current) {
+      clearTimeout(staleMissionRetryTimerRef.current);
+      staleMissionRetryTimerRef.current = null;
+    }
     setMissionId(response.missionId);
     setMissionStatus(DAILY_MISSION_STATUS_MAP[response.status]);
     setMissionTitle(response.title ?? "");
     setMissionDescription(response.description ?? "");
     setMissionArrivalLabel(formatOfferArrivalLabel(response.offerTime));
+    return true;
   }
 
-  // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번 불러온다.
+  // loadDailyMission이 실패했거나 서버가 아직 전날 미션을 돌려준 (서버 기준)
+  // 날짜. rollover로 상태를 비운 뒤 조회가 실패하면 같은 날엔 missionDateKey가
+  // 안 바뀌어 다시 조회할 계기가 없으므로, 아래 foreground 복귀 때 이 날짜가
+  // 여전히 오늘이면 한 번 더 조회한다.
+  const failedMissionDateKeyRef = useRef<string | null>(null);
+  // 기기 시계가 서버보다 조금 빨라 자정 직후 조회에 서버가 아직 전날 미션을
+  // 돌려줬을 때, 화면을 계속 보고 있으면 foreground 복귀가 없어 빈 미션
+  // 카드가 남는다 — 그 경우에만 잠깐 뒤 한 번 더 조회한다(clock skew 흡수).
+  const staleMissionRetryTimerRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
+
+  function loadDailyMission() {
+    const requestDateKey = getServerDateKey();
+    failedMissionDateKeyRef.current = null;
+    // 새 조회가 시작되면 앞선 stale 재시도 예약은 필요 없다.
+    if (staleMissionRetryTimerRef.current) {
+      clearTimeout(staleMissionRetryTimerRef.current);
+      staleMissionRetryTimerRef.current = null;
+    }
+    // 자정을 넘겨 버려진 이전 날짜 요청은 실패로 남기지 않는다 — 새 날짜는
+    // rollover가 따로 조회한다.
+    const markFailed = () => {
+      if (requestDateKey === getServerDateKey()) {
+        failedMissionDateKeyRef.current = requestDateKey;
+      }
+    };
+    // onServerBehind는 첫 조회에만 넘겨 재시도가 한 번으로 끝나게 한다(자기
+    // 자신을 다시 부르는 재귀는 React Compiler가 컴포넌트 최적화를 포기한다).
+    const requestDailyMission = (onServerBehind?: () => void) =>
+      getDailyMission()
+        .then((response) => {
+          if (applyMissionResponse(response)) return;
+          markFailed();
+          // 요청한 날짜가 여전히 오늘인데 서버가 그보다 이전 날짜(YYYY-MM-DD
+          // 문자열 비교)를 돌려줬다면 서버 시계가 아직 자정 전이다. 네트워크
+          // 오류는 대상이 아니다.
+          if (
+            requestDateKey === getServerDateKey() &&
+            response.missionDate < requestDateKey
+          ) {
+            onServerBehind?.();
+          }
+        })
+        .catch((error) => {
+          console.error("Failed to load daily mission", error);
+          markFailed();
+        });
+
+    requestDailyMission(() => {
+      staleMissionRetryTimerRef.current = setTimeout(() => {
+        staleMissionRetryTimerRef.current = null;
+        // 그 사이 날짜가 또 바뀌었거나 오늘 미션이 반영됐으면(실패 기록이
+        // 지워짐) 건너뛴다.
+        if (
+          failedMissionDateKeyRef.current === requestDateKey &&
+          getServerDateKey() === requestDateKey
+        ) {
+          failedMissionDateKeyRef.current = null;
+          requestDailyMission();
+        }
+      }, STALE_MISSION_RETRY_DELAY_MS);
+    });
+  }
+
+  // GET /api/v1/missions/daily — 오늘의 미션 조회. 마운트 시 한 번, 그리고
+  // 앱을 켜둔 채 서버 기준(Asia/Seoul) 자정을 넘기거나 자정 이후 foreground로
+  // 돌아와 날짜 key가 바뀔 때마다 다시 불러온다.
+  const missionDateKey = useServerDateKey();
   useEffect(() => {
-    getDailyMission()
-      .then(applyMissionResponse)
-      .catch((error) => console.error("Failed to load daily mission", error));
+    loadDailyMission();
+    // loadDailyMission은 ref·setter·모듈 함수만 써서 어느 렌더의 것이든 같게
+    // 동작한다 — 날짜 key가 바뀔 때만 다시 실행되면 된다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missionDateKey]);
+
+  // 위 조회가 실패한 날에만 foreground 복귀 때 다시 시도한다 — 성공한 날엔
+  // 아무것도 하지 않으므로 같은 날 복귀마다 재조회하지 않고, 복귀 한 번에
+  // 한 번만 시도하므로 polling이 되지 않는다.
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      if (
+        nextState === "active" &&
+        failedMissionDateKeyRef.current === getServerDateKey()
+      ) {
+        loadDailyMission();
+      }
+    });
+    return () => {
+      subscription.remove();
+      if (staleMissionRetryTimerRef.current) {
+        clearTimeout(staleMissionRetryTimerRef.current);
+      }
+    };
+    // 위 effect와 같은 이유로 첫 렌더의 loadDailyMission을 붙잡아도 안전하다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 서버 날짜가 바뀌면(KST 자정) 새 날짜의 조회 응답이 올 때까지 전날
+  // missionId/CTA가 눌리지 않게, 첫 조회 전과 같은 초기 상태로 되돌린다 —
+  // missionId가 null이면 수락/닫기/기록 열기/신고가 모두 막힌다. effect가
+  // 아니라 렌더 중에 직전 key와 비교해 바로 조정해야(React의 "값이 바뀔 때
+  // state 조정" 패턴) 날짜가 바뀐 첫 화면부터 전날 CTA가 그려지지 않는다.
+  const [rolloverMissionDateKey, setRolloverMissionDateKey] =
+    useState(missionDateKey);
+  if (rolloverMissionDateKey !== missionDateKey) {
+    setRolloverMissionDateKey(missionDateKey);
+    setMissionId(null);
+    setMissionStatus("scheduled");
+    setMissionTitle("");
+    setMissionDescription("");
+    setMissionArrivalLabel("");
+  }
 
   async function handleMissionReveal() {
     trackClick("home", "mission_reveal");
@@ -652,6 +780,29 @@ export default function HomeScreen() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(
     () => new Date(),
   );
+
+  // 기기 로컬 날짜가 바뀌면(로컬 자정) 캘린더 선택 날짜를 새 오늘로 맞춘다 —
+  // 캘린더는 로컬 날짜로 그리므로 미션(서버 KST 기준) rollover와 따로 감지한다.
+  // 직전 로컬 "오늘"을 보고 있었다면 새 오늘로 따라가고(캘린더 달도 그 달을
+  // 보고 있었을 때만 함께 넘긴다), 다른 날짜를 골라 보고 있었다면 그대로 둔다.
+  // 미션 rollover와 같은 이유로 렌더 중에 조정한다.
+  const localDateKey = useLocalDateKey();
+  const [rolloverLocalDateKey, setRolloverLocalDateKey] =
+    useState(localDateKey);
+  if (rolloverLocalDateKey !== localDateKey) {
+    setRolloverLocalDateKey(localDateKey);
+    if (toDateKey(selectedCalendarDate) === rolloverLocalDateKey) {
+      const previousToday = selectedCalendarDate;
+      const newToday = new Date();
+      setSelectedCalendarDate(newToday);
+      setViewedMonth((current) =>
+        current.getFullYear() === previousToday.getFullYear() &&
+        current.getMonth() === previousToday.getMonth()
+          ? new Date(newToday.getFullYear(), newToday.getMonth(), 1)
+          : current,
+      );
+    }
+  }
   const [isRecordMethodModalVisible, setIsRecordMethodModalVisible] =
     useState(false);
   // "사진 촬영"으로 찍은 사진을 업로드하는 동안 — 시스템 카메라가 닫힌 뒤
